@@ -1,0 +1,53 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model ProductImage {
+  id        Int      @id @default(autoincrement())
+  sku       String   @db.VarChar(7)
+  filename  String   @db.VarChar(255)
+  position  Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([sku])
+  @@map("product_images")
+}
+
+model ProductDescription {
+  id          Int      @id @default(autoincrement())
+  sku         String   @unique @db.VarChar(7)
+  description String   @db.Text
+  updatedAt   DateTime @updatedAt
+
+  @@map("product_descriptions")
+}
+
+model Setting {
+  id    Int    @id @default(autoincrement())
+  key   String @unique @db.VarChar(50)
+  value String @db.VarChar(255)
+
+  @@map("settings")
+}
+
+model HiddenCategory {
+  id         Int    @id @default(autoincrement())
+  categoryId String @unique @db.VarChar(4)
+
+  @@map("hidden_categories")
+}
+
+model User {
+  id           Int      @id @default(autoincrement())
+  username     String   @unique @db.VarChar(50)
+  passwordHash String   @db.VarChar(255)
+  role         String   @default("customer") @db.VarChar(20)
+  createdAt    DateTime @default(now())
+
+  @@map("users")
+}
