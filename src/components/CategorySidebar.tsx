@@ -9,9 +9,8 @@ export default function CategorySidebar({
 }: {
   activeId?: string;
 }) {
-  const { categories } = useCategories();
+  const { categories, filter, setFilter } = useCategories();
   const [open, setOpen] = useState(false);
-  const [filter, setFilter] = useState("");
 
   useEffect(() => {
     if (open) {
@@ -45,7 +44,7 @@ export default function CategorySidebar({
       <li>
         <Link
           href="/productos"
-          onClick={() => { setOpen(false); setFilter(""); }}
+          onClick={() => setOpen(false)}
           className={`block px-3 py-2 text-sm rounded-lg ${
             !activeId
               ? "bg-blue-50 text-blue-700 font-medium"
@@ -59,7 +58,7 @@ export default function CategorySidebar({
         <li key={cat.id}>
           <Link
             href={`/categoria/${cat.id}`}
-            onClick={() => { setOpen(false); setFilter(""); }}
+            onClick={() => setOpen(false)}
             className={`block px-3 py-2 text-sm rounded-lg ${
               activeId === cat.id
                 ? "bg-blue-50 text-blue-700 font-medium"
