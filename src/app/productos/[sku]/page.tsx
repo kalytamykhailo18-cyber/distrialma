@@ -107,6 +107,7 @@ export default function ProductDetailPage() {
         setMessage("Imagen eliminada");
         const data = await fetch(`/api/products/${sku}`).then((r) => r.json());
         setProduct(data);
+        setActiveImage(0);
       } else {
         setMessage("Error al eliminar imagen");
       }
@@ -160,7 +161,7 @@ export default function ProductDetailPage() {
           <div className="w-full h-72 bg-gray-100 rounded flex items-center justify-center overflow-hidden">
             {product.images.length > 0 ? (
               <img
-                src={product.images[0].url}
+                src={product.images[activeImage >= product.images.length ? 0 : activeImage]?.url}
                 alt={product.name}
                 className="max-h-full max-w-full object-contain"
               />
@@ -170,10 +171,13 @@ export default function ProductDetailPage() {
           </div>
           {((product.images.length > 1) || (isAdmin && product.images.length > 0)) && (
             <div className="flex gap-2 mt-3 flex-wrap">
-              {product.images.map((img) => (
+              {product.images.map((img, i) => (
                 <div
                   key={img.id}
-                  className="relative w-16 h-16 border rounded overflow-hidden group"
+                  className={`relative w-16 h-16 border-2 rounded overflow-hidden group cursor-pointer ${
+                    i === activeImage ? "border-blue-500" : "border-transparent"
+                  }`}
+                  onClick={() => setActiveImage(i)}
                 >
                   <img
                     src={img.url}
@@ -182,7 +186,10 @@ export default function ProductDetailPage() {
                   />
                   {isAdmin && (
                     <button
-                      onClick={() => handleDeleteImage(img.id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteImage(img.id);
+                      }}
                       disabled={deleting || uploading || saving}
                       className="absolute top-0 right-0 w-5 h-5 bg-red-600 text-white text-xs rounded-bl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-700 disabled:opacity-50"
                     >
