@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { formatPrice } from "@/lib/utils";
+import ConfirmModal from "@/components/ConfirmModal";
 import type { Product } from "@/types";
 
 export default function ProductDetailPage() {
@@ -23,6 +24,7 @@ export default function ProductDetailPage() {
   const [uploading, setUploading] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [message, setMessage] = useState("");
+  const [deleteImageId, setDeleteImageId] = useState<number | null>(null);
 
   useEffect(() => {
     fetch(`/api/products/${sku}`)
@@ -93,8 +95,7 @@ export default function ProductDetailPage() {
   }
 
   async function handleDeleteImage(imageId: number) {
-    if (!confirm("¿Eliminar esta imagen?")) return;
-
+    setDeleteImageId(null);
     setDeleting(true);
     setMessage("");
     try {
@@ -188,7 +189,7 @@ export default function ProductDetailPage() {
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleDeleteImage(img.id);
+                        setDeleteImageId(img.id);
                       }}
                       disabled={deleting || uploading || saving}
                       className="absolute top-0 right-0 w-5 h-5 bg-red-600 text-white text-xs rounded-bl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-700 disabled:opacity-50"
@@ -235,33 +236,60 @@ export default function ProductDetailPage() {
           </h1>
 
           <div className="space-y-3 mb-6">
-            {product.precioMayorista > 0 && (
-              <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
-                <span className="text-gray-700 font-medium">Mayorista</span>
-                <span className="text-xl font-bold text-green-700">
-                  {formatPrice(product.precioMayorista)}
-                </span>
-              </div>
-            )}
-            {product.precioCajaCerrada > 0 && (
-              <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
-                <span className="text-gray-700 font-medium">
-                  Caja Cerrada
-                </span>
-                <span className="text-xl font-bold text-blue-700">
-                  {formatPrice(product.precioCajaCerrada)}
-                </span>
-              </div>
-            )}
-            {product.precioEspecial !== undefined &&
-              product.precioEspecial > 0 && (
-                <div className="flex justify-between items-center p-3 bg-purple-50 rounded-lg">
-                  <span className="text-gray-700 font-medium">Especial</span>
-                  <span className="text-xl font-bold text-purple-700">
-                    {formatPrice(product.precioEspecial)}
-                  </span>
-                </div>
-              )}
+            {(() => {
+              const isKg = product.unit === "KG";
+              const priceLabel = isKg ? "/KG" : "";
+              return (
+                <>
+                  {product.precioMayorista > 0 && (
+                    <div className="p-3 bg-green-50 rounded-lg">
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-700 font-medium">Mayorista{priceLabel}</span>
+                        <span className="text-xl font-bold text-green-700">
+                          {formatPrice(product.precioMayorista)}
+                        </span>
+                      </div>
+                      {isKg && product.pesoMayorista > 0 && (
+                        <p className="text-xs text-green-600 mt-1">
+                          Horma aprox. {product.pesoMayorista} KG = {formatPrice(product.precioMayorista * product.pesoMayorista)}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                  {product.precioCajaCerrada > 0 && (
+                    <div className="p-3 bg-blue-50 rounded-lg">
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-700 font-medium">Caja Cerrada{priceLabel}</span>
+                        <span className="text-xl font-bold text-blue-700">
+                          {formatPrice(product.precioCajaCerrada)}
+                        </span>
+                      </div>
+                      {product.cantidadPorCaja > 0 && (
+                        <p className="text-xs text-blue-600 mt-1">
+                          Caja x{product.cantidadPorCaja}{isKg ? " KG" : " un."} = {formatPrice(product.precioCajaCerrada * product.cantidadPorCaja)}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                  {product.precioEspecial !== undefined &&
+                    product.precioEspecial > 0 && (
+                      <div className="p-3 bg-purple-50 rounded-lg">
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-700 font-medium">Especial{priceLabel}</span>
+                          <span className="text-xl font-bold text-purple-700">
+                            {formatPrice(product.precioEspecial)}
+                          </span>
+                        </div>
+                        {product.cantidadPorCaja > 0 && (
+                          <p className="text-xs text-purple-600 mt-1">
+                            Caja x{product.cantidadPorCaja}{isKg ? " KG" : " un."} = {formatPrice(product.precioEspecial * product.cantidadPorCaja)}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                </>
+              );
+            })()}
             {product.precioEspecial === undefined && (
               <p className="text-sm text-gray-500 italic">
                 {!session?.user ? (
@@ -319,6 +347,16 @@ export default function ProductDetailPage() {
           )}
         </div>
       </div>
+
+      <ConfirmModal
+        open={deleteImageId !== null}
+        message="¿Eliminar esta imagen?"
+        loading={deleting}
+        onConfirm={() => {
+          if (deleteImageId !== null) handleDeleteImage(deleteImageId);
+        }}
+        onCancel={() => setDeleteImageId(null)}
+      />
     </div>
   );
 }

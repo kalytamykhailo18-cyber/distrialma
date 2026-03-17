@@ -6,6 +6,9 @@ export interface Product {
   brandId: string;
   brand: string;
   barcode: string;
+  unit: string;
+  pesoMayorista: number;
+  cantidadPorCaja: number;
   precioMayorista: number;
   precioCajaCerrada: number;
   precioEspecial?: number;

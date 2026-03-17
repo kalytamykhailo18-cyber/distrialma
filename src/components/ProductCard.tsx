@@ -3,6 +3,9 @@ import { formatPrice } from "@/lib/utils";
 import type { Product } from "@/types";
 
 export default function ProductCard({ product }: { product: Product }) {
+  const isKg = product.unit === "KG";
+  const priceLabel = isKg ? "/KG" : "";
+
   return (
     <Link
       href={`/productos/${product.sku}`}
@@ -36,7 +39,7 @@ export default function ProductCard({ product }: { product: Product }) {
       <div className="mt-auto space-y-1">
         {product.precioMayorista > 0 && (
           <div className="flex justify-between text-sm">
-            <span className="text-gray-600">Mayorista</span>
+            <span className="text-gray-600">Mayorista{priceLabel}</span>
             <span className="font-semibold text-green-700">
               {formatPrice(product.precioMayorista)}
             </span>
@@ -44,7 +47,7 @@ export default function ProductCard({ product }: { product: Product }) {
         )}
         {product.precioCajaCerrada > 0 && (
           <div className="flex justify-between text-sm">
-            <span className="text-gray-600">Caja Cerrada</span>
+            <span className="text-gray-600">Caja Cerrada{priceLabel}</span>
             <span className="font-semibold text-blue-700">
               {formatPrice(product.precioCajaCerrada)}
             </span>
@@ -52,11 +55,18 @@ export default function ProductCard({ product }: { product: Product }) {
         )}
         {product.precioEspecial !== undefined && product.precioEspecial > 0 && (
           <div className="flex justify-between text-sm">
-            <span className="text-gray-600">Especial</span>
+            <span className="text-gray-600">Especial{priceLabel}</span>
             <span className="font-semibold text-purple-700">
               {formatPrice(product.precioEspecial)}
             </span>
           </div>
+        )}
+        {(isKg && product.pesoMayorista > 0 || product.cantidadPorCaja > 0) && (
+          <p className="text-xs text-gray-400 pt-1">
+            {isKg && product.pesoMayorista > 0 && `Horma aprox. ${product.pesoMayorista} KG`}
+            {isKg && product.pesoMayorista > 0 && product.cantidadPorCaja > 0 && " — "}
+            {product.cantidadPorCaja > 0 && `Caja x${product.cantidadPorCaja}${isKg ? " KG" : " un."}`}
+          </p>
         )}
       </div>
     </Link>
