@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useCategories } from "./CategoriesProvider";
 
 export default function CategorySidebar({
@@ -11,6 +11,7 @@ export default function CategorySidebar({
 }) {
   const { categories } = useCategories();
   const [open, setOpen] = useState(false);
+  const [filter, setFilter] = useState("");
 
   useEffect(() => {
     if (open) {
@@ -23,12 +24,28 @@ export default function CategorySidebar({
     };
   }, [open]);
 
+  const filtered = useMemo(() => {
+    if (!filter.trim()) return categories;
+    const term = filter.toLowerCase();
+    return categories.filter((cat) => cat.name.toLowerCase().includes(term));
+  }, [categories, filter]);
+
+  const filterInput = (
+    <input
+      type="text"
+      value={filter}
+      onChange={(e) => setFilter(e.target.value)}
+      placeholder="Filtrar categorías..."
+      className="w-full px-3 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2"
+    />
+  );
+
   const categoryList = (
     <ul className="space-y-1">
       <li>
         <Link
           href="/productos"
-          onClick={() => setOpen(false)}
+          onClick={() => { setOpen(false); setFilter(""); }}
           className={`block px-3 py-2 text-sm rounded-lg ${
             !activeId
               ? "bg-blue-50 text-blue-700 font-medium"
@@ -38,11 +55,11 @@ export default function CategorySidebar({
           Todas
         </Link>
       </li>
-      {categories.map((cat) => (
+      {filtered.map((cat) => (
         <li key={cat.id}>
           <Link
             href={`/categoria/${cat.id}`}
-            onClick={() => setOpen(false)}
+            onClick={() => { setOpen(false); setFilter(""); }}
             className={`block px-3 py-2 text-sm rounded-lg ${
               activeId === cat.id
                 ? "bg-blue-50 text-blue-700 font-medium"
@@ -53,6 +70,9 @@ export default function CategorySidebar({
           </Link>
         </li>
       ))}
+      {filtered.length === 0 && (
+        <li className="px-3 py-2 text-sm text-gray-400">Sin resultados</li>
+      )}
     </ul>
   );
 
@@ -92,12 +112,16 @@ export default function CategorySidebar({
             ✕
           </button>
         </div>
-        <nav className="p-4">{categoryList}</nav>
+        <nav className="p-4">
+          {filterInput}
+          {categoryList}
+        </nav>
       </aside>
 
       {/* Desktop static sidebar */}
       <div className="hidden md:block">
         <h2 className="font-semibold text-gray-900 mb-3">Categorías</h2>
+        {filterInput}
         {categoryList}
       </div>
     </>
