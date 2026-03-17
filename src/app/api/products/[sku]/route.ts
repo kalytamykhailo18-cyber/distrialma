@@ -10,9 +10,10 @@ export async function GET(
 ) {
   try {
     const session = await getServerSession(authOptions);
-    const isAuthenticated = !!session?.user;
+    const userRole = (session?.user as { role?: string } | undefined)?.role;
+    const canSeeEspecial = userRole === "especial" || userRole === "admin";
 
-    const product = await getProductBySku(params.sku, isAuthenticated);
+    const product = await getProductBySku(params.sku, canSeeEspecial);
 
     if (!product) {
       return NextResponse.json(

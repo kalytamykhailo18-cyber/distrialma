@@ -23,7 +23,7 @@ export const authOptions: NextAuthOptions = {
             .request()
             .input("cuit", credentials.username.trim())
             .query(
-              `SELECT LTRIM(RTRIM(Cod)) AS cod, LTRIM(RTRIM(Nombre)) AS nombre, LTRIM(RTRIM(ISNULL(Observaciones,''))) AS observaciones
+              `SELECT LTRIM(RTRIM(Cod)) AS cod, LTRIM(RTRIM(Nombre)) AS nombre, LTRIM(RTRIM(ISNULL(Observaciones,''))) AS observaciones, LTRIM(RTRIM(ISNULL(ListaPrecios,''))) AS listaPrecios
                FROM [${dbClientes}].dbo.Clientes
                WHERE LTRIM(RTRIM(CUIT)) = @cuit
                  AND (DeBaja = 0 OR DeBaja IS NULL)`
@@ -35,7 +35,7 @@ export const authOptions: NextAuthOptions = {
               return {
                 id: cliente.cod,
                 name: cliente.nombre,
-                role: "customer",
+                role: cliente.listaPrecios === "3" ? "especial" : "customer",
               };
             }
             return null;

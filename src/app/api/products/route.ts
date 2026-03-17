@@ -7,7 +7,8 @@ import { prisma } from "@/lib/prisma";
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    const isAuthenticated = !!session?.user;
+    const userRole = (session?.user as { role?: string } | undefined)?.role;
+    const canSeeEspecial = userRole === "especial" || userRole === "admin";
 
     const { searchParams } = request.nextUrl;
     const page = parseInt(searchParams.get("page") || "1");
@@ -22,7 +23,7 @@ export async function GET(request: NextRequest) {
       categoryId,
       brandId,
       search,
-      includeEspecial: isAuthenticated,
+      includeEspecial: canSeeEspecial,
     });
 
     // Merge with local PostgreSQL data (images + descriptions)

@@ -262,12 +262,18 @@ export default function ProductDetailPage() {
                   </span>
                 </div>
               )}
-            {!session?.user && (
+            {product.precioEspecial === undefined && (
               <p className="text-sm text-gray-500 italic">
-                <Link href="/login" className="text-blue-600 hover:underline">
-                  Iniciá sesión
-                </Link>{" "}
-                para ver el precio Especial.
+                {!session?.user ? (
+                  <>
+                    <Link href="/login" className="text-blue-600 hover:underline">
+                      Iniciá sesión
+                    </Link>{" "}
+                    para ver el precio Especial.
+                  </>
+                ) : (
+                  "Tu cuenta no tiene acceso al precio Especial."
+                )}
               </p>
             )}
           </div>
