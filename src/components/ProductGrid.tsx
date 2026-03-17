@@ -67,11 +67,13 @@ export default function ProductGrid({
     try {
       const res = await fetch(`/api/products?${params}`);
       const data = await res.json();
-      setProducts(data.products);
-      setTotalPages(data.totalPages);
-      setTotal(data.total);
+      setProducts(data.products || []);
+      setTotalPages(data.totalPages || 1);
+      setTotal(data.total || 0);
     } catch {
-      console.error("Error loading products");
+      setProducts([]);
+      setTotalPages(1);
+      setTotal(0);
     } finally {
       setLoading(false);
     }
