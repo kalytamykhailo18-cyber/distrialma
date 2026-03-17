@@ -12,6 +12,7 @@ export default function CategoriaPage() {
   const { id } = useParams<{ id: string }>();
   const { categories } = useCategories();
   const categoryName = categories.find((c) => c.id === id)?.name;
+  const [search, setSearch] = useState("");
   const [pag, setPag] = useState<PaginationState | null>(null);
 
   return (
@@ -21,7 +22,7 @@ export default function CategoriaPage() {
           {categoryName || "Productos"}
         </h1>
         <div className="order-3 md:order-2 w-full md:w-auto md:flex-1 md:max-w-sm">
-          <SearchBox />
+          <SearchBox onSearch={setSearch} />
         </div>
         {pag && (
           <div className="order-2 md:order-3">
@@ -40,7 +41,11 @@ export default function CategoriaPage() {
           <CategorySidebar activeId={id} />
         </div>
         <div className="flex-1">
-          <ProductGrid categoryId={id} onPaginationReady={setPag} />
+          <ProductGrid
+            categoryId={id}
+            search={search || undefined}
+            onPaginationReady={setPag}
+          />
         </div>
       </div>
     </div>

@@ -1,30 +1,31 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, useRef } from "react";
 
-export default function SearchBox({ initialValue }: { initialValue?: string }) {
-  const [search, setSearch] = useState(initialValue || "");
-  const router = useRouter();
+interface Props {
+  initialValue?: string;
+  onSearch: (value: string) => void;
+}
 
-  function handleSearch(e: React.FormEvent) {
-    e.preventDefault();
-    if (search.trim()) {
-      router.push(`/productos?search=${encodeURIComponent(search.trim())}`);
-    } else {
-      router.push("/productos");
-    }
-  }
+export default function SearchBox({ initialValue, onSearch }: Props) {
+  const [value, setValue] = useState(initialValue || "");
+  const timerRef = useRef<ReturnType<typeof setTimeout>>();
+
+  useEffect(() => {
+    clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => {
+      onSearch(value.trim());
+    }, 400);
+    return () => clearTimeout(timerRef.current);
+  }, [value]);
 
   return (
-    <form onSubmit={handleSearch} className="w-full">
-      <input
-        type="text"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        placeholder="Buscar productos..."
-        className="w-full px-3 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-      />
-    </form>
+    <input
+      type="text"
+      value={value}
+      onChange={(e) => setValue(e.target.value)}
+      placeholder="Buscar productos..."
+      className="w-full px-3 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+    />
   );
 }
