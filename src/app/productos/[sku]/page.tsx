@@ -20,6 +20,7 @@ export default function ProductDetailPage() {
   const [description, setDescription] = useState("");
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [message, setMessage] = useState("");
 
   useEffect(() => {
@@ -90,6 +91,32 @@ export default function ProductDetailPage() {
     setTimeout(() => setMessage(""), 3000);
   }
 
+  async function handleDeleteImage(imageId: number) {
+    if (!confirm("¿Eliminar esta imagen?")) return;
+
+    setDeleting(true);
+    setMessage("");
+    try {
+      const res = await fetch("/api/admin/delete-image", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: imageId }),
+      });
+      if (res.ok) {
+        setMessage("Imagen eliminada");
+        const data = await fetch(`/api/products/${sku}`).then((r) => r.json());
+        setProduct(data);
+      } else {
+        setMessage("Error al eliminar imagen");
+      }
+    } catch {
+      setMessage("Error al eliminar imagen");
+    } finally {
+      setDeleting(false);
+    }
+    setTimeout(() => setMessage(""), 3000);
+  }
+
   if (loading) {
     return (
       <div className="max-w-4xl mx-auto px-4 py-8 animate-pulse">
@@ -132,7 +159,7 @@ export default function ProductDetailPage() {
           <div className="w-full h-72 bg-gray-100 rounded flex items-center justify-center overflow-hidden">
             {product.images.length > 0 ? (
               <img
-                src={product.images[0]}
+                src={product.images[0].url}
                 alt={product.name}
                 className="max-h-full max-w-full object-contain"
               />
@@ -141,17 +168,26 @@ export default function ProductDetailPage() {
             )}
           </div>
           {product.images.length > 1 && (
-            <div className="flex gap-2 mt-3">
-              {product.images.map((img, i) => (
+            <div className="flex gap-2 mt-3 flex-wrap">
+              {product.images.map((img) => (
                 <div
-                  key={i}
-                  className="w-16 h-16 border rounded overflow-hidden"
+                  key={img.id}
+                  className="relative w-16 h-16 border rounded overflow-hidden group"
                 >
                   <img
-                    src={img}
+                    src={img.url}
                     alt=""
                     className="w-full h-full object-cover"
                   />
+                  {isAdmin && (
+                    <button
+                      onClick={() => handleDeleteImage(img.id)}
+                      disabled={deleting || uploading || saving}
+                      className="absolute top-0 right-0 w-5 h-5 bg-red-600 text-white text-xs rounded-bl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-700 disabled:opacity-50"
+                    >
+                      ✕
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
@@ -161,7 +197,7 @@ export default function ProductDetailPage() {
             <div className="mt-4">
               <label
                 className={`inline-block bg-blue-600 text-white px-4 py-2 rounded-lg text-sm ${
-                  uploading || saving
+                  uploading || saving || deleting
                     ? "opacity-50 cursor-not-allowed"
                     : "cursor-pointer hover:bg-blue-700"
                 }`}
@@ -172,7 +208,7 @@ export default function ProductDetailPage() {
                   accept="image/*"
                   onChange={handleUploadImage}
                   className="hidden"
-                  disabled={uploading || saving}
+                  disabled={uploading || saving || deleting}
                 />
               </label>
             </div>
@@ -243,16 +279,16 @@ export default function ProductDetailPage() {
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 rows={4}
-                disabled={saving || uploading}
+                disabled={saving || uploading || deleting}
                 className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
                 placeholder="Escribir descripción del producto..."
               />
               <button
                 onClick={handleSaveDescription}
-                disabled={saving || uploading}
+                disabled={saving || uploading || deleting}
                 className="mt-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50"
               >
-                {saving ? "Guardando..." : uploading ? "Esperando..." : "Guardar Descripción"}
+                {saving ? "Guardando..." : uploading || deleting ? "Esperando..." : "Guardar Descripción"}
               </button>
             </div>
           ) : (

@@ -11,7 +11,7 @@ export default function ProductCard({ product }: { product: Product }) {
       <div className="w-full h-40 bg-gray-100 rounded mb-3 flex items-center justify-center overflow-hidden">
         {product.images.length > 0 ? (
           <img
-            src={product.images[0]}
+            src={product.images[0].url}
             alt={product.name}
             className="max-h-full max-w-full object-contain"
           />

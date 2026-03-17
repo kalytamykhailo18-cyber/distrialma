@@ -98,12 +98,12 @@ export default function AdminProductEditPage() {
         <h2 className="font-semibold text-gray-900 mb-4">Imágenes</h2>
 
         <div className="flex gap-3 flex-wrap mb-4">
-          {product.images.map((img, i) => (
+          {product.images.map((img) => (
             <div
-              key={i}
+              key={img.id}
               className="w-24 h-24 border rounded overflow-hidden"
             >
-              <img src={img} alt="" className="w-full h-full object-cover" />
+              <img src={img.url} alt="" className="w-full h-full object-cover" />
             </div>
           ))}
           {product.images.length === 0 && (

@@ -10,7 +10,7 @@ export interface Product {
   precioCajaCerrada: number;
   precioEspecial?: number;
   stock: number;
-  images: string[];
+  images: { id: number; url: string }[];
   description?: string;
 }
 

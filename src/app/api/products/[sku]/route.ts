@@ -31,7 +31,7 @@ export async function GET(
       }),
     ]);
 
-    product.images = images.map((img) => img.filename);
+    product.images = images.map((img) => ({ id: img.id, url: img.filename }));
     product.description = desc?.description;
 
     return NextResponse.json(product);

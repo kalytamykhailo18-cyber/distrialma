@@ -37,10 +37,10 @@ export async function GET(request: NextRequest) {
       }),
     ]);
 
-    const imageMap = new Map<string, string[]>();
+    const imageMap = new Map<string, { id: number; url: string }[]>();
     for (const img of images) {
       const list = imageMap.get(img.sku) || [];
-      list.push(img.filename);
+      list.push({ id: img.id, url: img.filename });
       imageMap.set(img.sku, list);
     }
 
