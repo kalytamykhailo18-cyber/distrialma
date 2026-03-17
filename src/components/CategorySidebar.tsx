@@ -2,22 +2,15 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import type { Category } from "@/types";
+import { useCategories } from "./CategoriesProvider";
 
 export default function CategorySidebar({
   activeId,
 }: {
   activeId?: string;
 }) {
-  const [categories, setCategories] = useState<Category[]>([]);
+  const { categories } = useCategories();
   const [open, setOpen] = useState(false);
-
-  useEffect(() => {
-    fetch("/api/categories")
-      .then((r) => r.json())
-      .then(setCategories)
-      .catch(() => {});
-  }, []);
 
   useEffect(() => {
     if (open) {
