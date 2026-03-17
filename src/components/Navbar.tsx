@@ -3,20 +3,10 @@
 import Link from "next/link";
 import { useSession, signOut } from "next-auth/react";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 
 export default function Navbar() {
   const { data: session } = useSession();
-  const [search, setSearch] = useState("");
   const [signingOut, setSigningOut] = useState(false);
-  const router = useRouter();
-
-  function handleSearch(e: React.FormEvent) {
-    e.preventDefault();
-    if (search.trim()) {
-      router.push(`/productos?search=${encodeURIComponent(search.trim())}`);
-    }
-  }
 
   return (
     <nav className="bg-white shadow-sm border-b">
@@ -24,16 +14,6 @@ export default function Navbar() {
         <Link href="/" className="text-xl font-bold text-blue-700 shrink-0">
           Distrialma
         </Link>
-
-        <form onSubmit={handleSearch} className="flex-1 max-w-md">
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar productos..."
-            className="w-full px-4 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </form>
 
         <div className="flex items-center gap-3 shrink-0">
           <Link

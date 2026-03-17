@@ -5,11 +5,20 @@ import ProductCard from "./ProductCard";
 import Pagination from "./Pagination";
 import type { Product } from "@/types";
 
+export interface PaginationState {
+  page: number;
+  totalPages: number;
+  total: number;
+  loading: boolean;
+  setPage: (page: number) => void;
+}
+
 interface Props {
   initialProducts?: Product[];
   categoryId?: string;
   brandId?: string;
   search?: string;
+  onPaginationReady?: (state: PaginationState) => void;
 }
 
 export default function ProductGrid({
@@ -17,6 +26,7 @@ export default function ProductGrid({
   categoryId,
   brandId,
   search,
+  onPaginationReady,
 }: Props) {
   const [products, setProducts] = useState<Product[]>(initialProducts || []);
   const [page, setPage] = useState(1);
@@ -24,6 +34,12 @@ export default function ProductGrid({
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(!initialProducts);
   const prevFilters = useRef({ categoryId, brandId, search });
+
+  useEffect(() => {
+    if (onPaginationReady) {
+      onPaginationReady({ page, totalPages, total, loading, setPage });
+    }
+  }, [page, totalPages, total, loading]);
 
   useEffect(() => {
     const filtersChanged =
@@ -61,6 +77,16 @@ export default function ProductGrid({
     }
   }
 
+  const pagination = (
+    <Pagination
+      page={page}
+      totalPages={totalPages}
+      total={total}
+      loading={loading}
+      onPageChange={setPage}
+    />
+  );
+
   return (
     <div>
       {loading ? (
@@ -88,13 +114,7 @@ export default function ProductGrid({
         </div>
       )}
 
-      <Pagination
-        page={page}
-        totalPages={totalPages}
-        total={total}
-        loading={loading}
-        onPageChange={setPage}
-      />
+      <div className="mt-8">{pagination}</div>
     </div>
   );
 }

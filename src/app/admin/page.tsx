@@ -146,13 +146,15 @@ export default function AdminPage() {
         </table>
       </div>
 
-      <Pagination
-        page={page}
-        totalPages={totalPages}
-        total={total}
-        loading={loading}
-        onPageChange={setPage}
-      />
+      <div className="mt-6">
+        <Pagination
+          page={page}
+          totalPages={totalPages}
+          total={total}
+          loading={loading}
+          onPageChange={setPage}
+        />
+      </div>
     </div>
   );
 }
