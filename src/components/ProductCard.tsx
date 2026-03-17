@@ -61,10 +61,15 @@ export default function ProductCard({ product }: { product: Product }) {
             </span>
           </div>
         )}
-        {(isKg && product.pesoMayorista > 0 || product.cantidadPorCaja > 0) && (
-          <p className="text-xs text-gray-400 pt-1">
-            {isKg && product.pesoMayorista > 0 && `Horma aprox. ${product.pesoMayorista} KG`}
-            {isKg && product.pesoMayorista > 0 && product.cantidadPorCaja > 0 && " — "}
+        {product.minimoCompra && (
+          <p className="text-xs text-amber-600 pt-1">
+            Mín: {product.minimoCompra}
+          </p>
+        )}
+        {(product.pesoMayorista > 0 || product.cantidadPorCaja > 0) && (
+          <p className="text-xs text-gray-400">
+            {product.pesoMayorista > 0 && (isKg ? `Horma aprox. ${product.pesoMayorista} KG` : `x${product.pesoMayorista} un.`)}
+            {product.pesoMayorista > 0 && product.cantidadPorCaja > 0 && " — "}
             {product.cantidadPorCaja > 0 && `Caja x${product.cantidadPorCaja}${isKg ? " KG" : " un."}`}
           </p>
         )}

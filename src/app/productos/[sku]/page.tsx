@@ -249,9 +249,12 @@ export default function ProductDetailPage() {
                           {formatPrice(product.precioMayorista)}
                         </span>
                       </div>
-                      {isKg && product.pesoMayorista > 0 && (
+                      {product.pesoMayorista > 0 && (
                         <p className="text-xs text-green-600 mt-1">
-                          Horma aprox. {product.pesoMayorista} KG = {formatPrice(product.precioMayorista * product.pesoMayorista)}
+                          {isKg
+                            ? `Horma aprox. ${product.pesoMayorista} KG = ${formatPrice(product.precioMayorista * product.pesoMayorista)}`
+                            : `x${product.pesoMayorista} un. = ${formatPrice(product.precioMayorista * product.pesoMayorista)}`
+                          }
                         </p>
                       )}
                     </div>
@@ -305,6 +308,17 @@ export default function ProductDetailPage() {
               </p>
             )}
           </div>
+
+          {product.minimoCompra && (
+            <div className="p-3 bg-amber-50 rounded-lg mb-6">
+              <span className="text-sm text-amber-800 font-medium">
+                Compra mínima: {product.minimoCompra}
+                {product.unit === "KG" && product.pesoMayorista > 0
+                  ? ` (${product.pesoMayorista} KG aprox.)`
+                  : ""}
+              </span>
+            </div>
+          )}
 
           <p className="text-sm text-gray-500">SKU: {product.sku}</p>
           {product.barcode && (

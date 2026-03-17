@@ -44,6 +44,7 @@ export async function getProducts(opts: {
 
   let where = `WHERE (p.DeBaja = 0 OR p.DeBaja IS NULL)
     AND (s.DeBaja = 0 OR s.DeBaja IS NULL)
+    AND LTRIM(RTRIM(s.Deposito)) = '0'
     AND s.Precio2 > 0`;
 
   const params: Record<string, unknown> = {};
@@ -95,6 +96,7 @@ export async function getProducts(opts: {
       LTRIM(RTRIM(ISNULL(m.[Desc], ''))) AS brand,
       LTRIM(RTRIM(ISNULL(p.Codbar, ''))) AS barcode,
       LTRIM(RTRIM(ISNULL(p.Unidad, ''))) AS unit,
+      LTRIM(RTRIM(ISNULL(p.Palabra1, ''))) AS minimoCompra,
       LTRIM(RTRIM(ISNULL(p.Palabra2, ''))) AS pesoMayorista,
       LTRIM(RTRIM(ISNULL(p.Palabra3, ''))) AS cantidadPorCaja,
       s.Precio2 AS precioMayorista,
@@ -135,6 +137,7 @@ export async function getProducts(opts: {
     brand: row.brand,
     barcode: row.barcode,
     unit: row.unit,
+    minimoCompra: row.minimoCompra || "",
     pesoMayorista: parseFloat(row.pesoMayorista) || 0,
     cantidadPorCaja: parseFloat(row.cantidadPorCaja) || 0,
     precioMayorista: row.precioMayorista || 0,
@@ -165,6 +168,7 @@ export async function getProductBySku(
       LTRIM(RTRIM(ISNULL(m.[Desc], ''))) AS brand,
       LTRIM(RTRIM(ISNULL(p.Codbar, ''))) AS barcode,
       LTRIM(RTRIM(ISNULL(p.Unidad, ''))) AS unit,
+      LTRIM(RTRIM(ISNULL(p.Palabra1, ''))) AS minimoCompra,
       LTRIM(RTRIM(ISNULL(p.Palabra2, ''))) AS pesoMayorista,
       LTRIM(RTRIM(ISNULL(p.Palabra3, ''))) AS cantidadPorCaja,
       s.Precio2 AS precioMayorista,
@@ -178,6 +182,7 @@ export async function getProductBySku(
     WHERE LTRIM(RTRIM(p.Cod)) = @sku
       AND (p.DeBaja = 0 OR p.DeBaja IS NULL)
       AND (s.DeBaja = 0 OR s.DeBaja IS NULL)
+      AND LTRIM(RTRIM(s.Deposito)) = '0'
       AND s.Precio2 > 0
   `;
 
@@ -195,6 +200,7 @@ export async function getProductBySku(
     brand: row.brand,
     barcode: row.barcode,
     unit: row.unit,
+    minimoCompra: row.minimoCompra || "",
     pesoMayorista: parseFloat(row.pesoMayorista) || 0,
     cantidadPorCaja: parseFloat(row.cantidadPorCaja) || 0,
     precioMayorista: row.precioMayorista || 0,
