@@ -1,16 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useCategories } from "./CategoriesProvider";
 
 export default function CategorySidebar({
   activeId,
+  activeBrandId,
 }: {
   activeId?: string;
+  activeBrandId?: string;
 }) {
-  const { categories, filter, setFilter } = useCategories();
+  const { categories, brands, filter, setFilter, brandFilter, setBrandFilter } = useCategories();
   const [open, setOpen] = useState(false);
+  const [tab, setTab] = useState<"categorias" | "marcas">(activeBrandId ? "marcas" : "categorias");
 
   useEffect(() => {
     if (open) {
@@ -23,56 +26,123 @@ export default function CategorySidebar({
     };
   }, [open]);
 
-  const filtered = useMemo(() => {
+  const filteredCats = useMemo(() => {
     if (!filter.trim()) return categories;
     const term = filter.toLowerCase();
-    return categories.filter((cat) => cat.name.toLowerCase().includes(term));
+    return categories.filter((c) => c.name.toLowerCase().includes(term));
   }, [categories, filter]);
 
-  const filterInput = (
-    <input
-      type="text"
-      value={filter}
-      onChange={(e) => setFilter(e.target.value)}
-      placeholder="Filtrar categorías..."
-      className="w-full px-3 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2"
-    />
-  );
+  const filteredBrands = useMemo(() => {
+    if (!brandFilter.trim()) return brands;
+    const term = brandFilter.toLowerCase();
+    return brands.filter((b) => b.name.toLowerCase().includes(term));
+  }, [brands, brandFilter]);
 
-  const categoryList = (
-    <ul className="space-y-1">
-      <li>
-        <Link
-          href="/productos"
-          onClick={() => setOpen(false)}
-          className={`block px-3 py-2 text-sm rounded-lg ${
-            !activeId
-              ? "bg-blue-50 text-blue-700 font-medium"
-              : "text-gray-600 hover:bg-gray-50"
+  const sidebarContent = (
+    <nav className="p-4">
+      {/* Tabs */}
+      <div className="flex border-b mb-4">
+        <button
+          onClick={() => setTab("categorias")}
+          className={`flex-1 py-2 text-sm font-medium border-b-2 transition-colors ${
+            tab === "categorias"
+              ? "border-blue-600 text-blue-600"
+              : "border-transparent text-gray-500 hover:text-gray-700"
           }`}
         >
-          Todas
-        </Link>
-      </li>
-      {filtered.map((cat) => (
-        <li key={cat.id}>
-          <Link
-            href={`/categoria/${cat.id}`}
-            onClick={() => setOpen(false)}
-            className={`block px-3 py-2 text-sm rounded-lg ${
-              activeId === cat.id
-                ? "bg-blue-50 text-blue-700 font-medium"
-                : "text-gray-600 hover:bg-gray-50"
-            }`}
-          >
-            {cat.name}
-          </Link>
-        </li>
-      ))}
-      {filtered.length === 0 && (
-        <li className="px-3 py-2 text-sm text-gray-400">Sin resultados</li>
+          Categorías
+        </button>
+        <button
+          onClick={() => setTab("marcas")}
+          className={`flex-1 py-2 text-sm font-medium border-b-2 transition-colors ${
+            tab === "marcas"
+              ? "border-blue-600 text-blue-600"
+              : "border-transparent text-gray-500 hover:text-gray-700"
+          }`}
+        >
+          Marcas
+        </button>
+      </div>
+
+      {/* Categories tab */}
+      {tab === "categorias" && (
+        <div>
+          <input
+            type="text"
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            placeholder="Filtrar categorías..."
+            className="w-full px-3 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2"
+          />
+          <ul className="space-y-1 overflow-y-auto max-h-[calc(100vh-220px)]">
+            <li>
+              <Link
+                href="/productos"
+                onClick={() => setOpen(false)}
+                className={`block px-3 py-2 text-sm rounded-lg ${
+                  !activeId && !activeBrandId
+                    ? "bg-blue-50 text-blue-700 font-medium"
+                    : "text-gray-600 hover:bg-gray-50"
+                }`}
+              >
+                Todas
+              </Link>
+            </li>
+            {filteredCats.map((cat) => (
+              <li key={cat.id}>
+                <Link
+                  href={`/categoria/${cat.id}`}
+                  onClick={() => setOpen(false)}
+                  className={`block px-3 py-2 text-sm rounded-lg ${
+                    activeId === cat.id
+                      ? "bg-blue-50 text-blue-700 font-medium"
+                      : "text-gray-600 hover:bg-gray-50"
+                  }`}
+                >
+                  {cat.name}
+                </Link>
+              </li>
+            ))}
+            {filteredCats.length === 0 && (
+              <li className="px-3 py-2 text-sm text-gray-400">Sin resultados</li>
+            )}
+          </ul>
+        </div>
       )}
-    </ul>
+
+      {/* Brands tab */}
+      {tab === "marcas" && (
+        <div>
+          <input
+            type="text"
+            value={brandFilter}
+            onChange={(e) => setBrandFilter(e.target.value)}
+            placeholder="Filtrar marcas..."
+            className="w-full px-3 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2"
+          />
+          <ul className="space-y-1 overflow-y-auto max-h-[calc(100vh-220px)]">
+            {filteredBrands.map((brand) => (
+              <li key={brand.id}>
+                <Link
+                  href={`/marca/${brand.id}`}
+                  onClick={() => setOpen(false)}
+                  className={`block px-3 py-2 text-sm rounded-lg ${
+                    activeBrandId === brand.id
+                      ? "bg-blue-50 text-blue-700 font-medium"
+                      : "text-gray-600 hover:bg-gray-50"
+                  }`}
+                >
+                  {brand.name}
+                </Link>
+              </li>
+            ))}
+            {filteredBrands.length === 0 && (
+              <li className="px-3 py-2 text-sm text-gray-400">Sin resultados</li>
+            )}
+          </ul>
+        </div>
+      )}
+    </nav>
   );
 
   return (
@@ -85,7 +155,7 @@ export default function CategorySidebar({
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
         </svg>
-        Categorías
+        Filtros
       </button>
 
       {/* Mobile overlay */}
@@ -103,7 +173,7 @@ export default function CategorySidebar({
         }`}
       >
         <div className="flex items-center justify-between px-4 py-4 border-b">
-          <h2 className="font-semibold text-gray-900 text-lg">Categorías</h2>
+          <h2 className="font-semibold text-gray-900 text-lg">Filtros</h2>
           <button
             onClick={() => setOpen(false)}
             className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-500 text-lg"
@@ -111,17 +181,12 @@ export default function CategorySidebar({
             ✕
           </button>
         </div>
-        <nav className="p-4">
-          {filterInput}
-          {categoryList}
-        </nav>
+        {sidebarContent}
       </aside>
 
       {/* Desktop static sidebar */}
       <div className="hidden md:block">
-        <h2 className="font-semibold text-gray-900 mb-3">Categorías</h2>
-        {filterInput}
-        {categoryList}
+        {sidebarContent}
       </div>
     </>
   );

@@ -75,7 +75,7 @@ export async function getProducts(opts: {
     params.brandId = brandId;
   }
   if (search) {
-    where += " AND p.Nombre LIKE @search";
+    where += " AND (p.Nombre LIKE @search OR LTRIM(RTRIM(p.Cod)) LIKE @search)";
     params.search = `%${search}%`;
   }
 
@@ -221,7 +221,7 @@ export async function getCategories(includeHidden: boolean = false): Promise<Cat
 
   if (hiddenIds.length > 0) {
     const placeholders = hiddenIds.map((_, i) => `@hidden${i}`).join(",");
-    where += ` AND r.Cod NOT IN (${placeholders})`;
+    where += ` AND LTRIM(RTRIM(r.Cod)) NOT IN (${placeholders})`;
     hiddenIds.forEach((id, i) => {
       req.input(`hidden${i}`, id);
     });
@@ -246,10 +246,31 @@ export async function getCategories(includeHidden: boolean = false): Promise<Cat
 
 export async function getBrands(): Promise<Brand[]> {
   const pool = await getPool();
-  const result = await pool.request().query(`
+  const hiddenIds = await getHiddenCategoryIds();
+
+  let hiddenFilter = "";
+  if (hiddenIds.length > 0) {
+    const placeholders = hiddenIds.map((_, i) => `@hidden${i}`).join(",");
+    hiddenFilter = `AND LTRIM(RTRIM(p.Rubro)) NOT IN (${placeholders})`;
+  }
+
+  const req = pool.request();
+  hiddenIds.forEach((id, i) => req.input(`hidden${i}`, id));
+
+  const result = await req.query(`
     SELECT LTRIM(RTRIM(m.Cod)) AS id, LTRIM(RTRIM(m.[Desc])) AS name
     FROM [${db()}].dbo.Marcas m
     WHERE (m.DeBaja = 0 OR m.DeBaja IS NULL)
+      AND EXISTS (
+        SELECT 1 FROM [${db()}].dbo.Productos p
+        JOIN [${db()}].dbo.Stock s ON s.CodProducto = p.Cod
+        WHERE p.Marca = m.Cod
+          AND (p.DeBaja = 0 OR p.DeBaja IS NULL)
+          AND (s.DeBaja = 0 OR s.DeBaja IS NULL)
+          AND LTRIM(RTRIM(s.Deposito)) = '0'
+          AND s.Precio2 > 0
+          ${hiddenFilter}
+      )
     ORDER BY m.[Desc]
   `);
   return result.recordset;

@@ -97,7 +97,7 @@ async function main() {
 
   console.log(`\nDone: ${uploaded} uploaded, ${skipped} skipped (already exist), ${failed} failed`);
 
-  await sql.close();
+  await pool.close();
   await prisma.$disconnect();
 }
 
