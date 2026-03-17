@@ -12,6 +12,7 @@ export default function ProductDetailPage() {
   const { data: session } = useSession();
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
+  const [activeImage, setActiveImage] = useState(0);
 
   const isAdmin =
     (session?.user as { role?: string } | undefined)?.role === "admin";
@@ -167,7 +168,7 @@ export default function ProductDetailPage() {
               <span className="text-gray-400">Sin imagen</span>
             )}
           </div>
-          {product.images.length > 1 && (
+          {((product.images.length > 1) || (isAdmin && product.images.length > 0)) && (
             <div className="flex gap-2 mt-3 flex-wrap">
               {product.images.map((img) => (
                 <div

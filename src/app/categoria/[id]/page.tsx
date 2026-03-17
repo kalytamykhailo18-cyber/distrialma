@@ -12,8 +12,8 @@ export default function CategoriaPage() {
       <h1 className="text-2xl font-bold text-gray-900 mb-6">
         Productos por Categoría
       </h1>
-      <div className="flex gap-6">
-        <div className="hidden md:block w-56 shrink-0">
+      <div className="md:flex md:gap-6">
+        <div className="md:w-56 shrink-0">
           <CategorySidebar activeId={id} />
         </div>
         <div className="flex-1">

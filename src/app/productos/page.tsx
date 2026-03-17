@@ -14,8 +14,8 @@ function ProductosContent() {
       <h1 className="text-2xl font-bold text-gray-900 mb-6">
         {search ? `Resultados para "${search}"` : "Todos los Productos"}
       </h1>
-      <div className="flex gap-6">
-        <div className="hidden md:block w-56 shrink-0">
+      <div className="md:flex md:gap-6">
+        <div className="md:w-56 shrink-0">
           <CategorySidebar />
         </div>
         <div className="flex-1">
