@@ -99,6 +99,7 @@ export async function getProducts(opts: {
       LTRIM(RTRIM(ISNULL(p.Palabra1, ''))) AS minimoCompra,
       LTRIM(RTRIM(ISNULL(p.Palabra2, ''))) AS pesoMayorista,
       LTRIM(RTRIM(ISNULL(p.Palabra3, ''))) AS cantidadPorCaja,
+      s.Precio AS precioMinorista,
       s.Precio2 AS precioMayorista,
       s.Precio4 AS precioCajaCerrada,
       ${especial}
@@ -140,6 +141,7 @@ export async function getProducts(opts: {
     minimoCompra: row.minimoCompra || "",
     pesoMayorista: parseFloat(row.pesoMayorista) || 0,
     cantidadPorCaja: parseFloat(row.cantidadPorCaja) || 0,
+    precioMinorista: row.precioMinorista || 0,
     precioMayorista: row.precioMayorista || 0,
     precioCajaCerrada: row.precioCajaCerrada || 0,
     precioEspecial: includeEspecial ? row.precioEspecial || 0 : undefined,
@@ -171,6 +173,7 @@ export async function getProductBySku(
       LTRIM(RTRIM(ISNULL(p.Palabra1, ''))) AS minimoCompra,
       LTRIM(RTRIM(ISNULL(p.Palabra2, ''))) AS pesoMayorista,
       LTRIM(RTRIM(ISNULL(p.Palabra3, ''))) AS cantidadPorCaja,
+      s.Precio AS precioMinorista,
       s.Precio2 AS precioMayorista,
       s.Precio4 AS precioCajaCerrada,
       ${especial}
@@ -203,6 +206,7 @@ export async function getProductBySku(
     minimoCompra: row.minimoCompra || "",
     pesoMayorista: parseFloat(row.pesoMayorista) || 0,
     cantidadPorCaja: parseFloat(row.cantidadPorCaja) || 0,
+    precioMinorista: row.precioMinorista || 0,
     precioMayorista: row.precioMayorista || 0,
     precioCajaCerrada: row.precioCajaCerrada || 0,
     precioEspecial: includeEspecial ? row.precioEspecial || 0 : undefined,
@@ -246,13 +250,18 @@ export async function getCategories(includeHidden: boolean = false): Promise<Cat
 
 export async function getBrands(): Promise<Brand[]> {
   const pool = await getPool();
-  const hiddenIds = await getHiddenCategoryIds();
+  const [hiddenIds, hideOutOfStock] = await Promise.all([
+    getHiddenCategoryIds(),
+    getSetting("hide_out_of_stock"),
+  ]);
 
   let hiddenFilter = "";
   if (hiddenIds.length > 0) {
     const placeholders = hiddenIds.map((_, i) => `@hidden${i}`).join(",");
     hiddenFilter = `AND LTRIM(RTRIM(p.Rubro)) NOT IN (${placeholders})`;
   }
+
+  const stockFilter = hideOutOfStock === "true" ? "AND s.Stk > 0" : "";
 
   const req = pool.request();
   hiddenIds.forEach((id, i) => req.input(`hidden${i}`, id));
@@ -270,6 +279,7 @@ export async function getBrands(): Promise<Brand[]> {
           AND LTRIM(RTRIM(s.Deposito)) = '0'
           AND s.Precio2 > 0
           ${hiddenFilter}
+          ${stockFilter}
       )
     ORDER BY m.[Desc]
   `);

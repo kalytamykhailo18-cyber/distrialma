@@ -16,7 +16,7 @@ function ProductosContent() {
   return (
     <div className="max-w-7xl mx-auto px-4 py-6">
       <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
-        <h1 className="text-xl md:text-2xl font-bold text-gray-900">
+        <h1 className="text-base md:text-xl font-bold text-gray-900">
           Productos
         </h1>
         <div className="order-3 md:order-2 w-full md:w-auto md:flex-1 md:max-w-sm">

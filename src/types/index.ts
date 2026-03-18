@@ -10,6 +10,7 @@ export interface Product {
   minimoCompra: string;
   pesoMayorista: number;
   cantidadPorCaja: number;
+  precioMinorista?: number;
   precioMayorista: number;
   precioCajaCerrada: number;
   precioEspecial?: number;

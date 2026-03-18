@@ -18,8 +18,8 @@ export default function MarcaPage() {
   return (
     <div className="max-w-7xl mx-auto px-4 py-6">
       <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
-        <h1 className="text-xl md:text-2xl font-bold text-gray-900">
-          {brandName || "Productos"}
+        <h1 className="text-base md:text-xl font-bold text-gray-900">
+          Productos {brandName && <span className="text-sm md:text-lg text-gray-500 font-normal">/ Marca: {brandName}</span>}
         </h1>
         <div className="order-3 md:order-2 w-full md:w-auto md:flex-1 md:max-w-sm">
           <SearchBox onSearch={setSearch} />

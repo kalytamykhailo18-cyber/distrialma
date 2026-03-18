@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useCategories } from "./CategoriesProvider";
 
 export default function CategorySidebar({
@@ -14,6 +14,18 @@ export default function CategorySidebar({
   const { categories, brands, filter, setFilter, brandFilter, setBrandFilter } = useCategories();
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<"categorias" | "marcas">(activeBrandId ? "marcas" : "categorias");
+
+  const saveScroll = useCallback(() => {
+    sessionStorage.setItem("sidebarScrollY", String(window.scrollY));
+  }, []);
+
+  useEffect(() => {
+    const saved = sessionStorage.getItem("sidebarScrollY");
+    if (saved) {
+      window.scrollTo(0, parseInt(saved, 10));
+      sessionStorage.removeItem("sidebarScrollY");
+    }
+  }, []);
 
   useEffect(() => {
     if (open) {
@@ -77,8 +89,9 @@ export default function CategorySidebar({
           <ul className="space-y-1 overflow-y-auto max-h-[calc(100vh-220px)]">
             <li>
               <Link
+                scroll={false}
                 href="/productos"
-                onClick={() => setOpen(false)}
+                onClick={() => { saveScroll(); setOpen(false); }}
                 className={`block px-3 py-2 text-sm rounded-lg ${
                   !activeId && !activeBrandId
                     ? "bg-blue-50 text-blue-700 font-medium"
@@ -91,8 +104,9 @@ export default function CategorySidebar({
             {filteredCats.map((cat) => (
               <li key={cat.id}>
                 <Link
+                  scroll={false}
                   href={`/categoria/${cat.id}`}
-                  onClick={() => setOpen(false)}
+                  onClick={() => { saveScroll(); setOpen(false); }}
                   className={`block px-3 py-2 text-sm rounded-lg ${
                     activeId === cat.id
                       ? "bg-blue-50 text-blue-700 font-medium"
@@ -124,8 +138,9 @@ export default function CategorySidebar({
             {filteredBrands.map((brand) => (
               <li key={brand.id}>
                 <Link
+                  scroll={false}
                   href={`/marca/${brand.id}`}
-                  onClick={() => setOpen(false)}
+                  onClick={() => { saveScroll(); setOpen(false); }}
                   className={`block px-3 py-2 text-sm rounded-lg ${
                     activeBrandId === brand.id
                       ? "bg-blue-50 text-blue-700 font-medium"
