@@ -85,7 +85,6 @@ export async function generateLabelPdf(
     }
   }
 
-  const labelsPerPage = f.cols * f.rows;
   let labelIdx = 0;
 
   while (labelIdx < labels.length) {
