@@ -24,6 +24,7 @@
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
+    "@types/bwip-js": "^3.2.3",
     "@types/mssql": "^9.1.9",
     "@types/node": "^20",
     "@types/react": "^18",

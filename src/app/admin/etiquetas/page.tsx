@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import type { Product } from "@/types";
 import type { LabelFormat, LabelProduct } from "@/lib/label-pdf";
@@ -11,6 +11,22 @@ interface SelectedProduct {
   quantity: number;
 }
 
+interface PriceChange {
+  id: number;
+  sku: string;
+  name: string;
+  field: string;
+  oldPrice: string;
+  newPrice: string;
+  detectedAt: string;
+}
+
+const FIELD_LABELS: Record<string, string> = {
+  precio: "Minorista",
+  precio2: "Mayorista",
+  precio4: "Caja Cerrada",
+};
+
 export default function EtiquetasPage() {
   const [format, setFormat] = useState<LabelFormat>("gondola");
   const [search, setSearch] = useState("");
@@ -19,6 +35,62 @@ export default function EtiquetasPage() {
   const [searching, setSearching] = useState(false);
   const [generating, setGenerating] = useState(false);
   const searchTimeout = useRef<NodeJS.Timeout | null>(null);
+
+  // Price tracking state
+  const [scanning, setScanning] = useState(false);
+  const [scanResult, setScanResult] = useState<{ scanned: number; changes: number; isFirstScan: boolean } | null>(null);
+  const [priceChanges, setPriceChanges] = useState<PriceChange[]>([]);
+  const [loadingChanges, setLoadingChanges] = useState(false);
+
+  useEffect(() => {
+    loadPriceChanges();
+  }, []);
+
+  async function loadPriceChanges() {
+    setLoadingChanges(true);
+    try {
+      const res = await fetch("/api/admin/price-changes?days=30");
+      const data = await res.json();
+      setPriceChanges(data.changes || []);
+    } catch {
+      setPriceChanges([]);
+    } finally {
+      setLoadingChanges(false);
+    }
+  }
+
+  async function runPriceScan() {
+    setScanning(true);
+    setScanResult(null);
+    try {
+      const res = await fetch("/api/admin/price-scan", { method: "POST" });
+      const data = await res.json();
+      setScanResult(data);
+      await loadPriceChanges();
+    } catch {
+      alert("Error al escanear precios");
+    } finally {
+      setScanning(false);
+    }
+  }
+
+  async function addChangedProducts() {
+    // Get unique SKUs from price changes
+    const skus = Array.from(new Set(priceChanges.map((c) => c.sku)));
+    const newSelected = [...selected];
+    for (const sku of skus) {
+      if (newSelected.find((s) => s.product.sku === sku)) continue;
+      try {
+        const res = await fetch(`/api/products/${encodeURIComponent(sku)}`);
+        if (!res.ok) continue;
+        const product = await res.json();
+        newSelected.push({ product, quantity: 1 });
+      } catch {
+        // skip if product not found
+      }
+    }
+    setSelected(newSelected);
+  }
 
   function handleSearch(value: string) {
     setSearch(value);
@@ -98,6 +170,86 @@ export default function EtiquetasPage() {
         >
           Volver
         </Link>
+      </div>
+
+      {/* Price changes */}
+      <div className="bg-white rounded-lg border p-4 mb-4">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-medium text-gray-700">Cambios de precios</h2>
+          <button
+            onClick={runPriceScan}
+            disabled={scanning}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              scanning
+                ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                : "bg-green-600 text-white hover:bg-green-700"
+            }`}
+          >
+            {scanning ? "Escaneando..." : "Escanear precios"}
+          </button>
+        </div>
+
+        {scanResult && (
+          <div className={`text-sm p-3 rounded-lg mb-3 ${
+            scanResult.isFirstScan
+              ? "bg-blue-50 text-blue-700"
+              : scanResult.changes > 0
+              ? "bg-yellow-50 text-yellow-700"
+              : "bg-green-50 text-green-700"
+          }`}>
+            {scanResult.isFirstScan
+              ? `Primera captura realizada: ${scanResult.scanned} productos registrados. En el próximo escaneo se detectarán los cambios.`
+              : scanResult.changes > 0
+              ? `Se detectaron ${scanResult.changes} cambios de precio en ${scanResult.scanned} productos.`
+              : `Sin cambios. ${scanResult.scanned} productos verificados.`}
+          </div>
+        )}
+
+        {loadingChanges ? (
+          <p className="text-sm text-gray-400">Cargando...</p>
+        ) : priceChanges.length > 0 ? (
+          <>
+            <div className="max-h-60 overflow-y-auto border rounded-lg">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 sticky top-0">
+                  <tr>
+                    <th className="text-left px-3 py-2 font-medium text-gray-600">Producto</th>
+                    <th className="text-left px-3 py-2 font-medium text-gray-600">Lista</th>
+                    <th className="text-right px-3 py-2 font-medium text-gray-600">Anterior</th>
+                    <th className="text-right px-3 py-2 font-medium text-gray-600">Nuevo</th>
+                    <th className="text-right px-3 py-2 font-medium text-gray-600">Fecha</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {priceChanges.map((c) => (
+                    <tr key={c.id} className="hover:bg-gray-50">
+                      <td className="px-3 py-2">
+                        <div className="truncate max-w-[200px]">{c.name}</div>
+                        <div className="text-xs text-gray-400">{c.sku}</div>
+                      </td>
+                      <td className="px-3 py-2 text-gray-600">{FIELD_LABELS[c.field] || c.field}</td>
+                      <td className="px-3 py-2 text-right text-red-500 line-through">${Number(c.oldPrice).toFixed(2)}</td>
+                      <td className="px-3 py-2 text-right text-green-600 font-medium">${Number(c.newPrice).toFixed(2)}</td>
+                      <td className="px-3 py-2 text-right text-gray-400 text-xs">
+                        {new Date(c.detectedAt).toLocaleDateString("es-AR")}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <button
+              onClick={addChangedProducts}
+              className="mt-3 w-full py-2 bg-yellow-500 text-white rounded-lg text-sm font-medium hover:bg-yellow-600 transition-colors"
+            >
+              Agregar {Array.from(new Set(priceChanges.map((c) => c.sku))).length} productos con cambios a las etiquetas
+            </button>
+          </>
+        ) : (
+          <p className="text-sm text-gray-400">
+            No hay cambios de precios registrados. Presioná &quot;Escanear precios&quot; para iniciar el seguimiento.
+          </p>
+        )}
       </div>
 
       {/* Format selector */}

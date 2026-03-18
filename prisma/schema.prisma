@@ -42,6 +42,32 @@ model HiddenCategory {
   @@map("hidden_categories")
 }
 
+model PriceSnapshot {
+  id       Int      @id @default(autoincrement())
+  sku      String   @db.VarChar(7)
+  precio   Decimal  @db.Decimal(12, 2)
+  precio2  Decimal  @db.Decimal(12, 2)
+  precio4  Decimal  @db.Decimal(12, 2)
+  takenAt  DateTime @default(now())
+
+  @@unique([sku])
+  @@map("price_snapshots")
+}
+
+model PriceChange {
+  id          Int      @id @default(autoincrement())
+  sku         String   @db.VarChar(7)
+  name        String   @db.VarChar(255)
+  field       String   @db.VarChar(20)
+  oldPrice    Decimal  @db.Decimal(12, 2)
+  newPrice    Decimal  @db.Decimal(12, 2)
+  detectedAt  DateTime @default(now())
+
+  @@index([detectedAt])
+  @@index([sku])
+  @@map("price_changes")
+}
+
 model User {
   id           Int      @id @default(autoincrement())
   username     String   @unique @db.VarChar(50)
