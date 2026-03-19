@@ -31,7 +31,7 @@ export const authOptions: NextAuthOptions = {
 
           if (result.recordset.length > 0) {
             const cliente = result.recordset[0];
-            if (cliente.observaciones === credentials.password) {
+            if (cliente.observaciones.toLowerCase() === credentials.password.toLowerCase()) {
               return {
                 id: cliente.cod,
                 name: cliente.nombre,
