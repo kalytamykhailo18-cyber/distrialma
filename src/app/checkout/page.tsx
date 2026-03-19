@@ -174,26 +174,9 @@ export default function CheckoutPage() {
       <div className="space-y-3">
         {clientInfo?.deliveryDay && (
           <button
-            onClick={async () => {
-              setSending(true);
-              try {
-                const res = await fetch("/api/orders", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ items, notes: notes.trim() }),
-                });
-                if (res.ok) {
-                  clearCart();
-                  router.push("/pedido-enviado");
-                } else {
-                  const data = await res.json();
-                  alert(data.error || "Error al enviar el pedido");
-                }
-              } catch {
-                alert("Error al enviar el pedido");
-              } finally {
-                setSending(false);
-              }
+            onClick={() => {
+              setPendingAction("order");
+              setShowDisclaimer(true);
             }}
             disabled={sending}
             className="w-full py-3 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors disabled:opacity-50"
@@ -203,7 +186,10 @@ export default function CheckoutPage() {
         )}
 
         <button
-          onClick={handleWhatsApp}
+          onClick={() => {
+            setPendingAction("whatsapp");
+            setShowDisclaimer(true);
+          }}
           className="w-full py-3 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600 transition-colors flex items-center justify-center gap-2"
         >
           <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
@@ -219,6 +205,88 @@ export default function CheckoutPage() {
           </p>
         )}
       </div>
+
+      {/* Disclaimer modal */}
+      {showDisclaimer && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
+            <div className="flex justify-center mb-4">
+              <img src="/logo.png" alt="Alma" className="h-20 object-contain" />
+            </div>
+
+            <div className="flex items-center gap-2 mb-4 justify-center">
+              <svg className="w-5 h-5 text-amber-500 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+              <h3 className="text-lg font-semibold text-gray-900">Condiciones del pedido</h3>
+            </div>
+
+            <ol className="space-y-3 text-sm text-gray-700 mb-6">
+              <li className="flex gap-2">
+                <span className="font-semibold text-brand-400 shrink-0">1.</span>
+                <span>Precios de productos pasibles sujeto a facturación final.</span>
+              </li>
+              <li className="flex gap-2">
+                <span className="font-semibold text-brand-400 shrink-0">2.</span>
+                <span>Precios en efectivo. Consulte costos por otros medios de pago.</span>
+              </li>
+              <li className="flex gap-2">
+                <span className="font-semibold text-brand-400 shrink-0">3.</span>
+                <span>Aplican condiciones de entrega y disponibilidad.</span>
+              </li>
+              <li className="flex gap-2">
+                <span className="font-semibold text-brand-400 shrink-0">4.</span>
+                <span>Sujeto a cierre de horario de pedidos.</span>
+              </li>
+            </ol>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowDisclaimer(false);
+                  setPendingAction(null);
+                }}
+                className="flex-1 py-2.5 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={async () => {
+                  setShowDisclaimer(false);
+                  if (pendingAction === "whatsapp") {
+                    handleWhatsApp();
+                  } else if (pendingAction === "order") {
+                    setSending(true);
+                    try {
+                      const res = await fetch("/api/orders", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ items, notes: notes.trim() }),
+                      });
+                      if (res.ok) {
+                        clearCart();
+                        router.push("/pedido-enviado");
+                      } else {
+                        const data = await res.json();
+                        alert(data.error || "Error al enviar el pedido");
+                      }
+                    } catch {
+                      alert("Error al enviar el pedido");
+                    } finally {
+                      setSending(false);
+                    }
+                  }
+                  setPendingAction(null);
+                }}
+                disabled={sending}
+                className="flex-1 py-2.5 bg-brand-400 text-white rounded-lg text-sm font-medium hover:bg-brand-500 disabled:opacity-50"
+              >
+                Aceptar y enviar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
