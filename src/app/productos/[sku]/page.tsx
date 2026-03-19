@@ -148,10 +148,10 @@ export default function ProductDetailPage() {
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
       <Link
-        href="/productos"
+        href={product.categoryId ? `/categoria/${product.categoryId}` : "/productos"}
         className="text-sm text-brand-600 hover:underline mb-4 inline-block"
       >
-        &larr; Volver a productos
+        &larr; {product.category ? `Volver a ${product.category}` : "Volver a productos"}
       </Link>
 
       {message && (
