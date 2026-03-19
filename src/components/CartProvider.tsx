@@ -51,14 +51,16 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   const addItem = useCallback(
     (item: Omit<CartItem, "quantity" | "mode">, mode: "unit" | "box" = "unit") => {
+      const minQty = mode === "unit" && item.pesoMayorista > 0 ? item.pesoMayorista : 1;
       setItems((prev) => {
         const existing = prev.find((i) => i.sku === item.sku);
         if (existing) {
+          const step = existing.mode === "unit" && existing.pesoMayorista > 0 ? existing.pesoMayorista : 1;
           return prev.map((i) =>
-            i.sku === item.sku ? { ...i, quantity: i.quantity + 1 } : i
+            i.sku === item.sku ? { ...i, quantity: i.quantity + step } : i
           );
         }
-        return [...prev, { ...item, quantity: 1, mode }];
+        return [...prev, { ...item, quantity: minQty, mode }];
       });
     },
     []
@@ -69,15 +71,24 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const updateQuantity = useCallback((sku: string, quantity: number) => {
-    if (quantity < 1) return;
     setItems((prev) =>
-      prev.map((i) => (i.sku === sku ? { ...i, quantity } : i))
+      prev.map((i) => {
+        if (i.sku !== sku) return i;
+        const minQty = i.mode === "unit" && i.pesoMayorista > 0 ? i.pesoMayorista : 1;
+        const newQty = Math.max(minQty, quantity);
+        return { ...i, quantity: newQty };
+      })
     );
   }, []);
 
   const updateMode = useCallback((sku: string, mode: "unit" | "box") => {
     setItems((prev) =>
-      prev.map((i) => (i.sku === sku ? { ...i, mode } : i))
+      prev.map((i) => {
+        if (i.sku !== sku) return i;
+        const minQty = mode === "unit" && i.pesoMayorista > 0 ? i.pesoMayorista : 1;
+        const newQty = Math.max(minQty, i.quantity);
+        return { ...i, mode, quantity: newQty };
+      })
     );
   }, []);
 

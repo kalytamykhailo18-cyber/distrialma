@@ -40,6 +40,8 @@ export default function CarritoPage() {
         {items.map((item) => {
           const isKg = item.unit === "KG";
           const unitLabel = isKg ? "KG" : "un.";
+          const step = item.mode === "unit" && item.pesoMayorista > 0 ? item.pesoMayorista : 1;
+          const minQty = step;
           const unitPrice = item.mode === "box" && item.precioCajaCerrada > 0
             ? item.precioCajaCerrada
             : item.precioMayorista;
@@ -96,8 +98,8 @@ export default function CarritoPage() {
                 {/* Quantity */}
                 <div className="flex items-center gap-1">
                   <button
-                    onClick={() => updateQuantity(item.sku, item.quantity - 1)}
-                    disabled={item.quantity <= 1}
+                    onClick={() => updateQuantity(item.sku, item.quantity - step)}
+                    disabled={item.quantity <= minQty}
                     className="w-7 h-7 flex items-center justify-center rounded border text-gray-600 hover:bg-gray-100 disabled:opacity-30"
                   >
                     -
@@ -105,12 +107,13 @@ export default function CarritoPage() {
                   <input
                     type="number"
                     value={item.quantity}
-                    onChange={(e) => updateQuantity(item.sku, parseInt(e.target.value) || 1)}
+                    onChange={(e) => updateQuantity(item.sku, parseInt(e.target.value) || minQty)}
                     className="w-12 text-center text-sm border rounded py-1"
-                    min={1}
+                    min={minQty}
+                    step={step}
                   />
                   <button
-                    onClick={() => updateQuantity(item.sku, item.quantity + 1)}
+                    onClick={() => updateQuantity(item.sku, item.quantity + step)}
                     className="w-7 h-7 flex items-center justify-center rounded border text-gray-600 hover:bg-gray-100"
                   >
                     +

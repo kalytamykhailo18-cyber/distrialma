@@ -33,6 +33,7 @@ export interface CartItem {
   sku: string;
   name: string;
   unit: string;
+  pesoMayorista: number;
   precioMayorista: number;
   precioCajaCerrada: number;
   cantidadPorCaja: number;
