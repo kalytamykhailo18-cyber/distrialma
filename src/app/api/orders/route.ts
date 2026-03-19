@@ -52,6 +52,8 @@ export async function POST(req: NextRequest) {
     const client = clientResult.recordset[0];
 
     // Get next Cod and Nroped
+    const dbTransas = "c:\\puntouch\\bdtransas.mdf";
+
     const maxResult = await pool.request().query(`
       SELECT ISNULL(MAX(CAST(LTRIM(RTRIM(Cod)) AS INT)), 0) AS maxCod,
              ISNULL(MAX(CAST(LTRIM(RTRIM(Nroped)) AS INT)), 0) AS maxNroped,
@@ -59,9 +61,16 @@ export async function POST(req: NextRequest) {
       FROM [${dbPedidos}].dbo.Pedidos
     `);
 
+    // NroMostra (turno) must come from Transas table for correct sequencing
+    const maxMostra = await pool.request().query(`
+      SELECT ISNULL(MAX(CAST(LTRIM(RTRIM(NroMostra)) AS INT)), 0) AS maxNroMostra
+      FROM [${dbTransas}].dbo.Transas
+    `);
+
     let nextCod = maxResult.recordset[0].maxCod + 1;
     const nextNroped = String(maxResult.recordset[0].maxNroped + 1).padStart(8, "0");
     const nextNroTransa = String(maxResult.recordset[0].maxNroTransa + 1).padStart(8, "0");
+    const nextNroMostra = String(maxMostra.recordset[0].maxNroMostra + 1).padStart(8, "0");
 
     // Build timestamp
     const now = new Date();
@@ -108,6 +117,7 @@ export async function POST(req: NextRequest) {
     headerReq.input("obs", notes);
 
     headerReq.input("nroTransa", nextNroTransa);
+    headerReq.input("nroMostra", nextNroMostra);
 
     await headerReq.query(`
       INSERT INTO [${dbPedidos}].dbo.Pedidos
@@ -124,7 +134,7 @@ export async function POST(req: NextRequest) {
          '       ', @cant, 0, @impo, @total, 0, 0, 0, 0, 0, 0,
          0, 0, 0, 0, 0, 0, 0,
          @obs, ' ', '', '    ', '', 0,
-         '       ', '       ', '       ', @nroped, '        ', @nroTransa,
+         '       ', '       ', '       ', @nroped, @nroMostra, @nroTransa,
          @telefono, @cliente, @nombre, @calle, @nume, @pisoDto, '', '',
          @localidad, @cuit, @iva, '              ', ' ', '', 0,
          'WEB')
@@ -163,6 +173,7 @@ export async function POST(req: NextRequest) {
       itemReq.input("telefono", client.telefono.padEnd(14, " "));
       itemReq.input("listaPrecio", listaPrecio);
       itemReq.input("nroTransa", nextNroTransa);
+      itemReq.input("nroMostra", nextNroMostra);
 
       await itemReq.query(`
         INSERT INTO [${dbPedidos}].dbo.Pedidos
@@ -179,7 +190,7 @@ export async function POST(req: NextRequest) {
            @producto, @cant, @precio, @impo, @total, 0, 0, 0, 0, 0, 0,
            0, 0, 0, 0, 0, 0, 0,
            '', ' ', '', '    ', '', @listaPrecio,
-           '       ', '       ', '       ', @nroped, '        ', @nroTransa,
+           '       ', '       ', '       ', @nroped, @nroMostra, @nroTransa,
            @telefono, @cliente, @nombre, @calle, @nume, @pisoDto, '', '',
            @localidad, @cuit, @iva, '              ', ' ', '', 0,
            'WEB')
