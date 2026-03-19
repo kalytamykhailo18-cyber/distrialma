@@ -39,12 +39,19 @@ export default function Navbar() {
           </Link>
           {session?.user ? (
             <>
-              {(session.user as { role?: string }).role === "admin" && (
+              {(session.user as { role?: string }).role === "admin" ? (
                 <Link
                   href="/admin"
                   className="text-sm text-gray-600 hover:text-brand-600"
                 >
                   Admin
+                </Link>
+              ) : (
+                <Link
+                  href="/mis-pedidos"
+                  className="text-sm text-gray-600 hover:text-brand-600"
+                >
+                  Mis Pedidos
                 </Link>
               )}
               <span className="text-sm text-gray-500">
