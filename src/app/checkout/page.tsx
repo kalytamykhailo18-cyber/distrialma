@@ -101,7 +101,7 @@ export default function CheckoutPage() {
     <div className="max-w-2xl mx-auto px-4 py-6">
       <Link
         href="/carrito"
-        className="text-sm text-brand-400 hover:underline mb-4 inline-block"
+        className="text-sm text-brand-600 hover:underline mb-4 inline-block"
       >
         &larr; Volver al carrito
       </Link>
@@ -223,19 +223,19 @@ export default function CheckoutPage() {
 
             <ol className="space-y-3 text-sm text-gray-700 mb-6">
               <li className="flex gap-2">
-                <span className="font-semibold text-brand-400 shrink-0">1.</span>
+                <span className="font-semibold text-brand-600 shrink-0">1.</span>
                 <span>Precios de productos pasibles sujeto a facturación final.</span>
               </li>
               <li className="flex gap-2">
-                <span className="font-semibold text-brand-400 shrink-0">2.</span>
+                <span className="font-semibold text-brand-600 shrink-0">2.</span>
                 <span>Precios en efectivo. Consulte costos por otros medios de pago.</span>
               </li>
               <li className="flex gap-2">
-                <span className="font-semibold text-brand-400 shrink-0">3.</span>
+                <span className="font-semibold text-brand-600 shrink-0">3.</span>
                 <span>Aplican condiciones de entrega y disponibilidad.</span>
               </li>
               <li className="flex gap-2">
-                <span className="font-semibold text-brand-400 shrink-0">4.</span>
+                <span className="font-semibold text-brand-600 shrink-0">4.</span>
                 <span>Sujeto a cierre de horario de pedidos.</span>
               </li>
             </ol>

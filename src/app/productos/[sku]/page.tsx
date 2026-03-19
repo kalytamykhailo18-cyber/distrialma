@@ -138,7 +138,7 @@ export default function ProductDetailPage() {
     return (
       <div className="max-w-4xl mx-auto px-4 py-12 text-center">
         <p className="text-gray-500 mb-4">Producto no encontrado</p>
-        <Link href="/productos" className="text-brand-400 hover:underline">
+        <Link href="/productos" className="text-brand-600 hover:underline">
           Volver a productos
         </Link>
       </div>
@@ -149,7 +149,7 @@ export default function ProductDetailPage() {
     <div className="max-w-4xl mx-auto px-4 py-8">
       <Link
         href="/productos"
-        className="text-sm text-brand-400 hover:underline mb-4 inline-block"
+        className="text-sm text-brand-600 hover:underline mb-4 inline-block"
       >
         &larr; Volver a productos
       </Link>
@@ -301,7 +301,7 @@ export default function ProductDetailPage() {
               <p className="text-sm text-gray-500 italic">
                 {!session?.user ? (
                   <>
-                    <Link href="/login" className="text-brand-400 hover:underline">
+                    <Link href="/login" className="text-brand-600 hover:underline">
                       Iniciá sesión
                     </Link>{" "}
                     para ver el precio Especial.

@@ -53,7 +53,7 @@ export default function CarritoPage() {
             <div key={item.sku} className="bg-white rounded-lg border p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1 min-w-0">
-                  <Link href={`/productos/${item.sku}`} className="text-sm font-medium text-gray-900 hover:text-brand-400">
+                  <Link href={`/productos/${item.sku}`} className="text-sm font-medium text-gray-900 hover:text-brand-600">
                     {item.name}
                   </Link>
                   <p className="text-xs text-gray-400 mt-0.5">SKU: {item.sku}</p>
