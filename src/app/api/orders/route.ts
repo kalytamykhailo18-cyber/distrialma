@@ -128,7 +128,9 @@ export async function POST(req: NextRequest) {
          Usuario, Empleado, Proveedor, Nroped, NroMostra, NroTransa,
          Telefono, Cliente, Nombre, Calle, Nume, PisoDto, Entre1, Entre2,
          Localidad, CUIT, IVA, FechoraEntregar, Anulado, TalleColor, Stkinicial,
-         Filler1)
+         Filler1, Filler2, Filler3,
+         FillerNum1, FillerNum2, FillerNum3, FillerNum4, FillerNum5,
+         FillerBit1, FillerBit2, FillerBit3, FillerBit4, FillerBit5)
       VALUES
         (@cod, @boleta, '0  ', 'V', ' ', '6  ', '0  ', 6, @fechora,
          '       ', @cant, 0, @impo, @total, 0, 0, 0, 0, 0, 0,
@@ -137,7 +139,9 @@ export async function POST(req: NextRequest) {
          '       ', '       ', '       ', @nroped, @nroMostra, @nroTransa,
          @telefono, @cliente, @nombre, @calle, @nume, @pisoDto, '', '',
          @localidad, @cuit, @iva, '              ', ' ', '', 0,
-         'WEB')
+         'WEB', '', '',
+         0, 0, 0, 0, 0,
+         0, 0, 0, 0, 0)
     `);
 
     nextCod++;
@@ -184,7 +188,9 @@ export async function POST(req: NextRequest) {
            Usuario, Empleado, Proveedor, Nroped, NroMostra, NroTransa,
            Telefono, Cliente, Nombre, Calle, Nume, PisoDto, Entre1, Entre2,
            Localidad, CUIT, IVA, FechoraEntregar, Anulado, TalleColor, Stkinicial,
-           Filler1)
+           Filler1, Filler2, Filler3,
+           FillerNum1, FillerNum2, FillerNum3, FillerNum4, FillerNum5,
+           FillerBit1, FillerBit2, FillerBit3, FillerBit4, FillerBit5)
         VALUES
           (@cod, @boleta, @itm, 'I', ' ', '6  ', '0  ', 6, @fechora,
            @producto, @cant, @precio, @impo, @total, 0, 0, 0, 0, 0, 0,
@@ -193,7 +199,9 @@ export async function POST(req: NextRequest) {
            '       ', '       ', '       ', @nroped, @nroMostra, @nroTransa,
            @telefono, @cliente, @nombre, @calle, @nume, @pisoDto, '', '',
            @localidad, @cuit, @iva, '              ', ' ', '', 0,
-           'WEB')
+           'WEB', '', '',
+           0, 0, 0, 0, 0,
+           0, 0, 0, 0, 0)
       `);
 
       nextCod++;
