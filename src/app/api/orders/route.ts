@@ -105,7 +105,7 @@ export async function POST(req: NextRequest) {
     headerReq.input("impo", totalImpo);
     headerReq.input("total", totalImpo);
     headerReq.input("nroped", nextNroped);
-    headerReq.input("cliente", client.cod.padEnd(7, " "));
+    headerReq.input("cliente", client.cod.padStart(7, " "));
     headerReq.input("nombre", client.nombre);
     headerReq.input("calle", client.calle);
     headerReq.input("nume", client.nume);
@@ -160,13 +160,13 @@ export async function POST(req: NextRequest) {
       itemReq.input("boleta", boletaCod);
       itemReq.input("itm", String(i + 1).padStart(3, " "));
       itemReq.input("fechora", fechora.padEnd(14, " "));
-      itemReq.input("producto", item.sku.padEnd(7, " "));
+      itemReq.input("producto", item.sku.padStart(7, " "));
       itemReq.input("cant", cant);
       itemReq.input("precio", price);
       itemReq.input("impo", impo);
       itemReq.input("total", totalImpo);
       itemReq.input("nroped", nextNroped);
-      itemReq.input("cliente", client.cod.padEnd(7, " "));
+      itemReq.input("cliente", client.cod.padStart(7, " "));
       itemReq.input("nombre", client.nombre);
       itemReq.input("calle", client.calle);
       itemReq.input("nume", client.nume);
