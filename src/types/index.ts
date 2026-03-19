@@ -32,7 +32,10 @@ export interface Brand {
 export interface CartItem {
   sku: string;
   name: string;
-  price: number;
-  priceLabel: string;
+  unit: string;
+  precioMayorista: number;
+  precioCajaCerrada: number;
+  cantidadPorCaja: number;
   quantity: number;
+  mode: "unit" | "box";
 }

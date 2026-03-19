@@ -6,6 +6,7 @@ import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { formatPrice } from "@/lib/utils";
 import ConfirmModal from "@/components/ConfirmModal";
+import { useCart } from "@/components/CartProvider";
 import type { Product } from "@/types";
 
 export default function ProductDetailPage() {
@@ -17,6 +18,9 @@ export default function ProductDetailPage() {
 
   const isAdmin =
     (session?.user as { role?: string } | undefined)?.role === "admin";
+  const { addItem, items } = useCart();
+  const inCart = items.find((i) => i.sku === sku);
+  const [addedFeedback, setAddedFeedback] = useState(false);
 
   // Admin edit state
   const [description, setDescription] = useState("");
@@ -317,6 +321,50 @@ export default function ProductDetailPage() {
                   ? ` (${product.pesoMayorista} KG aprox.)`
                   : ""}
               </span>
+            </div>
+          )}
+
+          {/* Add to cart */}
+          {!isAdmin && product.precioMayorista > 0 && (
+            <div className="mb-6">
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    addItem({
+                      sku: product.sku,
+                      name: product.name,
+                      unit: product.unit,
+                      precioMayorista: product.precioMayorista,
+                      precioCajaCerrada: product.precioCajaCerrada,
+                      cantidadPorCaja: product.cantidadPorCaja,
+                    }, "unit");
+                    setAddedFeedback(true);
+                    setTimeout(() => setAddedFeedback(false), 2000);
+                  }}
+                  className="flex-1 py-3 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors"
+                >
+                  {addedFeedback ? "Agregado!" : inCart ? `En carrito (${inCart.quantity})` : "Agregar por unidad"}
+                </button>
+                {product.precioCajaCerrada > 0 && product.cantidadPorCaja > 0 && (
+                  <button
+                    onClick={() => {
+                      addItem({
+                        sku: product.sku,
+                        name: product.name,
+                        unit: product.unit,
+                        precioMayorista: product.precioMayorista,
+                        precioCajaCerrada: product.precioCajaCerrada,
+                        cantidadPorCaja: product.cantidadPorCaja,
+                      }, "box");
+                      setAddedFeedback(true);
+                      setTimeout(() => setAddedFeedback(false), 2000);
+                    }}
+                    className="flex-1 py-3 bg-brand-400 text-white rounded-lg text-sm font-medium hover:bg-brand-500 transition-colors"
+                  >
+                    Agregar caja cerrada
+                  </button>
+                )}
+              </div>
             </div>
           )}
 

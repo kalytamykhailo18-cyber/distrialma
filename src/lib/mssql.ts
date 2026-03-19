@@ -51,6 +51,7 @@ export function getDbName(key: string): string {
     productos: process.env.MSSQL_DB_PRODUCTOS!,
     clientes: process.env.MSSQL_DB_CLIENTES!,
     elementos: process.env.MSSQL_DB_ELEMENTOS!,
+    pedidos: process.env.MSSQL_DB_PEDIDOS!,
   };
   return map[key];
 }
