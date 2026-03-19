@@ -54,12 +54,14 @@ export async function POST(req: NextRequest) {
     // Get next Cod and Nroped
     const maxResult = await pool.request().query(`
       SELECT ISNULL(MAX(CAST(LTRIM(RTRIM(Cod)) AS INT)), 0) AS maxCod,
-             ISNULL(MAX(CAST(LTRIM(RTRIM(Nroped)) AS INT)), 0) AS maxNroped
+             ISNULL(MAX(CAST(LTRIM(RTRIM(Nroped)) AS INT)), 0) AS maxNroped,
+             ISNULL(MAX(CAST(LTRIM(RTRIM(NroTransa)) AS INT)), 0) AS maxNroTransa
       FROM [${dbPedidos}].dbo.Pedidos
     `);
 
     let nextCod = maxResult.recordset[0].maxCod + 1;
     const nextNroped = String(maxResult.recordset[0].maxNroped + 1).padStart(8, "0");
+    const nextNroTransa = String(maxResult.recordset[0].maxNroTransa + 1).padStart(8, "0");
 
     // Build timestamp
     const now = new Date();
@@ -105,6 +107,8 @@ export async function POST(req: NextRequest) {
     headerReq.input("telefono", client.telefono.padEnd(14, " "));
     headerReq.input("obs", notes);
 
+    headerReq.input("nroTransa", nextNroTransa);
+
     await headerReq.query(`
       INSERT INTO [${dbPedidos}].dbo.Pedidos
         (Cod, Boleta, Itm, Tipo, TipoFac, Sucursal, Deposito, Terminal, Fechora,
@@ -113,15 +117,17 @@ export async function POST(req: NextRequest) {
          Observaciones, MovCaja, Concepto, CodTarjeta, NroTarjeta, ListaPrecio,
          Usuario, Empleado, Proveedor, Nroped, NroMostra, NroTransa,
          Telefono, Cliente, Nombre, Calle, Nume, PisoDto, Entre1, Entre2,
-         Localidad, CUIT, IVA, FechoraEntregar, Anulado, TalleColor, Stkinicial)
+         Localidad, CUIT, IVA, FechoraEntregar, Anulado, TalleColor, Stkinicial,
+         Filler1)
       VALUES
-        (@cod, @boleta, '0  ', 'V', ' ', '   ', '0  ', 0, @fechora,
+        (@cod, @boleta, '0  ', 'V', ' ', '6  ', '0  ', 6, @fechora,
          '       ', @cant, 0, @impo, @total, 0, 0, 0, 0, 0, 0,
          0, 0, 0, 0, 0, 0, 0,
          @obs, ' ', '', '    ', '', 0,
-         '       ', '       ', '       ', @nroped, '        ', '        ',
+         '       ', '       ', '       ', @nroped, '        ', @nroTransa,
          @telefono, @cliente, @nombre, @calle, @nume, @pisoDto, '', '',
-         @localidad, @cuit, @iva, '              ', ' ', '', 0)
+         @localidad, @cuit, @iva, '              ', ' ', '', 0,
+         'WEB')
     `);
 
     nextCod++;
@@ -156,6 +162,7 @@ export async function POST(req: NextRequest) {
       itemReq.input("iva", client.iva.padEnd(1, " "));
       itemReq.input("telefono", client.telefono.padEnd(14, " "));
       itemReq.input("listaPrecio", listaPrecio);
+      itemReq.input("nroTransa", nextNroTransa);
 
       await itemReq.query(`
         INSERT INTO [${dbPedidos}].dbo.Pedidos
@@ -165,15 +172,17 @@ export async function POST(req: NextRequest) {
            Observaciones, MovCaja, Concepto, CodTarjeta, NroTarjeta, ListaPrecio,
            Usuario, Empleado, Proveedor, Nroped, NroMostra, NroTransa,
            Telefono, Cliente, Nombre, Calle, Nume, PisoDto, Entre1, Entre2,
-           Localidad, CUIT, IVA, FechoraEntregar, Anulado, TalleColor, Stkinicial)
+           Localidad, CUIT, IVA, FechoraEntregar, Anulado, TalleColor, Stkinicial,
+           Filler1)
         VALUES
-          (@cod, @boleta, @itm, 'I', ' ', '   ', '0  ', 0, @fechora,
+          (@cod, @boleta, @itm, 'I', ' ', '6  ', '0  ', 6, @fechora,
            @producto, @cant, @precio, @impo, @total, 0, 0, 0, 0, 0, 0,
            0, 0, 0, 0, 0, 0, 0,
            '', ' ', '', '    ', '', @listaPrecio,
-           '       ', '       ', '       ', @nroped, '        ', '        ',
+           '       ', '       ', '       ', @nroped, '        ', @nroTransa,
            @telefono, @cliente, @nombre, @calle, @nume, @pisoDto, '', '',
-           @localidad, @cuit, @iva, '              ', ' ', '', 0)
+           @localidad, @cuit, @iva, '              ', ' ', '', 0,
+           'WEB')
       `);
 
       nextCod++;

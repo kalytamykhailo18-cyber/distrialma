@@ -58,7 +58,7 @@ export default function CategorySidebar({
           onClick={() => setTab("categorias")}
           className={`flex-1 py-2 text-sm font-medium border-b-2 transition-colors ${
             tab === "categorias"
-              ? "border-brand-400 text-brand-400"
+              ? "border-brand-500 text-brand-600"
               : "border-transparent text-gray-500 hover:text-gray-700"
           }`}
         >
@@ -68,7 +68,7 @@ export default function CategorySidebar({
           onClick={() => setTab("marcas")}
           className={`flex-1 py-2 text-sm font-medium border-b-2 transition-colors ${
             tab === "marcas"
-              ? "border-brand-400 text-brand-400"
+              ? "border-brand-500 text-brand-600"
               : "border-transparent text-gray-500 hover:text-gray-700"
           }`}
         >

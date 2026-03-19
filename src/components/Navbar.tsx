@@ -13,20 +13,20 @@ export default function Navbar() {
   return (
     <nav className="bg-white shadow-sm border-b">
       <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
-        <Link href="/" className="text-xl font-bold text-brand-400 shrink-0">
+        <Link href="/" className="text-xl font-bold text-brand-600 shrink-0">
           Distrialma
         </Link>
 
         <div className="flex items-center gap-3 shrink-0">
           <Link
             href="/productos"
-            className="text-sm text-gray-600 hover:text-brand-400"
+            className="text-sm text-gray-600 hover:text-brand-600"
           >
             Productos
           </Link>
           <Link
             href="/carrito"
-            className="relative text-gray-600 hover:text-brand-400"
+            className="relative text-gray-600 hover:text-brand-600"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z" />
@@ -42,7 +42,7 @@ export default function Navbar() {
               {(session.user as { role?: string }).role === "admin" && (
                 <Link
                   href="/admin"
-                  className="text-sm text-gray-600 hover:text-brand-400"
+                  className="text-sm text-gray-600 hover:text-brand-600"
                 >
                   Admin
                 </Link>
