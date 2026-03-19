@@ -134,7 +134,7 @@ export default function ProductDetailPage() {
     return (
       <div className="max-w-4xl mx-auto px-4 py-12 text-center">
         <p className="text-gray-500 mb-4">Producto no encontrado</p>
-        <Link href="/productos" className="text-blue-600 hover:underline">
+        <Link href="/productos" className="text-brand-400 hover:underline">
           Volver a productos
         </Link>
       </div>
@@ -145,13 +145,13 @@ export default function ProductDetailPage() {
     <div className="max-w-4xl mx-auto px-4 py-8">
       <Link
         href="/productos"
-        className="text-sm text-blue-600 hover:underline mb-4 inline-block"
+        className="text-sm text-brand-400 hover:underline mb-4 inline-block"
       >
         &larr; Volver a productos
       </Link>
 
       {message && (
-        <div className="bg-blue-50 text-blue-700 px-4 py-2 rounded-lg text-sm mb-4">
+        <div className="bg-brand-50 text-brand-600 px-4 py-2 rounded-lg text-sm mb-4">
           {message}
         </div>
       )}
@@ -176,7 +176,7 @@ export default function ProductDetailPage() {
                 <div
                   key={img.id}
                   className={`relative w-16 h-16 border-2 rounded overflow-hidden group cursor-pointer ${
-                    i === activeImage ? "border-blue-500" : "border-transparent"
+                    i === activeImage ? "border-brand-400" : "border-transparent"
                   }`}
                   onClick={() => setActiveImage(i)}
                 >
@@ -205,10 +205,10 @@ export default function ProductDetailPage() {
           {isAdmin && (
             <div className="mt-4">
               <label
-                className={`inline-block bg-blue-600 text-white px-4 py-2 rounded-lg text-sm ${
+                className={`inline-block bg-brand-400 text-white px-4 py-2 rounded-lg text-sm ${
                   uploading || saving || deleting
                     ? "opacity-50 cursor-not-allowed"
-                    : "cursor-pointer hover:bg-blue-700"
+                    : "cursor-pointer hover:bg-brand-500"
                 }`}
               >
                 {uploading ? "Subiendo..." : "Subir Imagen"}
@@ -260,15 +260,15 @@ export default function ProductDetailPage() {
                     </div>
                   )}
                   {product.precioCajaCerrada > 0 && (
-                    <div className="p-3 bg-blue-50 rounded-lg">
+                    <div className="p-3 bg-brand-50 rounded-lg">
                       <div className="flex justify-between items-center">
                         <span className="text-gray-700 font-medium">Caja Cerrada{priceLabel}</span>
-                        <span className="text-xl font-bold text-blue-700">
+                        <span className="text-xl font-bold text-brand-600">
                           {formatPrice(product.precioCajaCerrada)}
                         </span>
                       </div>
                       {product.cantidadPorCaja > 0 && (
-                        <p className="text-xs text-blue-600 mt-1">
+                        <p className="text-xs text-brand-500 mt-1">
                           Caja x{product.cantidadPorCaja}{isKg ? " KG" : " un."} = {formatPrice(product.precioCajaCerrada * product.cantidadPorCaja)}
                         </p>
                       )}
@@ -297,7 +297,7 @@ export default function ProductDetailPage() {
               <p className="text-sm text-gray-500 italic">
                 {!session?.user ? (
                   <>
-                    <Link href="/login" className="text-blue-600 hover:underline">
+                    <Link href="/login" className="text-brand-400 hover:underline">
                       Iniciá sesión
                     </Link>{" "}
                     para ver el precio Especial.
@@ -336,13 +336,13 @@ export default function ProductDetailPage() {
                 onChange={(e) => setDescription(e.target.value)}
                 rows={4}
                 disabled={saving || uploading || deleting}
-                className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-400 disabled:opacity-50"
                 placeholder="Escribir descripción del producto..."
               />
               <button
                 onClick={handleSaveDescription}
                 disabled={saving || uploading || deleting}
-                className="mt-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50"
+                className="mt-2 bg-brand-400 text-white px-4 py-2 rounded-lg text-sm hover:bg-brand-500 disabled:opacity-50"
               >
                 {saving ? "Guardando..." : uploading || deleting ? "Esperando..." : "Guardar Descripción"}
               </button>

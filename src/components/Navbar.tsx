@@ -11,14 +11,14 @@ export default function Navbar() {
   return (
     <nav className="bg-white shadow-sm border-b">
       <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
-        <Link href="/" className="text-xl font-bold text-blue-700 shrink-0">
+        <Link href="/" className="text-xl font-bold text-brand-400 shrink-0">
           Distrialma
         </Link>
 
         <div className="flex items-center gap-3 shrink-0">
           <Link
             href="/productos"
-            className="text-sm text-gray-600 hover:text-blue-700"
+            className="text-sm text-gray-600 hover:text-brand-400"
           >
             Productos
           </Link>
@@ -27,7 +27,7 @@ export default function Navbar() {
               {(session.user as { role?: string }).role === "admin" && (
                 <Link
                   href="/admin"
-                  className="text-sm text-gray-600 hover:text-blue-700"
+                  className="text-sm text-gray-600 hover:text-brand-400"
                 >
                   Admin
                 </Link>
@@ -49,7 +49,7 @@ export default function Navbar() {
           ) : (
             <Link
               href="/login"
-              className="text-sm bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+              className="text-sm bg-brand-400 text-white px-4 py-2 rounded-lg hover:bg-brand-500"
             >
               Ingresar
             </Link>

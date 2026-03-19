@@ -12,7 +12,7 @@ export default function Home() {
         </p>
         <Link
           href="/productos"
-          className="bg-blue-600 text-white px-8 py-3 rounded-lg text-lg font-medium hover:bg-blue-700 transition-colors"
+          className="bg-brand-400 text-white px-8 py-3 rounded-lg text-lg font-medium hover:bg-brand-500 transition-colors"
         >
           Ver Productos
         </Link>

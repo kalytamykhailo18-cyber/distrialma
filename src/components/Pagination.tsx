@@ -60,7 +60,7 @@ export default function Pagination({
               disabled={p === page || loading}
               className={`px-3 py-1.5 rounded-lg text-sm ${
                 p === page
-                  ? "bg-blue-600 text-white"
+                  ? "bg-brand-400 text-white"
                   : "border hover:bg-gray-50 disabled:opacity-50"
               }`}
             >

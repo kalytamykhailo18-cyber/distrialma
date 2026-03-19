@@ -58,7 +58,7 @@ export default function CategorySidebar({
           onClick={() => setTab("categorias")}
           className={`flex-1 py-2 text-sm font-medium border-b-2 transition-colors ${
             tab === "categorias"
-              ? "border-blue-600 text-blue-600"
+              ? "border-brand-400 text-brand-400"
               : "border-transparent text-gray-500 hover:text-gray-700"
           }`}
         >
@@ -68,7 +68,7 @@ export default function CategorySidebar({
           onClick={() => setTab("marcas")}
           className={`flex-1 py-2 text-sm font-medium border-b-2 transition-colors ${
             tab === "marcas"
-              ? "border-blue-600 text-blue-600"
+              ? "border-brand-400 text-brand-400"
               : "border-transparent text-gray-500 hover:text-gray-700"
           }`}
         >
@@ -84,7 +84,7 @@ export default function CategorySidebar({
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
             placeholder="Filtrar categorías..."
-            className="w-full px-3 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2"
+            className="w-full px-3 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-400 mb-2"
           />
           <ul className="space-y-1 overflow-y-auto max-h-[calc(100vh-220px)]">
             <li>
@@ -94,7 +94,7 @@ export default function CategorySidebar({
                 onClick={() => { saveScroll(); setOpen(false); }}
                 className={`block px-3 py-2 text-sm rounded-lg ${
                   !activeId && !activeBrandId
-                    ? "bg-blue-50 text-blue-700 font-medium"
+                    ? "bg-brand-50 text-brand-600 font-medium"
                     : "text-gray-600 hover:bg-gray-50"
                 }`}
               >
@@ -109,7 +109,7 @@ export default function CategorySidebar({
                   onClick={() => { saveScroll(); setOpen(false); }}
                   className={`block px-3 py-2 text-sm rounded-lg ${
                     activeId === cat.id
-                      ? "bg-blue-50 text-blue-700 font-medium"
+                      ? "bg-brand-50 text-brand-600 font-medium"
                       : "text-gray-600 hover:bg-gray-50"
                   }`}
                 >
@@ -132,7 +132,7 @@ export default function CategorySidebar({
             value={brandFilter}
             onChange={(e) => setBrandFilter(e.target.value)}
             placeholder="Filtrar marcas..."
-            className="w-full px-3 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2"
+            className="w-full px-3 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-400 mb-2"
           />
           <ul className="space-y-1 overflow-y-auto max-h-[calc(100vh-220px)]">
             {filteredBrands.map((brand) => (
@@ -143,7 +143,7 @@ export default function CategorySidebar({
                   onClick={() => { saveScroll(); setOpen(false); }}
                   className={`block px-3 py-2 text-sm rounded-lg ${
                     activeBrandId === brand.id
-                      ? "bg-blue-50 text-blue-700 font-medium"
+                      ? "bg-brand-50 text-brand-600 font-medium"
                       : "text-gray-600 hover:bg-gray-50"
                   }`}
                 >
@@ -165,7 +165,7 @@ export default function CategorySidebar({
       {/* Mobile toggle button */}
       <button
         onClick={() => setOpen(true)}
-        className="md:hidden fixed bottom-4 left-4 z-30 flex items-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-full shadow-lg text-sm font-medium"
+        className="md:hidden fixed bottom-4 left-4 z-30 flex items-center gap-2 px-4 py-3 bg-brand-400 text-white rounded-full shadow-lg text-sm font-medium"
       >
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
