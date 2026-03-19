@@ -72,15 +72,15 @@ export async function POST(req: NextRequest) {
     const nextNroTransa = String(maxResult.recordset[0].maxNroTransa + 1).padStart(8, "0");
     const nextNroMostra = String(maxMostra.recordset[0].maxNroMostra + 1).padStart(8, "0");
 
-    // Build timestamp
-    const now = new Date();
+    // Build timestamp in Argentina time (UTC-3)
+    const now = new Date(Date.now() - 3 * 60 * 60 * 1000);
     const fechora =
-      now.getFullYear().toString() +
-      String(now.getMonth() + 1).padStart(2, "0") +
-      String(now.getDate()).padStart(2, "0") +
-      String(now.getHours()).padStart(2, "0") +
-      String(now.getMinutes()).padStart(2, "0") +
-      String(now.getSeconds()).padStart(2, "0");
+      now.getUTCFullYear().toString() +
+      String(now.getUTCMonth() + 1).padStart(2, "0") +
+      String(now.getUTCDate()).padStart(2, "0") +
+      String(now.getUTCHours()).padStart(2, "0") +
+      String(now.getUTCMinutes()).padStart(2, "0") +
+      String(now.getUTCSeconds()).padStart(2, "0");
 
     // Calculate totals
     let totalCant = 0;
