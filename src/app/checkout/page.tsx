@@ -60,16 +60,24 @@ export default function CheckoutPage() {
     msg += `\n`;
 
     for (const item of items) {
-      const isBox = item.mode === "box" && item.precioCajaCerrada > 0;
-      const unitPrice = isBox ? item.precioCajaCerrada : item.precioMayorista;
-      const label = isBox
-        ? `Caja x${item.cantidadPorCaja}`
-        : item.unit === "KG" ? "KG" : "Un.";
-      const lineTotal = isBox
-        ? item.precioCajaCerrada * item.cantidadPorCaja * item.quantity
-        : item.precioMayorista * item.quantity;
-      msg += `- ${item.name} (${item.sku})\n`;
-      msg += `  ${item.quantity} x ${formatPrice(unitPrice)}/${label} = ${formatPrice(lineTotal)}\n`;
+      if (item.isCombo && item.comboItems) {
+        msg += `- COMBO: ${item.name} x${item.quantity}\n`;
+        for (const ci of item.comboItems) {
+          msg += `    ${ci.quantity}x ${ci.name}\n`;
+        }
+        msg += `  ${formatPrice(item.precioMayorista * item.quantity)}\n`;
+      } else {
+        const isBox = item.mode === "box" && item.precioCajaCerrada > 0;
+        const unitPrice = isBox ? item.precioCajaCerrada : item.precioMayorista;
+        const label = isBox
+          ? `Caja x${item.cantidadPorCaja}`
+          : item.unit === "KG" ? "KG" : "Un.";
+        const lineTotal = isBox
+          ? item.precioCajaCerrada * item.cantidadPorCaja * item.quantity
+          : item.precioMayorista * item.quantity;
+        msg += `- ${item.name} (${item.sku})\n`;
+        msg += `  ${item.quantity} x ${formatPrice(unitPrice)}/${label} = ${formatPrice(lineTotal)}\n`;
+      }
     }
 
     msg += `\n*Total: ${formatPrice(totalPrice)}*\n`;

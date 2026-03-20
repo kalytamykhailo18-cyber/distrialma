@@ -39,4 +39,7 @@ export interface CartItem {
   cantidadPorCaja: number;
   quantity: number;
   mode: "unit" | "box";
+  isCombo?: boolean;
+  comboId?: number;
+  comboItems?: { sku: string; name: string; quantity: number }[];
 }

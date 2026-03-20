@@ -68,6 +68,29 @@ model PriceChange {
   @@map("price_changes")
 }
 
+model Combo {
+  id          Int         @id @default(autoincrement())
+  name        String      @db.VarChar(100)
+  description String?     @db.VarChar(255)
+  price       Decimal?    @db.Decimal(12, 2)
+  active      Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  items       ComboItem[]
+
+  @@map("combos")
+}
+
+model ComboItem {
+  id       Int    @id @default(autoincrement())
+  comboId  Int
+  sku      String @db.VarChar(7)
+  quantity Int    @default(1)
+  combo    Combo  @relation(fields: [comboId], references: [id], onDelete: Cascade)
+
+  @@index([comboId])
+  @@map("combo_items")
+}
+
 model User {
   id           Int      @id @default(autoincrement())
   username     String   @unique @db.VarChar(50)

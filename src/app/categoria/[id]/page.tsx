@@ -7,11 +7,14 @@ import CategorySidebar from "@/components/CategorySidebar";
 import PaginationCompact from "@/components/PaginationCompact";
 import SearchBox from "@/components/SearchBox";
 import { useCategories } from "@/components/CategoriesProvider";
+import ComboGrid from "@/components/ComboGrid";
 
 export default function CategoriaPage() {
   const { id } = useParams<{ id: string }>();
   const { categories } = useCategories();
-  const categoryName = categories.find((c) => c.id === id)?.name;
+  const category = categories.find((c) => c.id === id);
+  const categoryName = category?.name;
+  const isComboCategory = categoryName?.toUpperCase() === "COMBOS";
   const [search, setSearch] = useState("");
   const [pag, setPag] = useState<PaginationState | null>(null);
 
@@ -41,11 +44,15 @@ export default function CategoriaPage() {
           <CategorySidebar activeId={id} />
         </div>
         <div className="flex-1">
-          <ProductGrid
-            categoryId={id}
-            search={search || undefined}
-            onPaginationReady={setPag}
-          />
+          {isComboCategory ? (
+            <ComboGrid />
+          ) : (
+            <ProductGrid
+              categoryId={id}
+              search={search || undefined}
+              onPaginationReady={setPag}
+            />
+          )}
         </div>
       </div>
     </div>

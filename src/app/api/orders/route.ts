@@ -82,16 +82,56 @@ export async function POST(req: NextRequest) {
       String(now.getUTCMinutes()).padStart(2, "0") +
       String(now.getUTCSeconds()).padStart(2, "0");
 
+    // Expand combos into individual products for PunTouch
+    interface ExpandedItem {
+      sku: string;
+      cant: number;
+      price: number;
+      listaPrecio: number;
+    }
+
+    const expandedItems: ExpandedItem[] = [];
+
+    for (const item of items) {
+      if (item.isCombo && item.comboItems) {
+        // Combo: expand into individual products at their regular prices
+        for (const ci of item.comboItems) {
+          // Fetch individual product price from SQL Server
+          const prodResult = await pool
+            .request()
+            .input("prodSku", ci.sku.padStart(7, " "))
+            .query(`
+              SELECT s.Precio2 AS precio
+              FROM [${getDbName("productos")}].dbo.Stock s
+              WHERE s.CodProducto = @prodSku AND LTRIM(RTRIM(s.Deposito)) = '0'
+            `);
+          const unitPrice = prodResult.recordset[0]?.precio || 0;
+          expandedItems.push({
+            sku: ci.sku,
+            cant: ci.quantity * item.quantity,
+            price: unitPrice,
+            listaPrecio: 2,
+          });
+        }
+      } else {
+        // Regular product
+        const isBox = item.mode === "box" && item.precioCajaCerrada > 0;
+        expandedItems.push({
+          sku: item.sku,
+          cant: isBox ? item.cantidadPorCaja * item.quantity : item.quantity,
+          price: isBox ? item.precioCajaCerrada : item.precioMayorista,
+          listaPrecio: isBox ? 4 : 2,
+        });
+      }
+    }
+
     // Calculate totals
     let totalCant = 0;
     let totalImpo = 0;
 
-    for (const item of items) {
-      const isBox = item.mode === "box" && item.precioCajaCerrada > 0;
-      const cant = isBox ? item.cantidadPorCaja * item.quantity : item.quantity;
-      const price = isBox ? item.precioCajaCerrada : item.precioMayorista;
-      totalCant += cant;
-      totalImpo += price * cant;
+    for (const ei of expandedItems) {
+      totalCant += ei.cant;
+      totalImpo += ei.price * ei.cant;
     }
 
     const boletaCod = String(nextCod).padStart(9, " ");
@@ -147,20 +187,19 @@ export async function POST(req: NextRequest) {
     nextCod++;
 
     // Insert item rows (Tipo = 'I', Itm = '1', '2', ...)
-    for (let i = 0; i < items.length; i++) {
-      const item = items[i];
-      const isBox = item.mode === "box" && item.precioCajaCerrada > 0;
-      const cant = isBox ? item.cantidadPorCaja * item.quantity : item.quantity;
-      const price = isBox ? item.precioCajaCerrada : item.precioMayorista;
+    for (let i = 0; i < expandedItems.length; i++) {
+      const ei = expandedItems[i];
+      const cant = ei.cant;
+      const price = ei.price;
       const impo = price * cant;
-      const listaPrecio = isBox ? 4 : 2;
+      const listaPrecio = ei.listaPrecio;
 
       const itemReq = pool.request();
       itemReq.input("cod", String(nextCod).padStart(9, " "));
       itemReq.input("boleta", boletaCod);
       itemReq.input("itm", String(i + 1).padStart(3, " "));
       itemReq.input("fechora", fechora.padEnd(14, " "));
-      itemReq.input("producto", item.sku.padStart(7, " "));
+      itemReq.input("producto", ei.sku.padStart(7, " "));
       itemReq.input("cant", cant);
       itemReq.input("precio", price);
       itemReq.input("impo", impo);

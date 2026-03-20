@@ -3,13 +3,22 @@
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
 import type { CartItem } from "@/types";
 
+// Cart key: sku + mode combination (same product can be in cart as unit AND box)
+function cartKey(sku: string, mode: string): string {
+  return `${sku}::${mode}`;
+}
+
+function itemKey(item: CartItem): string {
+  return cartKey(item.sku, item.mode);
+}
+
 interface CartContextType {
   items: CartItem[];
   addItem: (item: Omit<CartItem, "quantity" | "mode">, mode?: "unit" | "box") => void;
-  removeItem: (sku: string) => void;
-  updateQuantity: (sku: string, quantity: number) => void;
-  updateMode: (sku: string, mode: "unit" | "box") => void;
+  removeItem: (sku: string, mode: "unit" | "box") => void;
+  updateQuantity: (sku: string, mode: "unit" | "box", quantity: number) => void;
   clearCart: () => void;
+  findItem: (sku: string, mode: "unit" | "box") => CartItem | undefined;
   totalItems: number;
   totalPrice: number;
 }
@@ -51,13 +60,14 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   const addItem = useCallback(
     (item: Omit<CartItem, "quantity" | "mode">, mode: "unit" | "box" = "unit") => {
-      const minQty = mode === "unit" && item.pesoMayorista > 0 ? item.pesoMayorista : 1;
+      const key = cartKey(item.sku, mode);
+      const step = mode === "unit" && item.pesoMayorista > 0 ? item.pesoMayorista : 1;
+      const minQty = step;
       setItems((prev) => {
-        const existing = prev.find((i) => i.sku === item.sku);
+        const existing = prev.find((i) => itemKey(i) === key);
         if (existing) {
-          const step = existing.mode === "unit" && existing.pesoMayorista > 0 ? existing.pesoMayorista : 1;
           return prev.map((i) =>
-            i.sku === item.sku ? { ...i, quantity: i.quantity + step } : i
+            itemKey(i) === key ? { ...i, quantity: i.quantity + step } : i
           );
         }
         return [...prev, { ...item, quantity: minQty, mode }];
@@ -66,14 +76,16 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     []
   );
 
-  const removeItem = useCallback((sku: string) => {
-    setItems((prev) => prev.filter((i) => i.sku !== sku));
+  const removeItem = useCallback((sku: string, mode: "unit" | "box") => {
+    const key = cartKey(sku, mode);
+    setItems((prev) => prev.filter((i) => itemKey(i) !== key));
   }, []);
 
-  const updateQuantity = useCallback((sku: string, quantity: number) => {
+  const updateQuantity = useCallback((sku: string, mode: "unit" | "box", quantity: number) => {
+    const key = cartKey(sku, mode);
     setItems((prev) =>
       prev.map((i) => {
-        if (i.sku !== sku) return i;
+        if (itemKey(i) !== key) return i;
         const minQty = i.mode === "unit" && i.pesoMayorista > 0 ? i.pesoMayorista : 1;
         const newQty = Math.max(minQty, quantity);
         return { ...i, quantity: newQty };
@@ -81,20 +93,13 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     );
   }, []);
 
-  const updateMode = useCallback((sku: string, mode: "unit" | "box") => {
-    setItems((prev) =>
-      prev.map((i) => {
-        if (i.sku !== sku) return i;
-        const minQty = mode === "unit" && i.pesoMayorista > 0 ? i.pesoMayorista : 1;
-        const newQty = Math.max(minQty, i.quantity);
-        return { ...i, mode, quantity: newQty };
-      })
-    );
-  }, []);
-
   const clearCart = useCallback(() => {
     setItems([]);
   }, []);
+
+  const findItem = (sku: string, mode: "unit" | "box") => {
+    return items.find((i) => i.sku === sku && i.mode === mode);
+  };
 
   const totalItems = items.reduce((sum, i) => sum + i.quantity, 0);
 
@@ -112,8 +117,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         addItem,
         removeItem,
         updateQuantity,
-        updateMode,
         clearCart,
+        findItem,
         totalItems,
         totalPrice,
       }}

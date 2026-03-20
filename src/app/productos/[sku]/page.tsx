@@ -18,9 +18,11 @@ export default function ProductDetailPage() {
 
   const isAdmin =
     (session?.user as { role?: string } | undefined)?.role === "admin";
-  const { addItem, items } = useCart();
-  const inCart = items.find((i) => i.sku === sku);
-  const [addedFeedback, setAddedFeedback] = useState(false);
+  const { addItem, updateQuantity, removeItem, findItem } = useCart();
+  const inCartUnit = findItem(sku, "unit");
+  const inCartBox = findItem(sku, "box");
+  const [addedUnit, setAddedUnit] = useState(false);
+  const [addedBox, setAddedBox] = useState(false);
 
   // Admin edit state
   const [description, setDescription] = useState("");
@@ -325,50 +327,93 @@ export default function ProductDetailPage() {
           )}
 
           {/* Add to cart */}
-          {!isAdmin && product.precioMayorista > 0 && (
-            <div className="mb-6">
-              <div className="flex gap-2">
-                <button
-                  onClick={() => {
-                    addItem({
-                      sku: product.sku,
-                      name: product.name,
-                      unit: product.unit,
-                      pesoMayorista: product.pesoMayorista,
-                      precioMayorista: product.precioMayorista,
-                      precioCajaCerrada: product.precioCajaCerrada,
-                      cantidadPorCaja: product.cantidadPorCaja,
-                    }, "unit");
-                    setAddedFeedback(true);
-                    setTimeout(() => setAddedFeedback(false), 2000);
-                  }}
-                  className="flex-1 py-3 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors"
-                >
-                  {addedFeedback ? "Agregado!" : inCart ? `En carrito (${inCart.quantity})` : "Agregar por unidad"}
-                </button>
+          {!isAdmin && product.precioMayorista > 0 && (() => {
+            const unitStep = product.pesoMayorista > 0 ? product.pesoMayorista : 1;
+            const unitMin = unitStep;
+            const itemData = {
+              sku: product.sku,
+              name: product.name,
+              unit: product.unit,
+              pesoMayorista: product.pesoMayorista,
+              precioMayorista: product.precioMayorista,
+              precioCajaCerrada: product.precioCajaCerrada,
+              cantidadPorCaja: product.cantidadPorCaja,
+            };
+
+            return (
+              <div className="mb-6 space-y-3">
+                {/* Unit mode */}
+                <div className="flex items-center gap-2">
+                  {inCartUnit ? (
+                    <>
+                      <button
+                        onClick={() => {
+                          if (inCartUnit.quantity <= unitMin) removeItem(product.sku, "unit");
+                          else updateQuantity(product.sku, "unit", inCartUnit.quantity - unitStep);
+                        }}
+                        className="w-10 h-10 flex items-center justify-center rounded-lg border-2 border-green-600 text-green-600 font-bold text-lg hover:bg-green-50"
+                      >
+                        -
+                      </button>
+                      <span className="w-12 text-center font-semibold text-gray-900">{inCartUnit.quantity}</span>
+                      <button
+                        onClick={() => updateQuantity(product.sku, "unit", inCartUnit.quantity + unitStep)}
+                        className="w-10 h-10 flex items-center justify-center rounded-lg bg-green-600 text-white font-bold text-lg hover:bg-green-700"
+                      >
+                        +
+                      </button>
+                      <span className="text-sm text-gray-500 ml-2">
+                        {product.unit === "KG" ? "KG" : "un."} en carrito
+                      </span>
+                    </>
+                  ) : (
+                    <button
+                      onClick={() => { addItem(itemData, "unit"); setAddedUnit(true); setTimeout(() => setAddedUnit(false), 2000); }}
+                      className="flex-1 py-3 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors"
+                    >
+                      {addedUnit ? "Agregado!" : `Agregar por ${product.unit === "KG" ? "KG" : "unidad"}`}
+                    </button>
+                  )}
+                </div>
+
+                {/* Box mode */}
                 {product.precioCajaCerrada > 0 && product.cantidadPorCaja > 0 && (
-                  <button
-                    onClick={() => {
-                      addItem({
-                        sku: product.sku,
-                        name: product.name,
-                        unit: product.unit,
-                        pesoMayorista: product.pesoMayorista,
-                        precioMayorista: product.precioMayorista,
-                        precioCajaCerrada: product.precioCajaCerrada,
-                        cantidadPorCaja: product.cantidadPorCaja,
-                      }, "box");
-                      setAddedFeedback(true);
-                      setTimeout(() => setAddedFeedback(false), 2000);
-                    }}
-                    className="flex-1 py-3 bg-brand-400 text-white rounded-lg text-sm font-medium hover:bg-brand-500 transition-colors"
-                  >
-                    Agregar caja cerrada
-                  </button>
+                  <div className="flex items-center gap-2">
+                    {inCartBox ? (
+                      <>
+                        <button
+                          onClick={() => {
+                            if (inCartBox.quantity <= 1) removeItem(product.sku, "box");
+                            else updateQuantity(product.sku, "box", inCartBox.quantity - 1);
+                          }}
+                          className="w-10 h-10 flex items-center justify-center rounded-lg border-2 border-brand-400 text-brand-600 font-bold text-lg hover:bg-brand-50"
+                        >
+                          -
+                        </button>
+                        <span className="w-12 text-center font-semibold text-gray-900">{inCartBox.quantity}</span>
+                        <button
+                          onClick={() => updateQuantity(product.sku, "box", inCartBox.quantity + 1)}
+                          className="w-10 h-10 flex items-center justify-center rounded-lg bg-brand-400 text-white font-bold text-lg hover:bg-brand-500"
+                        >
+                          +
+                        </button>
+                        <span className="text-sm text-gray-500 ml-2">
+                          caja{inCartBox.quantity > 1 ? "s" : ""} en carrito
+                        </span>
+                      </>
+                    ) : (
+                      <button
+                        onClick={() => { addItem(itemData, "box"); setAddedBox(true); setTimeout(() => setAddedBox(false), 2000); }}
+                        className="flex-1 py-3 bg-brand-400 text-white rounded-lg text-sm font-medium hover:bg-brand-500 transition-colors"
+                      >
+                        {addedBox ? "Agregado!" : "Agregar caja cerrada"}
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           <p className="text-sm text-gray-500">SKU: {product.sku}</p>
           {product.barcode && (

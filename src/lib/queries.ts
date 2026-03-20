@@ -231,17 +231,23 @@ export async function getCategories(includeHidden: boolean = false): Promise<Cat
     });
   }
 
+  // Check if there are active combos in PostgreSQL
+  const activeComboCount = await prisma.combo.count({ where: { active: true } });
+
   const result = await req.query(`
     SELECT LTRIM(RTRIM(r.Cod)) AS id, LTRIM(RTRIM(r.[Desc])) AS name
     FROM [${db()}].dbo.Rubros r
     WHERE ${where}
-      AND EXISTS (
-        SELECT 1 FROM [${db()}].dbo.Productos p
-        JOIN [${db()}].dbo.Stock s ON s.CodProducto = p.Cod
-        WHERE p.Rubro = r.Cod
-          AND (p.DeBaja = 0 OR p.DeBaja IS NULL)
-          AND (s.DeBaja = 0 OR s.DeBaja IS NULL)
-          AND s.Precio2 > 0
+      AND (
+        EXISTS (
+          SELECT 1 FROM [${db()}].dbo.Productos p
+          JOIN [${db()}].dbo.Stock s ON s.CodProducto = p.Cod
+          WHERE p.Rubro = r.Cod
+            AND (p.DeBaja = 0 OR p.DeBaja IS NULL)
+            AND (s.DeBaja = 0 OR s.DeBaja IS NULL)
+            AND s.Precio2 > 0
+        )
+        ${activeComboCount > 0 ? "OR UPPER(LTRIM(RTRIM(r.[Desc]))) = 'COMBOS'" : ""}
       )
     ORDER BY r.[Desc]
   `);

@@ -5,7 +5,7 @@ import { useCart } from "@/components/CartProvider";
 import { formatPrice } from "@/lib/utils";
 
 export default function CarritoPage() {
-  const { items, removeItem, updateQuantity, updateMode, clearCart, totalPrice } = useCart();
+  const { items, removeItem, updateQuantity, clearCart, totalPrice } = useCart();
 
   if (items.length === 0) {
     return (
@@ -59,7 +59,7 @@ export default function CarritoPage() {
                   <p className="text-xs text-gray-400 mt-0.5">SKU: {item.sku}</p>
                 </div>
                 <button
-                  onClick={() => removeItem(item.sku)}
+                  onClick={() => removeItem(item.sku, item.mode)}
                   className="text-gray-400 hover:text-red-500 shrink-0"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -69,36 +69,25 @@ export default function CarritoPage() {
               </div>
 
               <div className="flex items-center gap-4 mt-3">
-                {/* Mode selector */}
-                <div className="flex text-xs border rounded-lg overflow-hidden">
-                  <button
-                    onClick={() => updateMode(item.sku, "unit")}
-                    className={`px-3 py-1.5 ${
-                      item.mode === "unit"
-                        ? "bg-green-600 text-white"
-                        : "bg-white text-gray-600 hover:bg-gray-50"
-                    }`}
-                  >
-                    Unidad
-                  </button>
-                  {item.precioCajaCerrada > 0 && item.cantidadPorCaja > 0 && (
-                    <button
-                      onClick={() => updateMode(item.sku, "box")}
-                      className={`px-3 py-1.5 border-l ${
-                        item.mode === "box"
-                          ? "bg-brand-400 text-white"
-                          : "bg-white text-gray-600 hover:bg-gray-50"
-                      }`}
-                    >
-                      Caja x{item.cantidadPorCaja} {unitLabel}
-                    </button>
-                  )}
-                </div>
+                {/* Mode label */}
+                {item.isCombo ? (
+                  <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full font-medium">
+                    Combo
+                  </span>
+                ) : (
+                  <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                    item.mode === "box"
+                      ? "bg-brand-100 text-brand-700"
+                      : "bg-green-100 text-green-700"
+                  }`}>
+                    {item.mode === "box" ? `Caja x${item.cantidadPorCaja} ${unitLabel}` : (isKg ? "Por KG" : "Por unidad")}
+                  </span>
+                )}
 
                 {/* Quantity */}
                 <div className="flex items-center gap-1">
                   <button
-                    onClick={() => updateQuantity(item.sku, item.quantity - step)}
+                    onClick={() => updateQuantity(item.sku, item.mode, item.quantity - step)}
                     disabled={item.quantity <= minQty}
                     className="w-7 h-7 flex items-center justify-center rounded border text-gray-600 hover:bg-gray-100 disabled:opacity-30"
                   >
@@ -107,13 +96,13 @@ export default function CarritoPage() {
                   <input
                     type="number"
                     value={item.quantity}
-                    onChange={(e) => updateQuantity(item.sku, parseInt(e.target.value) || minQty)}
+                    onChange={(e) => updateQuantity(item.sku, item.mode, parseInt(e.target.value) || minQty)}
                     className="w-12 text-center text-sm border rounded py-1"
                     min={minQty}
                     step={step}
                   />
                   <button
-                    onClick={() => updateQuantity(item.sku, item.quantity + step)}
+                    onClick={() => updateQuantity(item.sku, item.mode, item.quantity + step)}
                     className="w-7 h-7 flex items-center justify-center rounded border text-gray-600 hover:bg-gray-100"
                   >
                     +
