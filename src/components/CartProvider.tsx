@@ -61,13 +61,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const addItem = useCallback(
     (item: Omit<CartItem, "quantity" | "mode">, mode: "unit" | "box" = "unit") => {
       const key = cartKey(item.sku, mode);
-      const step = mode === "unit" && item.pesoMayorista > 0 ? item.pesoMayorista : 1;
-      const minQty = step;
+      const minQty = mode === "unit" && item.pesoMayorista > 0 ? item.pesoMayorista : 1;
       setItems((prev) => {
         const existing = prev.find((i) => itemKey(i) === key);
         if (existing) {
           return prev.map((i) =>
-            itemKey(i) === key ? { ...i, quantity: i.quantity + step } : i
+            itemKey(i) === key ? { ...i, quantity: i.quantity + 1 } : i
           );
         }
         return [...prev, { ...item, quantity: minQty, mode }];

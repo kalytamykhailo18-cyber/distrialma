@@ -40,8 +40,8 @@ export default function CarritoPage() {
         {items.map((item) => {
           const isKg = item.unit === "KG";
           const unitLabel = isKg ? "KG" : "un.";
-          const step = item.mode === "unit" && item.pesoMayorista > 0 ? item.pesoMayorista : 1;
-          const minQty = step;
+          const minQty = item.mode === "unit" && item.pesoMayorista > 0 ? item.pesoMayorista : 1;
+          const step = 1;
           const unitPrice = item.mode === "box" && item.precioCajaCerrada > 0
             ? item.precioCajaCerrada
             : item.precioMayorista;

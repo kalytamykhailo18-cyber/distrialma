@@ -328,8 +328,8 @@ export default function ProductDetailPage() {
 
           {/* Add to cart */}
           {!isAdmin && product.precioMayorista > 0 && (() => {
-            const unitStep = product.pesoMayorista > 0 ? product.pesoMayorista : 1;
-            const unitMin = unitStep;
+            const unitMin = product.pesoMayorista > 0 ? product.pesoMayorista : 1;
+            const unitStep = 1;
             const itemData = {
               sku: product.sku,
               name: product.name,
