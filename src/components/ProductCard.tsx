@@ -45,7 +45,7 @@ export default function ProductCard({ product }: { product: Product }) {
             </span>
           </div>
         )}
-        {product.precioCajaCerrada > 0 && (
+        {product.precioCajaCerrada > 0 && product.cantidadPorCaja > 0 && (
           <div className="flex justify-between text-sm">
             <span className="text-gray-600">Caja Cerrada{priceLabel}</span>
             <span className="font-semibold text-brand-600">

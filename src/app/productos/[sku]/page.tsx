@@ -265,7 +265,7 @@ export default function ProductDetailPage() {
                       )}
                     </div>
                   )}
-                  {product.precioCajaCerrada > 0 && (
+                  {product.precioCajaCerrada > 0 && product.cantidadPorCaja > 0 && (
                     <div className="p-3 bg-brand-50 rounded-lg">
                       <div className="flex justify-between items-center">
                         <span className="text-gray-700 font-medium">Caja Cerrada{priceLabel}</span>
