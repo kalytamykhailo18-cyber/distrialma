@@ -71,7 +71,7 @@ model PriceChange {
 model Combo {
   id          Int         @id @default(autoincrement())
   name        String      @db.VarChar(100)
-  description String?     @db.VarChar(255)
+  description String?     @db.Text
   price       Decimal?    @db.Decimal(12, 2)
   active      Boolean     @default(true)
   createdAt   DateTime    @default(now())

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import Pagination from "@/components/Pagination";
 import type { Product } from "@/types";
@@ -10,19 +10,18 @@ export default function AdminPage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
+  const [inputValue, setInputValue] = useState("");
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
-  const prevSearch = useRef(search);
 
   useEffect(() => {
-    if (prevSearch.current !== search && page !== 1) {
-      prevSearch.current = search;
-      setPage(1);
-      return;
-    }
-    prevSearch.current = search;
     fetchProducts();
   }, [page, search]);
+
+  function handleSearch() {
+    setPage(1);
+    setSearch(inputValue.trim());
+  }
 
   async function fetchProducts() {
     setLoading(true);
@@ -85,15 +84,23 @@ export default function AdminPage() {
         </div>
       </div>
 
-      <div className="mb-4">
+      <div className="mb-4 flex gap-2 max-w-md">
         <input
           type="text"
           placeholder="Buscar producto..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          value={inputValue}
+          onChange={(e) => setInputValue(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") handleSearch(); }}
           disabled={loading}
-          className="px-4 py-2 border rounded-lg w-full max-w-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+          className="flex-1 px-4 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-400 disabled:opacity-50"
         />
+        <button
+          onClick={handleSearch}
+          disabled={loading}
+          className="px-4 py-2 bg-brand-400 text-white rounded-lg text-sm font-medium hover:bg-brand-500 disabled:opacity-50"
+        >
+          Buscar
+        </button>
       </div>
 
       <div className="bg-white rounded-lg border overflow-hidden">

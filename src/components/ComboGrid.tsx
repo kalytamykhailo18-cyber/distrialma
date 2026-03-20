@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useCart } from "./CartProvider";
+import Link from "next/link";
 import { formatPrice } from "@/lib/utils";
 
 interface ComboItemDetail {
@@ -10,6 +10,7 @@ interface ComboItemDetail {
   name: string;
   unitPrice: number;
   unit: string;
+  images: string[];
 }
 
 interface ComboData {
@@ -18,14 +19,13 @@ interface ComboData {
   description: string | null;
   price: number;
   items: ComboItemDetail[];
+  comboImages: string[];
   originalPrice: number;
 }
 
 export default function ComboGrid() {
   const [combos, setCombos] = useState<ComboData[]>([]);
   const [loading, setLoading] = useState(true);
-  const { addItem, items: cartItems } = useCart();
-  const [addedId, setAddedId] = useState<number | null>(null);
 
   useEffect(() => {
     fetch("/api/combos")
@@ -35,38 +35,14 @@ export default function ComboGrid() {
       .finally(() => setLoading(false));
   }, []);
 
-  function handleAddCombo(combo: ComboData) {
-    addItem(
-      {
-        sku: `combo-${combo.id}`,
-        name: combo.name,
-        unit: "UN",
-        pesoMayorista: 0,
-        precioMayorista: combo.price,
-        precioCajaCerrada: 0,
-        cantidadPorCaja: 0,
-        isCombo: true,
-        comboId: combo.id,
-        comboItems: combo.items.map((i) => ({
-          sku: i.sku,
-          name: i.name,
-          quantity: i.quantity,
-        })),
-      },
-      "unit"
-    );
-    setAddedId(combo.id);
-    setTimeout(() => setAddedId(null), 2000);
-  }
-
   if (loading) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {[1, 2].map((i) => (
-          <div key={i} className="bg-white rounded-lg border p-6 animate-pulse">
-            <div className="h-6 bg-gray-200 rounded w-3/4 mb-3" />
-            <div className="h-4 bg-gray-200 rounded w-1/2 mb-4" />
-            <div className="h-10 bg-gray-200 rounded" />
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        {[1, 2, 3, 4].map((i) => (
+          <div key={i} className="bg-white rounded-lg border p-4 animate-pulse">
+            <div className="h-40 bg-gray-200 rounded mb-3" />
+            <div className="h-4 bg-gray-200 rounded w-3/4 mb-2" />
+            <div className="h-4 bg-gray-200 rounded w-1/2" />
           </div>
         ))}
       </div>
@@ -80,67 +56,94 @@ export default function ComboGrid() {
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
       {combos.map((combo) => {
-        const inCart = cartItems.find((i) => i.sku === `combo-${combo.id}`);
-        const discount = combo.originalPrice > 0
+        const hasComboImages = combo.comboImages.length > 0;
+        const displayImages = hasComboImages ? combo.comboImages : combo.items.flatMap((i) => i.images);
+        const discount = combo.originalPrice > 0 && combo.price < combo.originalPrice
           ? Math.round((1 - combo.price / combo.originalPrice) * 100)
           : 0;
 
         return (
-          <div key={combo.id} className="bg-white rounded-lg border p-5">
-            <div className="flex items-start justify-between mb-2">
-              <h3 className="font-semibold text-gray-900 text-lg">{combo.name}</h3>
+          <Link
+            key={combo.id}
+            href={`/combos/${combo.id}`}
+            className="bg-white rounded-lg border hover:shadow-md transition-shadow p-4 flex flex-col"
+          >
+            {/* Images — scrollable */}
+            <div className="w-full h-40 bg-gray-100 rounded mb-3 flex items-center overflow-x-auto gap-2 px-2">
+              {displayImages.length > 0 ? (
+                hasComboImages ? (
+                  combo.comboImages.map((url, i) => (
+                    <img
+                      key={i}
+                      src={url}
+                      alt={combo.name}
+                      className="h-32 w-auto object-contain shrink-0"
+                    />
+                  ))
+                ) : (
+                  combo.items.map((item) =>
+                    item.images[0] ? (
+                      <img
+                        key={item.sku}
+                        src={item.images[0]}
+                        alt={item.name}
+                        className="h-32 w-auto object-contain shrink-0"
+                      />
+                    ) : null
+                  )
+                )
+              ) : (
+                <span className="text-gray-400 text-sm mx-auto">Sin imagen</span>
+              )}
+            </div>
+
+            {/* Badge */}
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded font-medium">
+                COMBO
+              </span>
               {discount > 0 && (
-                <span className="bg-red-100 text-red-700 text-xs font-medium px-2 py-0.5 rounded-full">
+                <span className="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-medium">
                   -{discount}%
                 </span>
               )}
             </div>
 
-            {combo.description && (
-              <p className="text-sm text-gray-500 mb-3">{combo.description}</p>
-            )}
+            {/* Name */}
+            <h3 className="text-sm font-medium text-gray-900 mb-1">
+              {combo.name}
+            </h3>
 
-            {/* Items in combo */}
-            <div className="bg-gray-50 rounded-lg p-3 mb-4 space-y-1.5">
-              {combo.items.map((item) => (
-                <div key={item.sku} className="flex justify-between text-sm">
-                  <span className="text-gray-700">
-                    {item.quantity > 1 && <span className="font-medium">{item.quantity}x </span>}
-                    {item.name}
-                  </span>
-                  <span className="text-gray-400 line-through text-xs">
-                    {formatPrice(item.unitPrice * item.quantity)}
+            {/* Items list */}
+            <p className="text-xs text-gray-500 mb-2">
+              {combo.items.map((item, i) => (
+                <span key={item.sku}>
+                  {i > 0 && " + "}
+                  {item.quantity > 1 ? `${item.quantity}x ` : ""}
+                  {item.name}
+                </span>
+              ))}
+            </p>
+
+            {/* Price */}
+            <div className="mt-auto">
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-600">Combo</span>
+                <div className="flex items-center gap-2">
+                  {discount > 0 && (
+                    <span className="text-xs text-gray-400 line-through">
+                      {formatPrice(combo.originalPrice)}
+                    </span>
+                  )}
+                  <span className="font-semibold text-green-700">
+                    {formatPrice(combo.price)}
                   </span>
                 </div>
-              ))}
+              </div>
             </div>
-
-            {/* Prices */}
-            <div className="flex items-end gap-3 mb-4">
-              {combo.originalPrice > combo.price && (
-                <span className="text-gray-400 line-through text-sm">
-                  {formatPrice(combo.originalPrice)}
-                </span>
-              )}
-              <span className="text-2xl font-bold text-green-700">
-                {formatPrice(combo.price)}
-              </span>
-            </div>
-
-            {/* Add to cart */}
-            <button
-              onClick={() => handleAddCombo(combo)}
-              className="w-full py-2.5 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors"
-            >
-              {addedId === combo.id
-                ? "Agregado!"
-                : inCart
-                ? `En carrito (${inCart.quantity})`
-                : "Agregar al carrito"}
-            </button>
-          </div>
+          </Link>
         );
       })}
     </div>

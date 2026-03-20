@@ -17,11 +17,11 @@ export interface LabelProduct {
 
 const FORMATS: Record<
   LabelFormat,
-  { w: number; h: number; cols: number; rows: number; fontSize: number; barcodeH: number }
+  { w: number; h: number; cols: number; rows: number }
 > = {
-  gondola: { w: 100, h: 40, cols: 2, rows: 7, fontSize: 8, barcodeH: 10 },
-  nevera: { w: 80, h: 30, cols: 2, rows: 9, fontSize: 7, barcodeH: 8 },
-  rack: { w: 150, h: 50, cols: 1, rows: 5, fontSize: 11, barcodeH: 14 },
+  gondola: { w: 100, h: 40, cols: 2, rows: 7 },
+  nevera: { w: 80, h: 30, cols: 2, rows: 9 },
+  rack: { w: 150, h: 50, cols: 1, rows: 5 },
 };
 
 const FORMAT_LABELS: Record<LabelFormat, string> = {
@@ -33,7 +33,8 @@ const FORMAT_LABELS: Record<LabelFormat, string> = {
 export { FORMAT_LABELS };
 
 function formatPrice(price: number): string {
-  return "$" + price.toLocaleString("es-AR", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  if (!price || price === 0) return "-";
+  return "$" + price.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 function truncate(text: string, maxLen: number): string {
@@ -70,10 +71,11 @@ export async function generateLabelPdf(
   const marginY = (pageH - f.rows * f.h) / 2;
 
   // Pre-render all barcodes
+  const barcodeH = format === "nevera" ? 8 : format === "gondola" ? 10 : 14;
   const barcodeCache: Record<string, string | null> = {};
   for (const p of products) {
     if (p.barcode && !barcodeCache[p.barcode]) {
-      barcodeCache[p.barcode] = await renderBarcode(p.barcode, f.barcodeH);
+      barcodeCache[p.barcode] = await renderBarcode(p.barcode, barcodeH);
     }
   }
 
@@ -96,7 +98,13 @@ export async function generateLabelPdf(
         const x = marginX + col * f.w;
         const y = marginY + row * f.h;
 
-        drawLabel(doc, p, x, y, f, barcodeCache[p.barcode] || null);
+        if (format === "rack") {
+          drawRackLabel(doc, p, x, y, f, barcodeCache[p.barcode] || null);
+        } else if (format === "gondola") {
+          drawGondolaLabel(doc, p, x, y, f, barcodeCache[p.barcode] || null);
+        } else {
+          drawNeveraLabel(doc, p, x, y, f, barcodeCache[p.barcode] || null);
+        }
         labelIdx++;
       }
     }
@@ -105,62 +113,286 @@ export async function generateLabelPdf(
   return doc;
 }
 
-function drawLabel(
+// =========================
+// GÓNDOLA — 100×40mm
+// =========================
+function drawGondolaLabel(
   doc: jsPDF,
   p: LabelProduct,
   x: number,
   y: number,
-  f: { w: number; h: number; fontSize: number; barcodeH: number },
+  f: { w: number; h: number },
   barcodeImg: string | null
 ) {
   const pad = 2;
-  const innerW = f.w - pad * 2;
 
-  // Border
-  doc.setDrawColor(180);
-  doc.setLineWidth(0.3);
+  // Border with rounded feel
+  doc.setDrawColor(100);
+  doc.setLineWidth(0.4);
   doc.rect(x, y, f.w, f.h);
 
-  // Product name
-  const nameMaxLen = f.w <= 80 ? 28 : f.w <= 100 ? 38 : 55;
+  // Header bar
+  doc.setFillColor(251, 161, 71);
+  doc.rect(x, y, f.w, 6, "F");
+
+  // Product name in header
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(f.fontSize);
-  doc.text(truncate(p.name, nameMaxLen), x + pad, y + pad + f.fontSize * 0.35);
+  doc.setFontSize(8);
+  doc.setTextColor(255, 255, 255);
+  doc.text(truncate(p.name, 40), x + pad, y + 4.2);
+  doc.setTextColor(0);
 
-  // SKU + Unit + Qty per box
-  const infoY = y + pad + f.fontSize * 0.35 + f.fontSize * 0.45;
+  // SKU + Unit row
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(f.fontSize - 2);
+  doc.setFontSize(6.5);
+  doc.setTextColor(100);
   const unitBadge = p.unit || "UN";
-  const cajaTxt = p.cantidadPorCaja > 0 ? ` | x${p.cantidadPorCaja} caja` : "";
-  doc.text(`SKU: ${p.sku}  |  ${unitBadge}${cajaTxt}`, x + pad, infoY);
+  const cajaTxt = p.cantidadPorCaja > 0 ? `  |  Caja x${p.cantidadPorCaja}` : "";
+  doc.text(`SKU: ${p.sku}  |  ${unitBadge}${cajaTxt}`, x + pad, y + 9.5);
+  doc.setTextColor(0);
 
-  // Barcode
-  const barcodeY = infoY + 1.5;
-  const barcodeW = innerW * 0.6;
-  const barcodePrintH = f.barcodeH * 0.35;
-
+  // Barcode (left side)
   if (barcodeImg) {
-    doc.addImage(barcodeImg, "PNG", x + pad, barcodeY, barcodeW, barcodePrintH);
-    doc.setFontSize(f.fontSize - 3);
-    doc.text(p.barcode, x + pad, barcodeY + barcodePrintH + f.fontSize * 0.25);
-  } else {
-    doc.setFontSize(f.fontSize - 3);
-    doc.setTextColor(150);
-    doc.text("SIN CODIGO", x + pad, barcodeY + barcodePrintH * 0.5);
+    doc.addImage(barcodeImg, "PNG", x + pad, y + 11, 38, 4);
+    doc.setFontSize(5.5);
+    doc.setTextColor(120);
+    doc.text(p.barcode, x + pad, y + 16.5);
     doc.setTextColor(0);
   }
 
-  // Prices row at bottom
-  const priceY = y + f.h - pad - 0.5;
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(f.fontSize - 1);
+  // Prices section (right side, stacked)
+  const priceX = x + 52;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(5.5);
+  doc.setTextColor(120);
 
-  const priceSpacing = innerW / 3;
   // Minorista
-  doc.text(`Min ${formatPrice(p.precioMinorista)}`, x + pad, priceY);
+  doc.text("Minorista", priceX, y + 12);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8);
+  doc.setTextColor(0);
+  doc.text(formatPrice(p.precioMinorista), priceX, y + 15.5);
+
   // Mayorista
-  doc.text(`May ${formatPrice(p.precioMayorista)}`, x + pad + priceSpacing, priceY);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(5.5);
+  doc.setTextColor(120);
+  doc.text("Mayorista", priceX, y + 19);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(9);
+  doc.setTextColor(0, 128, 0);
+  doc.text(formatPrice(p.precioMayorista), priceX, y + 23);
+  doc.setTextColor(0);
+
   // Caja Cerrada
-  doc.text(`Caja ${formatPrice(p.precioCajaCerrada)}`, x + pad + priceSpacing * 2, priceY);
+  if (p.precioCajaCerrada > 0 && p.cantidadPorCaja > 0) {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(5.5);
+    doc.setTextColor(120);
+    doc.text("Caja Cerrada", priceX, y + 26.5);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8);
+    doc.setTextColor(234, 88, 12);
+    doc.text(formatPrice(p.precioCajaCerrada), priceX, y + 30);
+    doc.setTextColor(0);
+  }
+
+  // Separator line
+  doc.setDrawColor(220);
+  doc.setLineWidth(0.2);
+  doc.line(x + 50, y + 7, x + 50, y + f.h - 2);
+
+  // Bottom line with brand accent
+  doc.setFillColor(251, 161, 71);
+  doc.rect(x, y + f.h - 1.2, f.w, 1.2, "F");
+}
+
+// =========================
+// NEVERA — 80×30mm (compact)
+// =========================
+function drawNeveraLabel(
+  doc: jsPDF,
+  p: LabelProduct,
+  x: number,
+  y: number,
+  f: { w: number; h: number },
+  barcodeImg: string | null
+) {
+  const pad = 1.5;
+
+  // Border
+  doc.setDrawColor(100);
+  doc.setLineWidth(0.3);
+  doc.rect(x, y, f.w, f.h);
+
+  // Header bar
+  doc.setFillColor(251, 161, 71);
+  doc.rect(x, y, f.w, 5, "F");
+
+  // Product name
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(6.5);
+  doc.setTextColor(255, 255, 255);
+  doc.text(truncate(p.name, 32), x + pad, y + 3.5);
+  doc.setTextColor(0);
+
+  // SKU
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(5);
+  doc.setTextColor(120);
+  doc.text(`SKU: ${p.sku}  |  ${p.unit || "UN"}`, x + pad, y + 8);
+  doc.setTextColor(0);
+
+  // Barcode (small, left)
+  if (barcodeImg) {
+    doc.addImage(barcodeImg, "PNG", x + pad, y + 9, 28, 3);
+    doc.setFontSize(4.5);
+    doc.setTextColor(120);
+    doc.text(p.barcode, x + pad, y + 13.5);
+    doc.setTextColor(0);
+  }
+
+  // Prices (right side, compact)
+  const priceX = x + 38;
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(4.5);
+  doc.setTextColor(120);
+  doc.text("Min", priceX, y + 9);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(6);
+  doc.setTextColor(0);
+  doc.text(formatPrice(p.precioMinorista), priceX + 6, y + 9);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(4.5);
+  doc.setTextColor(120);
+  doc.text("May", priceX, y + 13);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(7);
+  doc.setTextColor(0, 128, 0);
+  doc.text(formatPrice(p.precioMayorista), priceX + 6, y + 13);
+  doc.setTextColor(0);
+
+  if (p.precioCajaCerrada > 0 && p.cantidadPorCaja > 0) {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(4.5);
+    doc.setTextColor(120);
+    doc.text("Caja", priceX, y + 17);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(6);
+    doc.setTextColor(234, 88, 12);
+    doc.text(formatPrice(p.precioCajaCerrada), priceX + 7, y + 17);
+    doc.setTextColor(0);
+  }
+
+  // Separator
+  doc.setDrawColor(220);
+  doc.setLineWidth(0.2);
+  doc.line(x + 36, y + 6, x + 36, y + f.h - 2);
+
+  // Caja info at bottom
+  if (p.cantidadPorCaja > 0) {
+    doc.setFontSize(4.5);
+    doc.setTextColor(120);
+    doc.text(`Caja x${p.cantidadPorCaja} ${p.unit || "UN"}`, x + pad, y + f.h - 2);
+    doc.setTextColor(0);
+  }
+
+  // Bottom accent
+  doc.setFillColor(251, 161, 71);
+  doc.rect(x, y + f.h - 0.8, f.w, 0.8, "F");
+}
+
+// =========================
+// RACK — 150×50mm (large)
+// =========================
+function drawRackLabel(
+  doc: jsPDF,
+  p: LabelProduct,
+  x: number,
+  y: number,
+  f: { w: number; h: number },
+  barcodeImg: string | null
+) {
+  const pad = 3;
+
+  // Border
+  doc.setDrawColor(80);
+  doc.setLineWidth(0.5);
+  doc.rect(x, y, f.w, f.h);
+
+  // Header bar
+  doc.setFillColor(251, 161, 71);
+  doc.rect(x, y, f.w, 8, "F");
+
+  // Product name
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  doc.setTextColor(255, 255, 255);
+  doc.text(truncate(p.name, 55), x + pad, y + 5.8);
+  doc.setTextColor(0);
+
+  // SKU + Unit + Caja info
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(100);
+  const cajaTxt = p.cantidadPorCaja > 0 ? `  |  Caja x${p.cantidadPorCaja} ${p.unit || "UN"}` : "";
+  doc.text(`SKU: ${p.sku}  |  ${p.unit || "UN"}${cajaTxt}`, x + pad, y + 12.5);
+  doc.setTextColor(0);
+
+  // Barcode (left side)
+  if (barcodeImg) {
+    doc.addImage(barcodeImg, "PNG", x + pad, y + 15, 55, 6);
+    doc.setFontSize(7);
+    doc.setTextColor(120);
+    doc.text(p.barcode, x + pad, y + 23);
+    doc.setTextColor(0);
+  }
+
+  // Prices section (right side)
+  const priceX = x + 70;
+
+  // Minorista
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7);
+  doc.setTextColor(120);
+  doc.text("Minorista", priceX, y + 15);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  doc.setTextColor(0);
+  doc.text(formatPrice(p.precioMinorista), priceX + 25, y + 15);
+
+  // Mayorista (highlighted)
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7);
+  doc.setTextColor(120);
+  doc.text("Mayorista", priceX, y + 22);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(14);
+  doc.setTextColor(0, 128, 0);
+  doc.text(formatPrice(p.precioMayorista), priceX + 25, y + 22.5);
+  doc.setTextColor(0);
+
+  // Caja Cerrada
+  if (p.precioCajaCerrada > 0 && p.cantidadPorCaja > 0) {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7);
+    doc.setTextColor(120);
+    doc.text("Caja Cerrada", priceX, y + 29);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.setTextColor(234, 88, 12);
+    doc.text(formatPrice(p.precioCajaCerrada), priceX + 25, y + 29);
+    doc.setTextColor(0);
+  }
+
+  // Separator line
+  doc.setDrawColor(200);
+  doc.setLineWidth(0.3);
+  doc.line(x + 65, y + 10, x + 65, y + f.h - 3);
+
+  // Bottom accent bar
+  doc.setFillColor(251, 161, 71);
+  doc.rect(x, y + f.h - 1.5, f.w, 1.5, "F");
 }

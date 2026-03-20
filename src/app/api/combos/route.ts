@@ -49,6 +49,19 @@ export async function GET() {
       result.recordset.map((p: { sku: string; name: string; precioMayorista: number; unit: string }) => [p.sku, p])
     );
 
+    // Fetch product images from PostgreSQL
+    const comboSkus = combos.map((c) => `combo-${c.id}`);
+    const allImageSkus = [...allSkus, ...comboSkus];
+    const allImages = await prisma.productImage.findMany({
+      where: { sku: { in: allImageSkus } },
+      orderBy: { position: "asc" },
+    });
+    const imageMap = new Map<string, string[]>();
+    for (const img of allImages) {
+      if (!imageMap.has(img.sku)) imageMap.set(img.sku, []);
+      imageMap.get(img.sku)!.push(img.filename);
+    }
+
     const enrichedCombos = combos.map((combo) => ({
       id: combo.id,
       name: combo.name,
@@ -62,12 +75,15 @@ export async function GET() {
           name: prod?.name || item.sku,
           unitPrice: prod?.precioMayorista || 0,
           unit: prod?.unit || "UN",
+          images: imageMap.get(item.sku) || [],
         };
       }),
     })).map((combo) => {
       const autoPrice = combo.items.reduce((sum, i) => sum + i.unitPrice * i.quantity, 0);
+      const comboImages = imageMap.get(`combo-${combo.id}`) || [];
       return {
         ...combo,
+        comboImages,
         price: combo.hasCustomPrice ? Number(combos.find((c) => c.id === combo.id)!.price) : autoPrice,
         originalPrice: autoPrice,
       };
