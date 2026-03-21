@@ -37,9 +37,6 @@ function formatPrice(price: number): string {
   return "$" + price.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-function truncate(text: string, maxLen: number): string {
-  return text.length > maxLen ? text.substring(0, maxLen - 2) + ".." : text;
-}
 
 async function renderQR(url: string, size: number): Promise<string | null> {
   if (!url) return null;
@@ -56,6 +53,23 @@ async function renderQR(url: string, size: number): Promise<string | null> {
   } catch {
     return null;
   }
+}
+
+// Draw product name with auto-wrap, returns the Y position after the name block
+function drawProductName(
+  doc: jsPDF, name: string, x: number, y: number, maxW: number, fontSize: number, lineH: number
+): number {
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(fontSize);
+  const lines = doc.splitTextToSize(name, maxW);
+  const displayLines = lines.slice(0, 2); // max 2 lines
+  if (lines.length > 2) {
+    displayLines[1] = displayLines[1].substring(0, displayLines[1].length - 2) + "..";
+  }
+  for (let i = 0; i < displayLines.length; i++) {
+    doc.text(displayLines[i], x + maxW / 2, y + (i * lineH), { align: "center" });
+  }
+  return y + displayLines.length * lineH;
 }
 
 async function renderBarcode(code: string, height: number): Promise<string | null> {
@@ -174,21 +188,19 @@ function drawGondolaLabel(
   doc.setFillColor(251, 161, 71);
   doc.rect(x, y, f.w, 1.5, "F");
 
-  // Product name (centered, full width)
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(10);
-  doc.text(truncate(p.name, 42), x + f.w / 2, y + 7, { align: "center" });
+  // Product name (centered, auto-wrap to 2 lines)
+  const nameBottom = drawProductName(doc, p.name, x + pad, y + 6, f.w - pad * 2, 13, 5);
 
   // SKU + Unit
   doc.setFont("helvetica", "normal");
   doc.setFontSize(7);
   doc.setTextColor(120);
   const unitBadge = p.unit || "UN";
-  doc.text(`SKU: ${p.sku}  |  ${unitBadge}`, x + pad, y + 12.5);
+  doc.text(`SKU: ${p.sku}  |  ${unitBadge}`, x + pad, nameBottom + 2);
   doc.setTextColor(0);
 
-  // --- Split at y+14 ---
-  const splitY = y + 14;
+  // --- Split below SKU ---
+  const splitY = nameBottom + 3.5;
 
   // LEFT: Barcode
   if (barcodeImg) {
@@ -199,9 +211,14 @@ function drawGondolaLabel(
     doc.setTextColor(0);
   }
 
-  // LEFT: QR (under barcode)
+  // LEFT: QR (under barcode, fit in remaining space)
   if (qrImg) {
-    doc.addImage(qrImg, "PNG", x + pad, splitY + 6, 12, 12);
+    const qrTop = splitY + 6;
+    const qrMax = y + f.h - pad - 1 - qrTop; // available height (minus accent+margin)
+    const qrS = Math.min(12, Math.max(6, qrMax)); // clamp between 6-12mm
+    if (qrS >= 6) {
+      doc.addImage(qrImg, "PNG", x + pad, qrTop, qrS, qrS);
+    }
   }
 
   // Separator
@@ -292,20 +309,18 @@ function drawNeveraLabel(
   doc.setFillColor(251, 161, 71);
   doc.rect(x, y, f.w, 1, "F");
 
-  // Product name (centered, full width)
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(8);
-  doc.text(truncate(p.name, 32), x + f.w / 2, y + 6, { align: "center" });
+  // Product name (centered, auto-wrap to 2 lines)
+  const nameBottom = drawProductName(doc, p.name, x + pad, y + 5.5, f.w - pad * 2, 11, 4.5);
 
   // SKU
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(7);
+  doc.setFontSize(6);
   doc.setTextColor(120);
-  doc.text(`${p.sku} | ${p.unit || "UN"}`, x + pad, y + 11.5);
+  doc.text(`${p.sku} | ${p.unit || "UN"}`, x + pad, nameBottom + 2);
   doc.setTextColor(0);
 
-  // --- Split at y+13 ---
-  const splitY = y + 13;
+  // --- Split below SKU ---
+  const splitY = nameBottom + 3.5;
 
   // Barcode
   if (barcodeImg) {
@@ -316,9 +331,14 @@ function drawNeveraLabel(
     doc.setTextColor(0);
   }
 
-  // QR (under barcode)
+  // QR (under barcode, fit in remaining space)
   if (qrImg) {
-    doc.addImage(qrImg, "PNG", x + pad, splitY + 6, 12, 12);
+    const qrTop = splitY + 6;
+    const qrMax = y + f.h - pad - 1 - qrTop;
+    const qrS = Math.min(12, Math.max(5, qrMax));
+    if (qrS >= 5) {
+      doc.addImage(qrImg, "PNG", x + pad, qrTop, qrS, qrS);
+    }
   }
 
   // Separator
@@ -408,20 +428,18 @@ function drawRackLabel(
   doc.setFillColor(251, 161, 71);
   doc.rect(x, y, f.w, 1.5, "F");
 
-  // Product name (centered, full width)
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(13);
-  doc.text(truncate(p.name, 50), x + f.w / 2, y + 9, { align: "center" });
+  // Product name (centered, auto-wrap to 2 lines)
+  const nameBottom = drawProductName(doc, p.name, x + pad, y + 7, f.w - pad * 2, 16, 6);
 
   // SKU + Unit
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
   doc.setTextColor(100);
-  doc.text(`SKU: ${p.sku}  |  ${p.unit || "UN"}`, x + pad, y + 14);
+  doc.text(`SKU: ${p.sku}  |  ${p.unit || "UN"}`, x + pad, nameBottom + 2);
   doc.setTextColor(0);
 
-  // --- Split at y+16 ---
-  const splitY = y + 16;
+  // --- Split below SKU ---
+  const splitY = nameBottom + 4;
 
   // Barcode
   if (barcodeImg) {
@@ -432,9 +450,14 @@ function drawRackLabel(
     doc.setTextColor(0);
   }
 
-  // QR (under barcode)
+  // QR (under barcode, fit in remaining space)
   if (qrImg) {
-    doc.addImage(qrImg, "PNG", x + pad, splitY + 10, 18, 18);
+    const qrTop = splitY + 10;
+    const qrMax = y + f.h - pad - 2 - qrTop;
+    const qrS = Math.min(18, Math.max(8, qrMax));
+    if (qrS >= 8) {
+      doc.addImage(qrImg, "PNG", x + pad, qrTop, qrS, qrS);
+    }
   }
 
   // Separator
