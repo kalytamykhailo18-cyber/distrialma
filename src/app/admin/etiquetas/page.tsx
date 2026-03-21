@@ -36,6 +36,16 @@ export default function EtiquetasPage() {
   const [generating, setGenerating] = useState(false);
   const searchTimeout = useRef<NodeJS.Timeout | null>(null);
 
+  // Barcode input
+  const [barcode, setBarcode] = useState("");
+  const [barcodeLoading, setBarcodeLoading] = useState(false);
+
+  // Brand filter
+  const [brands, setBrands] = useState<{ id: string; name: string }[]>([]);
+  const [selectedBrand, setSelectedBrand] = useState("");
+  const [brandProducts, setBrandProducts] = useState<Product[]>([]);
+  const [loadingBrand, setLoadingBrand] = useState(false);
+
   // Price tracking state
   const [scanning, setScanning] = useState(false);
   const [scanResult, setScanResult] = useState<{ scanned: number; changes: number; isFirstScan: boolean } | null>(null);
@@ -90,6 +100,47 @@ export default function EtiquetasPage() {
       }
     }
     setSelected(newSelected);
+  }
+
+  useEffect(() => {
+    fetch("/api/brands")
+      .then((r) => r.json())
+      .then((data) => setBrands(data || []))
+      .catch(() => setBrands([]));
+  }, []);
+
+  async function handleBarcode() {
+    if (!barcode.trim()) return;
+    setBarcodeLoading(true);
+    try {
+      const res = await fetch(`/api/products?search=${encodeURIComponent(barcode.trim())}&limit=1`);
+      const data = await res.json();
+      if (data.products && data.products.length > 0) {
+        addProduct(data.products[0]);
+        setBarcode("");
+      } else {
+        alert("Producto no encontrado con ese código de barras");
+      }
+    } catch {
+      alert("Error al buscar");
+    } finally {
+      setBarcodeLoading(false);
+    }
+  }
+
+  async function handleBrandFilter(brandId: string) {
+    setSelectedBrand(brandId);
+    if (!brandId) { setBrandProducts([]); return; }
+    setLoadingBrand(true);
+    try {
+      const res = await fetch(`/api/products?brand=${brandId}&limit=100`);
+      const data = await res.json();
+      setBrandProducts(data.products || []);
+    } catch {
+      setBrandProducts([]);
+    } finally {
+      setLoadingBrand(false);
+    }
   }
 
   function handleSearch(value: string) {
@@ -275,13 +326,70 @@ export default function EtiquetasPage() {
       {/* Product search */}
       <div className="bg-white rounded-lg border p-4 mb-4">
         <h2 className="text-sm font-medium text-gray-700 mb-3">Agregar productos</h2>
+
+        {/* Barcode input */}
+        <div className="flex gap-2 mb-3">
+          <input
+            type="text"
+            value={barcode}
+            onChange={(e) => setBarcode(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") handleBarcode(); }}
+            placeholder="Código de barras..."
+            className="flex-1 px-4 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-400"
+          />
+          <button
+            onClick={handleBarcode}
+            disabled={barcodeLoading || !barcode.trim()}
+            className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50"
+          >
+            {barcodeLoading ? "..." : "Agregar"}
+          </button>
+        </div>
+
+        {/* Brand filter */}
+        <div className="mb-3">
+          <select
+            value={selectedBrand}
+            onChange={(e) => handleBrandFilter(e.target.value)}
+            className="w-full px-4 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-400 bg-white"
+          >
+            <option value="">Filtrar por marca...</option>
+            {brands.map((b) => (
+              <option key={b.id} value={b.id}>{b.name}</option>
+            ))}
+          </select>
+          {loadingBrand && <p className="text-xs text-gray-400 mt-1">Cargando productos...</p>}
+          {brandProducts.length > 0 && (
+            <div className="mt-2 max-h-40 overflow-y-auto border rounded-lg">
+              {brandProducts.map((p) => {
+                const alreadyAdded = selected.some((s) => s.product.sku === p.sku);
+                return (
+                  <button
+                    key={p.sku}
+                    onClick={() => !alreadyAdded && addProduct(p)}
+                    disabled={alreadyAdded}
+                    className={`w-full text-left px-3 py-1.5 text-sm border-b last:border-b-0 ${
+                      alreadyAdded ? "bg-gray-50 text-gray-400" : "hover:bg-blue-50"
+                    }`}
+                  >
+                    <span className="font-mono text-gray-500 mr-2">{p.sku}</span>
+                    {p.name}
+                    {alreadyAdded && <span className="ml-2 text-xs">(agregado)</span>}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Name/SKU search */}
         <div className="relative">
           <input
             type="text"
             value={search}
             onChange={(e) => handleSearch(e.target.value)}
             placeholder="Buscar por nombre o SKU..."
-            className="w-full px-4 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-4 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-400"
           />
           {searching && (
             <div className="absolute right-3 top-2.5 text-gray-400 text-sm">Buscando...</div>
@@ -296,9 +404,7 @@ export default function EtiquetasPage() {
                     onClick={() => !alreadyAdded && addProduct(p)}
                     disabled={alreadyAdded}
                     className={`w-full text-left px-4 py-2 text-sm border-b last:border-b-0 ${
-                      alreadyAdded
-                        ? "bg-gray-50 text-gray-400 cursor-not-allowed"
-                        : "hover:bg-blue-50 cursor-pointer"
+                      alreadyAdded ? "bg-gray-50 text-gray-400" : "hover:bg-blue-50"
                     }`}
                   >
                     <span className="font-mono text-gray-500 mr-2">{p.sku}</span>
