@@ -232,7 +232,7 @@ function drawGondolaLabel(
     doc.addImage(qrImg, "PNG", x + pad, qrTop, qrS, qrS);
   }
   if (logoImg) {
-    doc.addImage(logoImg, "PNG", x + pad + qrS + 12, qrTop, qrS, qrS);
+    doc.addImage(logoImg, "PNG", x + sepX - pad - qrS, qrTop, qrS, qrS);
   }
 
   // Separator
@@ -350,7 +350,7 @@ function drawNeveraLabel(
     doc.addImage(qrImg, "PNG", x + pad, qrTop, qrS, qrS);
   }
   if (logoImg) {
-    doc.addImage(logoImg, "PNG", x + pad + qrS + 12, qrTop, qrS, qrS);
+    doc.addImage(logoImg, "PNG", x + sepX - pad - qrS, qrTop, qrS, qrS);
   }
 
   // Separator
@@ -467,7 +467,7 @@ function drawRackLabel(
     doc.addImage(qrImg, "PNG", x + pad, qrTop, qrS, qrS);
   }
   if (logoImg) {
-    doc.addImage(logoImg, "PNG", x + pad + qrS + 13, qrTop, qrS, qrS);
+    doc.addImage(logoImg, "PNG", x + sepX - pad - qrS, qrTop, qrS, qrS);
   }
 
   // Separator
