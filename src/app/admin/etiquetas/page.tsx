@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { useSession } from "next-auth/react";
 import Link from "next/link";
 import type { Product } from "@/types";
 import type { LabelFormat, LabelProduct } from "@/lib/label-pdf";
@@ -28,6 +29,8 @@ const FIELD_LABELS: Record<string, string> = {
 };
 
 export default function EtiquetasPage() {
+  const { data: session } = useSession();
+  const isMinorista = (session?.user as { role?: string } | undefined)?.role === "etiquetas";
   const [format, setFormat] = useState<LabelFormat>("gondola");
   const [search, setSearch] = useState("");
   const [results, setResults] = useState<Product[]>([]);
@@ -195,9 +198,10 @@ export default function EtiquetasPage() {
         precioMinorista: s.product.precioMinorista || 0,
         precioMayorista: s.product.precioMayorista,
         precioCajaCerrada: s.product.precioCajaCerrada,
+        promocion: s.product.promocion,
         quantity: s.quantity,
       }));
-      const doc = await generateLabelPdf(format, labels);
+      const doc = await generateLabelPdf(format, labels, isMinorista ? "minorista" : "mayorista");
       const blob = doc.output("blob");
       const url = URL.createObjectURL(blob);
       window.open(url, "_blank");

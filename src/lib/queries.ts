@@ -4,6 +4,20 @@ import type { Product, Category, Brand } from "@/types";
 
 const db = () => getDbName("productos");
 
+function parsePromocion(promoData: string): string | undefined {
+  if (!promoData || !promoData.trim()) return undefined;
+  // Active flag is the last character of Filler1 = "1"
+  if (promoData.trimEnd().slice(-1) !== "1") return undefined;
+  // Parse: spaces + qty + spaces + price (first promo only)
+  const match = promoData.trimStart().match(/^(\d+)\s+([\d.,]+)/);
+  if (!match) return undefined;
+  const qty = parseInt(match[1]);
+  const priceStr = match[2].replace(/\.(?=\d{3})/g, "").replace(",", ".");
+  const price = parseFloat(priceStr);
+  if (isNaN(qty) || isNaN(price) || qty < 1) return undefined;
+  return `Lleva ${qty} x $${price.toLocaleString("es-AR", { minimumFractionDigits: 2 })}/UN`;
+}
+
 async function getHiddenCategoryIds(): Promise<string[]> {
   const hidden = await prisma.hiddenCategory.findMany();
   return hidden.map((h) => h.categoryId);
@@ -103,7 +117,9 @@ export async function getProducts(opts: {
       s.Precio2 AS precioMayorista,
       s.Precio4 AS precioCajaCerrada,
       ${especial}
-      s.Stk AS stock
+      s.Stk AS stock,
+      LTRIM(RTRIM(ISNULL(p.Filler1, ''))) AS promoData,
+      LTRIM(RTRIM(ISNULL(p.Filler2, ''))) AS promoActive
     FROM [${db()}].dbo.Productos p
     JOIN [${db()}].dbo.Stock s ON s.CodProducto = p.Cod
     LEFT JOIN [${db()}].dbo.Rubros r ON r.Cod = p.Rubro
@@ -146,6 +162,7 @@ export async function getProducts(opts: {
     precioCajaCerrada: row.precioCajaCerrada || 0,
     precioEspecial: includeEspecial ? row.precioEspecial || 0 : undefined,
     stock: row.stock || 0,
+    promocion: parsePromocion(row.promoData),
     images: [],
     description: undefined,
   }));
@@ -177,7 +194,9 @@ export async function getProductBySku(
       s.Precio2 AS precioMayorista,
       s.Precio4 AS precioCajaCerrada,
       ${especial}
-      s.Stk AS stock
+      s.Stk AS stock,
+      LTRIM(RTRIM(ISNULL(p.Filler1, ''))) AS promoData,
+      LTRIM(RTRIM(ISNULL(p.Filler2, ''))) AS promoActive
     FROM [${db()}].dbo.Productos p
     JOIN [${db()}].dbo.Stock s ON s.CodProducto = p.Cod
     LEFT JOIN [${db()}].dbo.Rubros r ON r.Cod = p.Rubro
@@ -211,6 +230,7 @@ export async function getProductBySku(
     precioCajaCerrada: row.precioCajaCerrada || 0,
     precioEspecial: includeEspecial ? row.precioEspecial || 0 : undefined,
     stock: row.stock || 0,
+    promocion: parsePromocion(row.promoData),
     images: [],
     description: undefined,
   };

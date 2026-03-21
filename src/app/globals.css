@@ -50,6 +50,20 @@ body {
   background: #f97316;
 }
 
+/* Infinite carousel */
+@keyframes carousel {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.animate-carousel {
+  animation: carousel linear infinite;
+}
+
+.animate-carousel:hover {
+  animation-play-state: paused;
+}
+
 /* Firefox */
 * {
   scrollbar-width: thin;

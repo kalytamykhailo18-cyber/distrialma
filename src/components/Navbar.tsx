@@ -38,6 +38,10 @@ export default function Navbar() {
             <Link href="/admin" className="text-sm text-gray-600 hover:text-brand-600" onClick={() => setMenuOpen(false)}>
               Admin
             </Link>
+          ) : (session.user as { role?: string }).role === "etiquetas" ? (
+            <Link href="/admin/etiquetas" className="text-sm text-gray-600 hover:text-brand-600" onClick={() => setMenuOpen(false)}>
+              Etiquetas
+            </Link>
           ) : (
             <Link href="/mis-pedidos" className="text-sm text-gray-600 hover:text-brand-600" onClick={() => setMenuOpen(false)}>
               Mis Pedidos

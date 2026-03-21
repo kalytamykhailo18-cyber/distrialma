@@ -64,6 +64,12 @@ export default function AdminPage() {
             Categorías
           </Link>
           <Link
+            href="/admin/marcas"
+            className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm hover:bg-gray-200"
+          >
+            Marcas
+          </Link>
+          <Link
             href="/admin/combos"
             className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm hover:bg-gray-200"
           >

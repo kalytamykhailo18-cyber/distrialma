@@ -9,7 +9,7 @@ datasource db {
 
 model ProductImage {
   id        Int      @id @default(autoincrement())
-  sku       String   @db.VarChar(7)
+  sku       String   @db.VarChar(20)
   filename  String   @db.VarChar(255)
   position  Int      @default(0)
   createdAt DateTime @default(now())
@@ -40,6 +40,13 @@ model HiddenCategory {
   categoryId String @unique @db.VarChar(4)
 
   @@map("hidden_categories")
+}
+
+model FeaturedBrand {
+  id      Int    @id @default(autoincrement())
+  brandId String @unique @db.VarChar(4)
+
+  @@map("featured_brands")
 }
 
 model PriceSnapshot {

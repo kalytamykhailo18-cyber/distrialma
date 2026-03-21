@@ -3,6 +3,8 @@ import bwipjs from "bwip-js";
 
 export type LabelFormat = "gondola" | "nevera" | "rack";
 
+export type LabelMode = "mayorista" | "minorista";
+
 export interface LabelProduct {
   sku: string;
   name: string;
@@ -12,6 +14,7 @@ export interface LabelProduct {
   precioMinorista: number;
   precioMayorista: number;
   precioCajaCerrada: number;
+  promocion?: string;
   quantity: number;
 }
 
@@ -90,9 +93,81 @@ async function renderBarcode(code: string, height: number): Promise<string | nul
   }
 }
 
+// Draw price block based on mode
+function drawPrices(
+  doc: jsPDF, p: LabelProduct, priceX: number, rightEdge: number,
+  splitY: number, mode: LabelMode, sizes: { main: number; label: number; sub: number; spacing: number }
+) {
+  if (mode === "minorista") {
+    // MINORISTA as main price
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(sizes.label);
+    doc.setTextColor(0);
+    doc.text("MINORISTA", priceX, splitY + sizes.spacing);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(sizes.main);
+    doc.setTextColor(0, 128, 0);
+    doc.text(formatPrice(p.precioMinorista), rightEdge, splitY + sizes.spacing, { align: "right" });
+    doc.setTextColor(0);
+
+    // Promoción if available (prominent)
+    if (p.promocion) {
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(sizes.sub);
+      doc.setTextColor(234, 88, 12);
+      doc.text("PROMOCIÓN", priceX, splitY + sizes.spacing * 2.3);
+      doc.text(p.promocion, rightEdge, splitY + sizes.spacing * 2.3, { align: "right" });
+      doc.setTextColor(0);
+    }
+  } else {
+    // MAYORISTA as main price
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(sizes.label);
+    doc.setTextColor(0);
+    doc.text("MAYORISTA", priceX, splitY + sizes.spacing);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(sizes.main);
+    doc.setTextColor(0, 128, 0);
+    doc.text(formatPrice(p.precioMayorista), rightEdge, splitY + sizes.spacing, { align: "right" });
+    doc.setTextColor(0);
+
+    // MINORISTA
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(sizes.label);
+    doc.setTextColor(0);
+    doc.text("MINORISTA", priceX, splitY + sizes.spacing * 2.3);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(sizes.sub);
+    doc.setTextColor(0);
+    doc.text(formatPrice(p.precioMinorista), rightEdge, splitY + sizes.spacing * 2.3, { align: "right" });
+
+    // CAJA CERRADA
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(sizes.label);
+    doc.setTextColor(0);
+    doc.text("CAJA CERRADA", priceX, splitY + sizes.spacing * 3.5);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(sizes.sub);
+    doc.setTextColor(234, 88, 12);
+    doc.text(formatPrice(p.precioCajaCerrada), rightEdge, splitY + sizes.spacing * 3.5, { align: "right" });
+    doc.setTextColor(0);
+
+    // Caja quantity
+    if (p.cantidadPorCaja > 0) {
+      const unitBadge = p.unit || "UN";
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(sizes.label);
+      doc.setTextColor(120);
+      doc.text(`Caja x${p.cantidadPorCaja} ${unitBadge}`, priceX, splitY + sizes.spacing * 4.6);
+      doc.setTextColor(0);
+    }
+  }
+}
+
 export async function generateLabelPdf(
   format: LabelFormat,
-  products: LabelProduct[]
+  products: LabelProduct[],
+  mode: LabelMode = "mayorista"
 ): Promise<jsPDF> {
   const baseF = FORMATS[format];
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
@@ -161,11 +236,11 @@ export async function generateLabelPdf(
 
         const qrImg = qrCache[p.sku] || null;
         if (format === "rack") {
-          drawRackLabel(doc, p, x, y, f, barcodeCache[p.barcode] || null, qrImg, logoImg);
+          drawRackLabel(doc, p, x, y, f, barcodeCache[p.barcode] || null, qrImg, logoImg, mode);
         } else if (format === "gondola") {
-          drawGondolaLabel(doc, p, x, y, f, barcodeCache[p.barcode] || null, qrImg, logoImg);
+          drawGondolaLabel(doc, p, x, y, f, barcodeCache[p.barcode] || null, qrImg, logoImg, mode);
         } else {
-          drawNeveraLabel(doc, p, x, y, f, barcodeCache[p.barcode] || null, qrImg, logoImg);
+          drawNeveraLabel(doc, p, x, y, f, barcodeCache[p.barcode] || null, qrImg, logoImg, mode);
         }
         labelIdx++;
       }
@@ -186,7 +261,8 @@ function drawGondolaLabel(
   f: { w: number; h: number },
   barcodeImg: string | null,
   qrImg: string | null,
-  logoImg: string | null
+  logoImg: string | null,
+  mode: LabelMode = "mayorista"
 ) {
   const pad = 5;
   // Layout: 100w x 40h, padding 5mm
@@ -243,51 +319,7 @@ function drawGondolaLabel(
   // RIGHT COLUMN
   const priceX = x + sepX + 3;
   const rightEdge = x + f.w - pad;
-
-  // MAYORISTA (same row)
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(6);
-  doc.setTextColor(0);
-  doc.text("MAYORISTA", priceX, splitY + 3);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(14);
-  doc.setTextColor(0, 128, 0);
-  doc.text(formatPrice(p.precioMayorista), rightEdge, splitY + 3, { align: "right" });
-  doc.setTextColor(0);
-
-  // MINORISTA (same row)
-  {
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(6);
-    doc.setTextColor(0);
-    doc.text("MINORISTA", priceX, splitY + 10);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(9);
-    doc.setTextColor(0);
-    doc.text(formatPrice(p.precioMinorista), rightEdge, splitY + 10, { align: "right" });
-  }
-
-  // CAJA CERRADA (same row)
-  {
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(6);
-    doc.setTextColor(0);
-    doc.text("CAJA CERRADA", priceX, splitY + 16);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(9);
-    doc.setTextColor(234, 88, 12);
-    doc.text(formatPrice(p.precioCajaCerrada), rightEdge, splitY + 16, { align: "right" });
-    doc.setTextColor(0);
-  }
-
-  // Caja quantity
-  if (p.cantidadPorCaja > 0) {
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(6);
-    doc.setTextColor(120);
-    doc.text(`Caja x${p.cantidadPorCaja} ${unitBadge}`, priceX, splitY + 21);
-    doc.setTextColor(0);
-  }
+  drawPrices(doc, p, priceX, rightEdge, splitY, mode, { main: 14, label: 6, sub: 9, spacing: 4.5 });
 
   // Bottom accent
   doc.setFillColor(251, 161, 71);
@@ -305,7 +337,8 @@ function drawNeveraLabel(
   f: { w: number; h: number },
   barcodeImg: string | null,
   qrImg: string | null,
-  logoImg: string | null
+  logoImg: string | null,
+  mode: LabelMode = "mayorista"
 ) {
   const pad = 4;
   // Layout: 80w x 40h
@@ -361,51 +394,7 @@ function drawNeveraLabel(
   // RIGHT COLUMN
   const priceX = x + sepX + 3;
   const rightEdge = x + f.w - pad;
-
-  // MAYORISTA (same row)
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(4.5);
-  doc.setTextColor(0);
-  doc.text("MAYORISTA", priceX, splitY + 3);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(13);
-  doc.setTextColor(0, 128, 0);
-  doc.text(formatPrice(p.precioMayorista), rightEdge, splitY + 3, { align: "right" });
-  doc.setTextColor(0);
-
-  // Minorista (same row)
-  {
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(4.5);
-    doc.setTextColor(0);
-    doc.text("MINORISTA", priceX, splitY + 9);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(7);
-    doc.setTextColor(0);
-    doc.text(formatPrice(p.precioMinorista), rightEdge, splitY + 9, { align: "right" });
-  }
-
-  // Caja Cerrada (same row)
-  {
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(4.5);
-    doc.setTextColor(0);
-    doc.text("CAJA CERRADA", priceX, splitY + 14);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(8);
-    doc.setTextColor(234, 88, 12);
-    doc.text(formatPrice(p.precioCajaCerrada), rightEdge, splitY + 14, { align: "right" });
-    doc.setTextColor(0);
-  }
-
-  // Caja quantity
-  if (p.cantidadPorCaja > 0) {
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(4.5);
-    doc.setTextColor(120);
-    doc.text(`x${p.cantidadPorCaja} ${p.unit || "UN"}`, priceX, splitY + 19);
-    doc.setTextColor(0);
-  }
+  drawPrices(doc, p, priceX, rightEdge, splitY, mode, { main: 13, label: 5, sub: 7, spacing: 4 });
 
   // Bottom accent
   doc.setFillColor(251, 161, 71);
@@ -423,7 +412,8 @@ function drawRackLabel(
   f: { w: number; h: number },
   barcodeImg: string | null,
   qrImg: string | null,
-  logoImg: string | null
+  logoImg: string | null,
+  mode: LabelMode = "mayorista"
 ) {
   const pad = 5;
 
@@ -478,51 +468,7 @@ function drawRackLabel(
   // RIGHT COLUMN
   const priceX = x + sepX + 4;
   const rightEdge = x + f.w - pad;
-
-  // MAYORISTA (same row)
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(7);
-  doc.setTextColor(0);
-  doc.text("MAYORISTA", priceX, splitY + 4);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(20);
-  doc.setTextColor(0, 128, 0);
-  doc.text(formatPrice(p.precioMayorista), rightEdge, splitY + 4, { align: "right" });
-  doc.setTextColor(0);
-
-  // Minorista (same row)
-  {
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(7);
-    doc.setTextColor(0);
-    doc.text("MINORISTA", priceX, splitY + 13);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(10);
-    doc.setTextColor(0);
-    doc.text(formatPrice(p.precioMinorista), rightEdge, splitY + 13, { align: "right" });
-  }
-
-  // Caja Cerrada (same row)
-  {
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(7);
-    doc.setTextColor(0);
-    doc.text("CAJA CERRADA", priceX, splitY + 21);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(10);
-    doc.setTextColor(234, 88, 12);
-    doc.text(formatPrice(p.precioCajaCerrada), rightEdge, splitY + 21, { align: "right" });
-    doc.setTextColor(0);
-  }
-
-  // Caja quantity
-  if (p.cantidadPorCaja > 0) {
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(7);
-    doc.setTextColor(120);
-    doc.text(`x${p.cantidadPorCaja} ${p.unit || "UN"}`, priceX, splitY + 28);
-    doc.setTextColor(0);
-  }
+  drawPrices(doc, p, priceX, rightEdge, splitY, mode, { main: 20, label: 7, sub: 10, spacing: 6 });
 
   // Bottom accent bar
   doc.setFillColor(251, 161, 71);

@@ -122,9 +122,7 @@ export default function Home() {
           <p className="text-gray-500 text-center mb-8">
             Trabajamos con las mejores marcas del mercado
           </p>
-          <div id="brand-logos" className="flex flex-wrap justify-center gap-6 items-center opacity-60">
-            <BrandLogos />
-          </div>
+          <BrandLogos />
         </div>
       </div>
 
@@ -222,30 +220,60 @@ export default function Home() {
   );
 }
 
-// Brand logos — shows brand names as text badges for now (can be replaced with uploaded logos later)
+// Brand logos — infinite scrolling carousel
 function BrandLogos() {
-  const [brands, setBrands] = useState<{ id: string; name: string }[]>([]);
+  const [brands, setBrands] = useState<{ id: string; name: string; logo?: string }[]>([]);
 
   useEffect(() => {
-    fetch("/api/brands")
-      .then((r) => r.json())
-      .then((data) => setBrands((data || []).slice(0, 20)))
+    Promise.all([
+      fetch("/api/brands").then((r) => r.json()),
+      fetch("/api/admin/featured-brands?logos=1").then((r) => r.json()),
+    ])
+      .then(([allBrands, featuredData]) => {
+        const featuredSet = new Set(featuredData.brandIds || []);
+        const logos: Record<string, string> = featuredData.logos || {};
+        const filtered = (allBrands || [])
+          .filter((b: { id: string }) => featuredSet.has(b.id))
+          .map((b: { id: string; name: string }) => ({
+            ...b,
+            logo: logos[b.id] || undefined,
+          }));
+        setBrands(filtered);
+      })
       .catch(() => setBrands([]));
   }, []);
 
   if (brands.length === 0) return null;
 
+  // Duplicate brands for seamless infinite loop
+  const items = [...brands, ...brands];
+  const duration = brands.length * 3; // 3 seconds per brand
+
   return (
-    <>
-      {brands.map((brand) => (
-        <Link
-          key={brand.id}
-          href={`/marca/${brand.id}`}
-          className="px-4 py-2 bg-white border rounded-lg text-sm font-medium text-gray-700 hover:border-brand-400 hover:text-brand-600 transition-colors"
-        >
-          {brand.name}
-        </Link>
-      ))}
-    </>
+    <div className="overflow-hidden w-full">
+      <div
+        className="flex items-center gap-10 animate-carousel"
+        style={{
+          width: "max-content",
+          animationDuration: `${duration}s`,
+        }}
+      >
+        {items.map((brand, i) => (
+          <Link
+            key={`${brand.id}-${i}`}
+            href={`/marca/${brand.id}`}
+            className={`flex items-center justify-center shrink-0 rounded-lg hover:shadow-sm transition-colors ${
+              brand.logo ? "" : "px-4 py-2 bg-white border hover:border-brand-400"
+            }`}
+          >
+            {brand.logo ? (
+              <img src={brand.logo} alt={brand.name} className="h-14 object-contain" />
+            ) : (
+              <span className="text-sm font-medium text-gray-700 whitespace-nowrap">{brand.name}</span>
+            )}
+          </Link>
+        ))}
+      </div>
+    </div>
   );
 }
