@@ -94,12 +94,24 @@ export async function generateLabelPdf(
   format: LabelFormat,
   products: LabelProduct[]
 ): Promise<jsPDF> {
-  const f = FORMATS[format];
+  const baseF = FORMATS[format];
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const pageW = 210;
   const pageH = 297;
+
+  // Check if any product name needs 2 lines — if so, add extra height
+  const nameFontSize = format === "rack" ? 16 : format === "gondola" ? 13 : 11;
+  const lineH = format === "rack" ? 6 : format === "gondola" ? 5 : 4.5;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(nameFontSize);
+  const maxNameW = baseF.w - (format === "rack" ? 10 : format === "gondola" ? 10 : 8);
+  const needs2Lines = products.some((p) => doc.splitTextToSize(p.name, maxNameW).length > 1);
+  const extraH = needs2Lines ? lineH : 0;
+
+  const f = { ...baseF, h: baseF.h + extraH };
+  const rows = Math.floor(pageH / f.h);
   const marginX = (pageW - f.cols * f.w) / 2;
-  const marginY = (pageH - f.rows * f.h) / 2;
+  const marginY = (pageH - rows * f.h) / 2;
 
   // Load logo
   let logoImg: string | null = null;
@@ -141,7 +153,7 @@ export async function generateLabelPdf(
   while (labelIdx < labels.length) {
     if (labelIdx > 0) doc.addPage();
 
-    for (let row = 0; row < f.rows && labelIdx < labels.length; row++) {
+    for (let row = 0; row < rows && labelIdx < labels.length; row++) {
       for (let col = 0; col < f.cols && labelIdx < labels.length; col++) {
         const p = labels[labelIdx];
         const x = marginX + col * f.w;
@@ -211,72 +223,70 @@ function drawGondolaLabel(
     doc.setTextColor(0);
   }
 
-  // LEFT: QR (under barcode, fit in remaining space)
+  // LEFT: QR + Logo (QR left, logo right of QR)
+  const sepX = 48;
+  const qrTop = splitY + 6;
+  const availH = y + f.h - pad - 1 - qrTop;
+  const qrS = Math.min(14, Math.max(8, availH));
   if (qrImg) {
-    const qrTop = splitY + 6;
-    const qrMax = y + f.h - pad - 1 - qrTop; // available height (minus accent+margin)
-    const qrS = Math.min(12, Math.max(6, qrMax)); // clamp between 6-12mm
-    if (qrS >= 6) {
-      doc.addImage(qrImg, "PNG", x + pad, qrTop, qrS, qrS);
-    }
+    doc.addImage(qrImg, "PNG", x + pad, qrTop, qrS, qrS);
+  }
+  if (logoImg) {
+    doc.addImage(logoImg, "PNG", x + pad + qrS + 12, qrTop, qrS, qrS);
   }
 
   // Separator
   doc.setDrawColor(220);
   doc.setLineWidth(0.2);
-  doc.line(x + 48, splitY, x + 48, y + f.h - pad);
+  doc.line(x + sepX, splitY, x + sepX, y + f.h - pad);
 
   // RIGHT COLUMN
-  const priceX = x + 51;
+  const priceX = x + sepX + 3;
+  const rightEdge = x + f.w - pad;
 
-  // MAYORISTA (primary) — 10mm block
+  // MAYORISTA (same row)
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(7);
-  doc.setTextColor(120);
-  doc.text("MAYORISTA", priceX, splitY + 2);
+  doc.setFontSize(6);
+  doc.setTextColor(0);
+  doc.text("MAYORISTA", priceX, splitY + 3);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(18);
+  doc.setFontSize(14);
   doc.setTextColor(0, 128, 0);
-  doc.text(formatPrice(p.precioMayorista), priceX, splitY + 8.5);
+  doc.text(formatPrice(p.precioMayorista), rightEdge, splitY + 3, { align: "right" });
   doc.setTextColor(0);
 
-  // Minorista
+  // MINORISTA (same row)
   {
     doc.setFont("helvetica", "normal");
     doc.setFontSize(6);
-    doc.setTextColor(120);
-    doc.text("Min:", priceX, splitY + 13);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(10);
     doc.setTextColor(0);
-    doc.text(formatPrice(p.precioMinorista), priceX + 8, splitY + 13);
+    doc.text("MINORISTA", priceX, splitY + 10);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.setTextColor(0);
+    doc.text(formatPrice(p.precioMinorista), rightEdge, splitY + 10, { align: "right" });
   }
 
-  // Caja Cerrada
+  // CAJA CERRADA (same row)
   {
     doc.setFont("helvetica", "normal");
     doc.setFontSize(6);
-    doc.setTextColor(120);
-    doc.text("Caja:", priceX, splitY + 18);
+    doc.setTextColor(0);
+    doc.text("CAJA CERRADA", priceX, splitY + 16);
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(10);
+    doc.setFontSize(9);
     doc.setTextColor(234, 88, 12);
-    doc.text(formatPrice(p.precioCajaCerrada), priceX + 10, splitY + 18);
+    doc.text(formatPrice(p.precioCajaCerrada), rightEdge, splitY + 16, { align: "right" });
     doc.setTextColor(0);
   }
 
-  // Caja quantity — 4mm block
+  // Caja quantity
   if (p.cantidadPorCaja > 0) {
     doc.setFont("helvetica", "normal");
     doc.setFontSize(6);
     doc.setTextColor(120);
     doc.text(`Caja x${p.cantidadPorCaja} ${unitBadge}`, priceX, splitY + 21);
     doc.setTextColor(0);
-  }
-
-  // Logo (bottom right, with margin)
-  if (logoImg) {
-    doc.addImage(logoImg, "PNG", x + f.w - pad - 16, y + f.h - pad - 16, 16, 16);
   }
 
   // Bottom accent
@@ -331,72 +341,70 @@ function drawNeveraLabel(
     doc.setTextColor(0);
   }
 
-  // QR (under barcode, fit in remaining space)
+  // QR + Logo (QR left, logo right of QR)
+  const sepX = 38;
+  const qrTop = splitY + 6;
+  const availH = y + f.h - pad - 1 - qrTop;
+  const qrS = Math.min(12, Math.max(6, availH));
   if (qrImg) {
-    const qrTop = splitY + 6;
-    const qrMax = y + f.h - pad - 1 - qrTop;
-    const qrS = Math.min(12, Math.max(5, qrMax));
-    if (qrS >= 5) {
-      doc.addImage(qrImg, "PNG", x + pad, qrTop, qrS, qrS);
-    }
+    doc.addImage(qrImg, "PNG", x + pad, qrTop, qrS, qrS);
+  }
+  if (logoImg) {
+    doc.addImage(logoImg, "PNG", x + pad + qrS + 12, qrTop, qrS, qrS);
   }
 
   // Separator
   doc.setDrawColor(220);
   doc.setLineWidth(0.2);
-  doc.line(x + 38, splitY, x + 38, y + f.h - pad);
+  doc.line(x + sepX, splitY, x + sepX, y + f.h - pad);
 
   // RIGHT COLUMN
-  const priceX = x + 40;
+  const priceX = x + sepX + 3;
+  const rightEdge = x + f.w - pad;
 
-  // MAYORISTA
+  // MAYORISTA (same row)
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(6);
-  doc.setTextColor(120);
-  doc.text("MAYORISTA", priceX, splitY + 2);
+  doc.setFontSize(4.5);
+  doc.setTextColor(0);
+  doc.text("MAYORISTA", priceX, splitY + 3);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(16);
+  doc.setFontSize(13);
   doc.setTextColor(0, 128, 0);
-  doc.text(formatPrice(p.precioMayorista), priceX, splitY + 8);
+  doc.text(formatPrice(p.precioMayorista), rightEdge, splitY + 3, { align: "right" });
   doc.setTextColor(0);
 
-  // Minorista
+  // Minorista (same row)
   {
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(6);
-    doc.setTextColor(120);
-    doc.text("Min:", priceX, splitY + 13);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(9);
+    doc.setFontSize(4.5);
     doc.setTextColor(0);
-    doc.text(formatPrice(p.precioMinorista), priceX + 8, splitY + 13);
+    doc.text("MINORISTA", priceX, splitY + 9);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7);
+    doc.setTextColor(0);
+    doc.text(formatPrice(p.precioMinorista), rightEdge, splitY + 9, { align: "right" });
   }
 
-  // Caja Cerrada
+  // Caja Cerrada (same row)
   {
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(6);
-    doc.setTextColor(120);
-    doc.text("Caja:", priceX, splitY + 18);
+    doc.setFontSize(4.5);
+    doc.setTextColor(0);
+    doc.text("CAJA CERRADA", priceX, splitY + 14);
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(9);
+    doc.setFontSize(8);
     doc.setTextColor(234, 88, 12);
-    doc.text(formatPrice(p.precioCajaCerrada), priceX + 10, splitY + 18);
+    doc.text(formatPrice(p.precioCajaCerrada), rightEdge, splitY + 14, { align: "right" });
     doc.setTextColor(0);
   }
 
   // Caja quantity
   if (p.cantidadPorCaja > 0) {
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(6);
+    doc.setFontSize(4.5);
     doc.setTextColor(120);
-    doc.text(`x${p.cantidadPorCaja} ${p.unit || "UN"}`, priceX, splitY + 22);
+    doc.text(`x${p.cantidadPorCaja} ${p.unit || "UN"}`, priceX, splitY + 19);
     doc.setTextColor(0);
-  }
-
-  // Logo (bottom right, with margin)
-  if (logoImg) {
-    doc.addImage(logoImg, "PNG", x + f.w - pad - 13, y + f.h - pad - 13, 13, 13);
   }
 
   // Bottom accent
@@ -450,72 +458,70 @@ function drawRackLabel(
     doc.setTextColor(0);
   }
 
-  // QR (under barcode, fit in remaining space)
+  // QR + Logo (QR left, logo right of QR)
+  const sepX = 65;
+  const qrTop = splitY + 10;
+  const availH = y + f.h - pad - 2 - qrTop;
+  const qrS = Math.min(18, Math.max(10, availH));
   if (qrImg) {
-    const qrTop = splitY + 10;
-    const qrMax = y + f.h - pad - 2 - qrTop;
-    const qrS = Math.min(18, Math.max(8, qrMax));
-    if (qrS >= 8) {
-      doc.addImage(qrImg, "PNG", x + pad, qrTop, qrS, qrS);
-    }
+    doc.addImage(qrImg, "PNG", x + pad, qrTop, qrS, qrS);
+  }
+  if (logoImg) {
+    doc.addImage(logoImg, "PNG", x + pad + qrS + 13, qrTop, qrS, qrS);
   }
 
   // Separator
   doc.setDrawColor(200);
   doc.setLineWidth(0.3);
-  doc.line(x + 65, splitY, x + 65, y + f.h - pad);
+  doc.line(x + sepX, splitY, x + sepX, y + f.h - pad);
 
   // RIGHT COLUMN
-  const priceX = x + 70;
+  const priceX = x + sepX + 4;
+  const rightEdge = x + f.w - pad;
 
-  // MAYORISTA
+  // MAYORISTA (same row)
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
-  doc.setTextColor(120);
-  doc.text("MAYORISTA", priceX, splitY + 3);
+  doc.setFontSize(7);
+  doc.setTextColor(0);
+  doc.text("MAYORISTA", priceX, splitY + 4);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(24);
+  doc.setFontSize(20);
   doc.setTextColor(0, 128, 0);
-  doc.text(formatPrice(p.precioMayorista), priceX, splitY + 12);
+  doc.text(formatPrice(p.precioMayorista), rightEdge, splitY + 4, { align: "right" });
   doc.setTextColor(0);
 
-  // Minorista
+  // Minorista (same row)
   {
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
-    doc.setTextColor(120);
-    doc.text("Min:", priceX, splitY + 18);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(13);
+    doc.setFontSize(7);
     doc.setTextColor(0);
-    doc.text(formatPrice(p.precioMinorista), priceX + 9, splitY + 18);
+    doc.text("MINORISTA", priceX, splitY + 13);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.setTextColor(0);
+    doc.text(formatPrice(p.precioMinorista), rightEdge, splitY + 13, { align: "right" });
   }
 
-  // Caja Cerrada
+  // Caja Cerrada (same row)
   {
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
-    doc.setTextColor(120);
-    doc.text("Caja:", priceX, splitY + 24);
+    doc.setFontSize(7);
+    doc.setTextColor(0);
+    doc.text("CAJA CERRADA", priceX, splitY + 21);
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(13);
+    doc.setFontSize(10);
     doc.setTextColor(234, 88, 12);
-    doc.text(formatPrice(p.precioCajaCerrada), priceX + 11, splitY + 24);
+    doc.text(formatPrice(p.precioCajaCerrada), rightEdge, splitY + 21, { align: "right" });
     doc.setTextColor(0);
   }
 
   // Caja quantity
   if (p.cantidadPorCaja > 0) {
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
+    doc.setFontSize(7);
     doc.setTextColor(120);
-    doc.text(`Caja x${p.cantidadPorCaja} ${p.unit || "UN"}`, priceX, splitY + 29);
+    doc.text(`x${p.cantidadPorCaja} ${p.unit || "UN"}`, priceX, splitY + 28);
     doc.setTextColor(0);
-  }
-
-  // Logo (bottom right, with margin)
-  if (logoImg) {
-    doc.addImage(logoImg, "PNG", x + f.w - pad - 20, y + f.h - pad - 20, 20, 20);
   }
 
   // Bottom accent bar
