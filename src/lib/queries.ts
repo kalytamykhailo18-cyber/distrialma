@@ -63,9 +63,10 @@ export async function getProducts(opts: {
 
   const params: Record<string, unknown> = {};
 
-  const [hiddenIds, hideOutOfStock] = await Promise.all([
+  const [hiddenIds, hideOutOfStock, stockThreshold] = await Promise.all([
     getHiddenCategoryIds(),
     getSetting("hide_out_of_stock"),
+    getSetting("stock_threshold"),
   ]);
 
   if (hiddenIds.length > 0) {
@@ -77,7 +78,8 @@ export async function getProducts(opts: {
   }
 
   if (hideOutOfStock === "true") {
-    where += " AND s.Stk > 0";
+    const threshold = parseInt(stockThreshold || "0") || 0;
+    where += ` AND s.Stk > ${threshold}`;
   }
 
   if (categoryId) {
@@ -276,9 +278,10 @@ export async function getCategories(includeHidden: boolean = false): Promise<Cat
 
 export async function getBrands(): Promise<Brand[]> {
   const pool = await getPool();
-  const [hiddenIds, hideOutOfStock] = await Promise.all([
+  const [hiddenIds, hideOutOfStock, stockThreshold] = await Promise.all([
     getHiddenCategoryIds(),
     getSetting("hide_out_of_stock"),
+    getSetting("stock_threshold"),
   ]);
 
   let hiddenFilter = "";
@@ -287,7 +290,8 @@ export async function getBrands(): Promise<Brand[]> {
     hiddenFilter = `AND LTRIM(RTRIM(p.Rubro)) NOT IN (${placeholders})`;
   }
 
-  const stockFilter = hideOutOfStock === "true" ? "AND s.Stk > 0" : "";
+  const threshold = parseInt(stockThreshold || "0") || 0;
+  const stockFilter = hideOutOfStock === "true" ? `AND s.Stk > ${threshold}` : "";
 
   const req = pool.request();
   hiddenIds.forEach((id, i) => req.input(`hidden${i}`, id));
