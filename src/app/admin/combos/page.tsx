@@ -195,14 +195,14 @@ export default function CombosPage() {
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Nombre del combo"
-            className="px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-400"
+            className="px-3 py-2 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
           />
           <input
             type="number"
             value={price}
             onChange={(e) => setPrice(e.target.value)}
             placeholder="Precio especial (opcional, vacío = suma automática)"
-            className="px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-400"
+            className="px-3 py-2 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
           />
         </div>
 
@@ -211,7 +211,7 @@ export default function CombosPage() {
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           placeholder="Descripción (opcional)"
-          className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-400 mb-3"
+          className="w-full px-3 py-2 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 mb-3"
         />
 
         {/* Product search */}
@@ -221,7 +221,7 @@ export default function CombosPage() {
             value={search}
             onChange={(e) => handleSearch(e.target.value)}
             placeholder="Buscar producto para agregar..."
-            className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-400"
+            className="w-full px-3 py-2 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
           />
           {searching && <span className="absolute right-3 top-2.5 text-gray-400 text-xs">Buscando...</span>}
           {results.length > 0 && (
@@ -234,7 +234,7 @@ export default function CombosPage() {
                     onClick={() => !added && addProduct(p)}
                     disabled={added}
                     className={`w-full text-left px-4 py-2 text-sm border-b last:border-b-0 ${
-                      added ? "bg-gray-50 text-gray-400" : "hover:bg-blue-50"
+                      added ? "bg-gray-50 text-gray-400" : "hover:bg-brand-50"
                     }`}
                   >
                     <span className="font-mono text-gray-500 mr-2">{p.sku}</span>
@@ -335,7 +335,7 @@ export default function CombosPage() {
               <div className="flex gap-2 text-sm">
                 <button
                   onClick={() => startEdit(combo)}
-                  className="text-blue-600 hover:underline"
+                  className="text-brand-600 hover:underline"
                 >
                   Editar
                 </button>

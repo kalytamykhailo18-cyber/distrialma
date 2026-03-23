@@ -282,7 +282,7 @@ export default function EtiquetasPage() {
         {scanResult && (
           <div className={`text-sm p-3 rounded-lg mb-3 ${
             scanResult.isFirstScan
-              ? "bg-blue-50 text-blue-700"
+              ? "bg-brand-50 text-brand-600"
               : scanResult.changes > 0
               ? "bg-yellow-50 text-yellow-700"
               : "bg-green-50 text-green-700"
@@ -352,7 +352,7 @@ export default function EtiquetasPage() {
               onClick={() => setFormat(f)}
               className={`px-4 py-2 rounded-lg text-sm border transition-colors ${
                 format === f
-                  ? "bg-blue-600 text-white border-blue-600"
+                  ? "bg-brand-400 text-white border-brand-400"
                   : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
               }`}
             >
@@ -374,7 +374,7 @@ export default function EtiquetasPage() {
             onChange={(e) => setBarcode(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") handleBarcode(); }}
             placeholder="Código de barras..."
-            className="flex-1 px-4 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-400"
+            className="flex-1 px-4 py-2 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
           />
           <button
             onClick={handleBarcode}
@@ -390,7 +390,7 @@ export default function EtiquetasPage() {
           <select
             value={selectedBrand}
             onChange={(e) => handleBrandFilter(e.target.value)}
-            className="w-full px-4 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-400 bg-white"
+            className="w-full px-4 py-2 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 bg-white"
           >
             <option value="">Filtrar por marca...</option>
             {brands.map((b) => (
@@ -408,7 +408,7 @@ export default function EtiquetasPage() {
                     onClick={() => !alreadyAdded && addProduct(p)}
                     disabled={alreadyAdded}
                     className={`w-full text-left px-3 py-1.5 text-sm border-b last:border-b-0 ${
-                      alreadyAdded ? "bg-gray-50 text-gray-400" : "hover:bg-blue-50"
+                      alreadyAdded ? "bg-gray-50 text-gray-400" : "hover:bg-brand-50"
                     }`}
                   >
                     <span className="font-mono text-gray-500 mr-2">{p.sku}</span>
@@ -428,7 +428,7 @@ export default function EtiquetasPage() {
             value={search}
             onChange={(e) => handleSearch(e.target.value)}
             placeholder="Buscar por nombre o SKU..."
-            className="w-full px-4 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-400"
+            className="w-full px-4 py-2 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
           />
           {searching && (
             <div className="absolute right-3 top-2.5 text-gray-400 text-sm">Buscando...</div>
@@ -443,7 +443,7 @@ export default function EtiquetasPage() {
                     onClick={() => !alreadyAdded && addProduct(p)}
                     disabled={alreadyAdded}
                     className={`w-full text-left px-4 py-2 text-sm border-b last:border-b-0 ${
-                      alreadyAdded ? "bg-gray-50 text-gray-400" : "hover:bg-blue-50"
+                      alreadyAdded ? "bg-gray-50 text-gray-400" : "hover:bg-brand-50"
                     }`}
                   >
                     <span className="font-mono text-gray-500 mr-2">{p.sku}</span>
@@ -516,7 +516,7 @@ export default function EtiquetasPage() {
         className={`w-full py-3 rounded-lg text-sm font-medium transition-colors ${
           selected.length === 0 || generating
             ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-            : "bg-blue-600 text-white hover:bg-blue-700"
+            : "bg-brand-400 text-white hover:bg-brand-500"
         }`}
       >
         {generating

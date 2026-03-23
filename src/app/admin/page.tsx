@@ -104,7 +104,7 @@ export default function AdminPage() {
           onChange={(e) => setInputValue(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") handleSearch(); }}
           disabled={loading}
-          className="flex-1 px-4 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-400 disabled:opacity-50"
+          className="flex-1 px-4 py-2 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 disabled:opacity-50"
         />
         <button
           onClick={handleSearch}
@@ -171,7 +171,7 @@ export default function AdminPage() {
                   <td className="px-4 py-3 text-right">
                     <Link
                       href={`/productos/${p.sku}`}
-                      className="text-blue-600 hover:underline text-sm"
+                      className="text-brand-600 hover:underline text-sm"
                     >
                       Editar
                     </Link>

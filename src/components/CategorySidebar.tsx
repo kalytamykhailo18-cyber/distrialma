@@ -84,7 +84,7 @@ export default function CategorySidebar({
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
             placeholder="Filtrar categorías..."
-            className="w-full px-3 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-400 mb-2"
+            className="w-full px-3 py-1.5 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 mb-2"
           />
           <ul className="space-y-1 overflow-y-auto max-h-[calc(100vh-220px)]">
             <li>
@@ -132,7 +132,7 @@ export default function CategorySidebar({
             value={brandFilter}
             onChange={(e) => setBrandFilter(e.target.value)}
             placeholder="Filtrar marcas..."
-            className="w-full px-3 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-400 mb-2"
+            className="w-full px-3 py-1.5 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 mb-2"
           />
           <ul className="space-y-1 overflow-y-auto max-h-[calc(100vh-220px)]">
             {filteredBrands.map((brand) => (

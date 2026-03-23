@@ -50,7 +50,7 @@ export async function GET() {
          FROM [${dbTransas}].dbo.Transas t
          WHERE t.Cliente = @cod2
            AND t.Tipo IN ('N', 'V')
-           AND LTRIM(RTRIM(t.Itm)) = '0'
+           AND (LTRIM(RTRIM(t.Itm)) = '0' OR LTRIM(RTRIM(t.Itm)) = '')
            AND t.Fechora >= @monthStart`
       );
 
@@ -65,7 +65,7 @@ export async function GET() {
          FROM [${dbTransas}].dbo.Transas t
          WHERE t.Cliente = @cod3
            AND t.MovCaja = 'P'
-           AND LTRIM(RTRIM(t.Itm)) = '0'
+           AND (LTRIM(RTRIM(t.Itm)) = '0' OR LTRIM(RTRIM(t.Itm)) = '')
          ORDER BY t.Fechora DESC`
       );
 
@@ -96,7 +96,7 @@ export async function GET() {
         FROM [${dbTransas}].dbo.Transas t
         WHERE t.Cliente = @cod
           AND t.Tipo IN ('N', 'V', 'M')
-          AND LTRIM(RTRIM(t.Itm)) = '0'
+          AND (LTRIM(RTRIM(t.Itm)) = '0' OR LTRIM(RTRIM(t.Itm)) = '')
         ORDER BY t.Fechora DESC`
       );
 

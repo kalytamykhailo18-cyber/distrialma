@@ -103,7 +103,7 @@ export default function MarcasPage() {
         value={filter}
         onChange={(e) => setFilter(e.target.value)}
         placeholder="Filtrar marcas..."
-        className="w-full px-4 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-400 mb-4"
+        className="w-full px-4 py-2 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 mb-4"
       />
 
       {loading ? (

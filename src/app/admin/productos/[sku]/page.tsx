@@ -88,7 +88,7 @@ export default function AdminProductEditPage() {
       <p className="text-sm text-gray-500 mb-6">SKU: {sku}</p>
 
       {message && (
-        <div className="bg-blue-50 text-blue-700 px-4 py-2 rounded-lg text-sm mb-4">
+        <div className="bg-brand-50 text-brand-600 px-4 py-2 rounded-lg text-sm mb-4">
           {message}
         </div>
       )}
@@ -111,7 +111,7 @@ export default function AdminProductEditPage() {
           )}
         </div>
 
-        <label className={`inline-block bg-blue-600 text-white px-4 py-2 rounded-lg text-sm ${uploading || saving ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:bg-blue-700"}`}>
+        <label className={`inline-block bg-brand-400 text-white px-4 py-2 rounded-lg text-sm ${uploading || saving ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:bg-brand-500"}`}>
           {uploading ? "Subiendo..." : "Subir Imagen"}
           <input
             type="file"
@@ -131,13 +131,13 @@ export default function AdminProductEditPage() {
           onChange={(e) => setDescription(e.target.value)}
           rows={6}
           disabled={saving || uploading}
-          className="w-full px-4 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+          className="w-full px-4 py-2 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 disabled:opacity-50"
           placeholder="Escribir descripción del producto..."
         />
         <button
           onClick={handleSaveDescription}
           disabled={saving || uploading}
-          className="mt-3 bg-blue-600 text-white px-6 py-2 rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50"
+          className="mt-3 bg-brand-400 text-white px-6 py-2 rounded-lg text-sm hover:bg-brand-500 disabled:opacity-50"
         >
           {saving ? "Guardando..." : "Guardar Descripción"}
         </button>

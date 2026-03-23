@@ -105,7 +105,7 @@ export default function AdminConfigPage() {
                   value={stockThreshold}
                   onChange={(e) => setStockThreshold(e.target.value)}
                   min="0"
-                  className="w-24 px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-400"
+                  className="w-24 px-3 py-2 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
                 />
                 <span className="text-sm text-gray-500">unidades</span>
                 <button

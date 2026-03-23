@@ -29,7 +29,7 @@ export default function ConfirmModal({
           <button
             onClick={onCancel}
             disabled={loading}
-            className="px-4 py-2 text-sm text-gray-600 border rounded-lg hover:bg-gray-50 disabled:opacity-50"
+            className="px-4 py-2 text-sm text-gray-600 border border-brand-400 rounded-lg hover:bg-gray-50 disabled:opacity-50"
           >
             Cancelar
           </button>
