@@ -79,7 +79,7 @@ export default function AdminProductEditPage() {
     <div className="max-w-4xl mx-auto px-4 py-6">
       <Link
         href="/admin"
-        className="text-sm text-blue-600 hover:underline mb-4 inline-block"
+        className="text-sm text-brand-600 hover:underline mb-4 inline-block"
       >
         &larr; Volver al panel
       </Link>

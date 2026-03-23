@@ -45,9 +45,17 @@ export default function CombosPage() {
   async function loadCombos() {
     setLoading(true);
     try {
-      const res = await fetch("/api/admin/combos");
-      const data = await res.json();
-      setCombos(data.combos || []);
+      const [adminRes, publicRes] = await Promise.all([
+        fetch("/api/admin/combos").then((r) => r.json()),
+        fetch("/api/combos").then((r) => r.json()),
+      ]);
+      const adminCombos = adminRes.combos || [];
+      const publicCombos = publicRes.combos || [];
+      const priceMap = new Map(publicCombos.map((c: { id: number; price: number }) => [c.id, c.price]));
+      setCombos(adminCombos.map((c: Combo) => ({
+        ...c,
+        price: c.price || priceMap.get(c.id) || 0,
+      })));
     } catch {
       setCombos([]);
     } finally {
@@ -85,12 +93,25 @@ export default function CombosPage() {
     setItems([]);
   }
 
-  function startEdit(combo: Combo) {
+  async function startEdit(combo: Combo) {
     setEditId(combo.id);
     setName(combo.name);
     setDescription(combo.description || "");
-    setPrice(String(combo.price));
-    setItems(combo.items.map((i) => ({ ...i })));
+    setPrice(combo.price ? String(combo.price) : "");
+    // Fetch product names for items
+    const itemsWithNames = await Promise.all(
+      combo.items.map(async (i) => {
+        try {
+          const res = await fetch(`/api/products?search=${encodeURIComponent(i.sku)}&limit=1`);
+          const data = await res.json();
+          const product = data.products?.find((p: { sku: string }) => p.sku === i.sku);
+          return { ...i, name: product?.name || i.sku };
+        } catch {
+          return { ...i, name: i.name || i.sku };
+        }
+      })
+    );
+    setItems(itemsWithNames);
   }
 
   async function handleSave() {
@@ -156,7 +177,7 @@ export default function CombosPage() {
         <h1 className="text-2xl font-bold text-gray-900">Combos</h1>
         <Link
           href="/admin"
-          className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm hover:bg-gray-200"
+          className="bg-white text-gray-700 px-4 py-2 rounded-lg text-sm font-medium border border-gray-200 hover:border-brand-400 hover:text-brand-600 transition-colors"
         >
           Volver
         </Link>

@@ -43,9 +43,17 @@ export default function Navbar() {
               Etiquetas
             </Link>
           ) : (
-            <Link href="/mis-pedidos" className="text-sm text-gray-600 hover:text-brand-600" onClick={() => setMenuOpen(false)}>
-              Mis Pedidos
-            </Link>
+            <>
+              <Link href="/mis-pedidos" className="text-sm text-gray-600 hover:text-brand-600" onClick={() => setMenuOpen(false)}>
+                Mis Pedidos
+              </Link>
+              <Link href="/estado-cuenta" className="text-sm text-gray-600 hover:text-brand-600" onClick={() => setMenuOpen(false)}>
+                Mi Cuenta
+              </Link>
+              <Link href="/lista-precios" className="text-sm text-gray-600 hover:text-brand-600" onClick={() => setMenuOpen(false)}>
+                Lista Precios
+              </Link>
+            </>
           )}
           <span className="text-sm text-gray-500 hidden md:inline">{session.user.name}</span>
           <button

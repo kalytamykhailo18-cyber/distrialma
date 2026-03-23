@@ -98,6 +98,41 @@ model ComboItem {
   @@map("combo_items")
 }
 
+model ArchivedOrder {
+  id          Int      @id @default(autoincrement())
+  boleta      String   @db.VarChar(9)
+  nroped      String   @db.VarChar(8)
+  fechora     String   @db.VarChar(14)
+  clienteCod  String   @db.VarChar(7)
+  clienteName String   @db.VarChar(60)
+  totalCant   Decimal  @db.Decimal(12, 3)
+  total       Decimal  @db.Decimal(12, 2)
+  notas       String?  @db.Text
+  archivedAt  DateTime @default(now())
+
+  items       ArchivedOrderItem[]
+
+  @@index([clienteCod])
+  @@index([fechora])
+  @@map("archived_orders")
+}
+
+model ArchivedOrderItem {
+  id          Int    @id @default(autoincrement())
+  orderId     Int
+  sku         String @db.VarChar(7)
+  productName String @db.VarChar(60)
+  cant        Decimal @db.Decimal(12, 3)
+  precio      Decimal @db.Decimal(12, 2)
+  impo        Decimal @db.Decimal(12, 2)
+  listaPrecio Int
+
+  order       ArchivedOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@map("archived_order_items")
+}
+
 model User {
   id           Int      @id @default(autoincrement())
   username     String   @unique @db.VarChar(50)
