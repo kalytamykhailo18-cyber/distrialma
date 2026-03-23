@@ -5,6 +5,7 @@ import { useSession } from "next-auth/react";
 import Link from "next/link";
 import type { Product } from "@/types";
 import type { LabelFormat, LabelProduct } from "@/lib/label-pdf";
+import ConfirmModal from "@/components/ConfirmModal";
 import { FORMAT_LABELS } from "@/lib/label-pdf";
 
 interface SelectedProduct {
@@ -54,6 +55,9 @@ export default function EtiquetasPage() {
   const [scanResult, setScanResult] = useState<{ scanned: number; changes: number; isFirstScan: boolean } | null>(null);
   const [priceChanges, setPriceChanges] = useState<PriceChange[]>([]);
   const [loadingChanges, setLoadingChanges] = useState(false);
+  const [lastScanDate, setLastScanDate] = useState<string | null>(null);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [clearing, setClearing] = useState(false);
 
   useEffect(() => {
     loadPriceChanges();
@@ -65,6 +69,9 @@ export default function EtiquetasPage() {
       const res = await fetch("/api/admin/price-changes?days=30");
       const data = await res.json();
       setPriceChanges(data.changes || []);
+      if (data.changes && data.changes.length > 0) {
+        setLastScanDate(data.changes[0].detectedAt);
+      }
     } catch {
       setPriceChanges([]);
     } finally {
@@ -79,6 +86,7 @@ export default function EtiquetasPage() {
       const res = await fetch("/api/admin/price-scan", { method: "POST" });
       const data = await res.json();
       setScanResult(data);
+      setLastScanDate(new Date().toISOString());
       await loadPriceChanges();
     } catch {
       alert("Error al escanear precios");
@@ -167,6 +175,16 @@ export default function EtiquetasPage() {
     }, 400);
   }
 
+  async function clearPriceChanges() {
+    setClearing(true);
+    await fetch("/api/admin/price-changes", { method: "DELETE" });
+    setPriceChanges([]);
+    setScanResult(null);
+    setLastScanDate(null);
+    setClearing(false);
+    setShowClearConfirm(false);
+  }
+
   function addProduct(product: Product) {
     if (selected.find((s) => s.product.sku === product.sku)) return;
     setSelected([...selected, { product, quantity: 1 }]);
@@ -230,18 +248,35 @@ export default function EtiquetasPage() {
       {/* Price changes */}
       <div className="bg-white rounded-lg border p-4 mb-4">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-medium text-gray-700">Cambios de precios</h2>
-          <button
-            onClick={runPriceScan}
-            disabled={scanning}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              scanning
-                ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                : "bg-green-600 text-white hover:bg-green-700"
-            }`}
-          >
-            {scanning ? "Escaneando..." : "Escanear precios"}
-          </button>
+          <div>
+            <h2 className="text-sm font-medium text-gray-700">Cambios de precios</h2>
+            {lastScanDate && (
+              <p className="text-xs text-gray-400 mt-0.5">
+                Última actualización: {new Date(lastScanDate).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" })}
+              </p>
+            )}
+          </div>
+          <div className="flex gap-2">
+            {priceChanges.length > 0 && (
+              <button
+                onClick={() => setShowClearConfirm(true)}
+                className="px-4 py-2 rounded-lg text-sm font-medium bg-red-100 text-red-700 hover:bg-red-200"
+              >
+                Limpiar
+              </button>
+            )}
+            <button
+              onClick={runPriceScan}
+              disabled={scanning}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                scanning
+                  ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                  : "bg-green-600 text-white hover:bg-green-700"
+              }`}
+            >
+              {scanning ? "Escaneando..." : "Escanear precios"}
+            </button>
+          </div>
         </div>
 
         {scanResult && (
@@ -488,6 +523,14 @@ export default function EtiquetasPage() {
           ? "Generando PDF..."
           : `Generar PDF — ${totalLabels} etiqueta${totalLabels !== 1 ? "s" : ""}`}
       </button>
+
+      <ConfirmModal
+        open={showClearConfirm}
+        message="¿Limpiar todos los cambios de precios? Esta acción no se puede deshacer."
+        loading={clearing}
+        onConfirm={clearPriceChanges}
+        onCancel={() => setShowClearConfirm(false)}
+      />
     </div>
   );
 }

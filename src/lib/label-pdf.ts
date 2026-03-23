@@ -321,6 +321,13 @@ function drawGondolaLabel(
   const rightEdge = x + f.w - pad;
   drawPrices(doc, p, priceX, rightEdge, splitY, mode, { main: 14, label: 6, sub: 9, spacing: 4.5 });
 
+  // Date at bottom right
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(6);
+  doc.setTextColor(80);
+  doc.text("Últ. actualización " + new Date().toLocaleDateString("es-AR"), x + f.w - pad, y + f.h - 4, { align: "right" });
+  doc.setTextColor(0);
+
   // Bottom accent
   doc.setFillColor(251, 161, 71);
   doc.rect(x, y + f.h - 1, f.w, 1, "F");
@@ -396,6 +403,13 @@ function drawNeveraLabel(
   const rightEdge = x + f.w - pad;
   drawPrices(doc, p, priceX, rightEdge, splitY, mode, { main: 13, label: 5, sub: 7, spacing: 4 });
 
+  // Date at bottom right
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(5);
+  doc.setTextColor(80);
+  doc.text("Últ. actualización " + new Date().toLocaleDateString("es-AR"), x + f.w - pad, y + f.h - 2.5, { align: "right" });
+  doc.setTextColor(0);
+
   // Bottom accent
   doc.setFillColor(251, 161, 71);
   doc.rect(x, y + f.h - 0.6, f.w, 0.6, "F");
@@ -469,6 +483,13 @@ function drawRackLabel(
   const priceX = x + sepX + 4;
   const rightEdge = x + f.w - pad;
   drawPrices(doc, p, priceX, rightEdge, splitY, mode, { main: 20, label: 7, sub: 10, spacing: 6 });
+
+  // Date at bottom right
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7);
+  doc.setTextColor(80);
+  doc.text("Últ. actualización " + new Date().toLocaleDateString("es-AR"), x + f.w - pad, y + f.h - 4, { align: "right" });
+  doc.setTextColor(0);
 
   // Bottom accent bar
   doc.setFillColor(251, 161, 71);

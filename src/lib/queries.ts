@@ -253,8 +253,15 @@ export async function getCategories(includeHidden: boolean = false): Promise<Cat
     });
   }
 
-  // Check if there are active combos in PostgreSQL
-  const activeComboCount = await prisma.combo.count({ where: { active: true } });
+  // Check if there are active combos and get stock settings
+  const [activeComboCount, hideOutOfStock, stockThreshold] = await Promise.all([
+    prisma.combo.count({ where: { active: true } }),
+    getSetting("hide_out_of_stock"),
+    getSetting("stock_threshold"),
+  ]);
+
+  const threshold = parseInt(stockThreshold || "0") || 0;
+  const stockFilter = hideOutOfStock === "true" ? `AND s.Stk > ${threshold}` : "";
 
   const result = await req.query(`
     SELECT LTRIM(RTRIM(r.Cod)) AS id, LTRIM(RTRIM(r.[Desc])) AS name
@@ -267,7 +274,9 @@ export async function getCategories(includeHidden: boolean = false): Promise<Cat
           WHERE p.Rubro = r.Cod
             AND (p.DeBaja = 0 OR p.DeBaja IS NULL)
             AND (s.DeBaja = 0 OR s.DeBaja IS NULL)
+            AND LTRIM(RTRIM(s.Deposito)) = '0'
             AND s.Precio2 > 0
+            ${stockFilter}
         )
         ${activeComboCount > 0 ? "OR UPPER(LTRIM(RTRIM(r.[Desc]))) = 'COMBOS'" : ""}
       )
