@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { formatPrice } from "@/lib/utils";
+import { HiChevronDown } from "react-icons/hi";
 
 interface OrderItem {
   sku: string;
@@ -154,16 +155,11 @@ export default function PedidosPage() {
                           <span className="text-sm font-semibold text-gray-900">
                             {formatPrice(order.total)}
                           </span>
-                          <svg
+                          <HiChevronDown
                             className={`w-4 h-4 text-gray-400 transition-transform ${
                               expanded.has(order.boleta) ? "rotate-180" : ""
                             }`}
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                          </svg>
+                          />
                         </div>
                       </button>
 

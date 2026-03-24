@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useCategories } from "./CategoriesProvider";
+import { HiMenu } from "react-icons/hi";
 
 export default function CategorySidebar({
   activeId,
@@ -167,9 +168,7 @@ export default function CategorySidebar({
         onClick={() => setOpen(true)}
         className="md:hidden fixed bottom-4 left-4 z-30 flex items-center gap-2 px-4 py-3 bg-brand-400 text-white rounded-full shadow-lg text-sm font-medium"
       >
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-        </svg>
+        <HiMenu className="w-5 h-5" />
         Filtros
       </button>
 

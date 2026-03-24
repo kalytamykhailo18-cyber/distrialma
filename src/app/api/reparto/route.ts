@@ -91,11 +91,10 @@ export async function GET(req: NextRequest) {
       + String(nextDay.getUTCMonth() + 1).padStart(2, "0")
       + String(nextDay.getUTCDate()).padStart(2, "0") + "000000";
 
-    // Check who has pending web orders (Pedidos) for THIS delivery day only
+    // Check who has pending web orders (Pedidos) — no date filter because
+    // orders can be placed days before the delivery day
     const orderReq = pool.request();
     allClientIds.forEach((id, i) => orderReq.input(`o${i}`, id.padStart(7, " ")));
-    orderReq.input("pedSince", sinceStr);
-    orderReq.input("pedUntil", untilStr);
     const ordPlaceholders = allClientIds.map((_, i) => `@o${i}`).join(",");
 
     const ordersResult = await orderReq.query(`
@@ -109,8 +108,6 @@ export async function GET(req: NextRequest) {
       WHERE p.Tipo = 'V'
         AND p.Cliente IN (${ordPlaceholders})
         AND (p.Anulado IS NULL OR LTRIM(RTRIM(p.Anulado)) = '' OR p.Anulado = ' ')
-        AND p.Fechora >= @pedSince
-        AND p.Fechora < @pedUntil
     `);
 
     const transReq = pool.request();

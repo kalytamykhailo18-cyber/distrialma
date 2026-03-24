@@ -59,6 +59,7 @@ export async function GET() {
         AND (s.DeBaja = 0 OR s.DeBaja IS NULL)
         AND LTRIM(RTRIM(s.Deposito)) = '0'
         AND s.Precio2 > 0
+        ${isEspecial ? "AND s.Precio3 > 0" : ""}
         ${hiddenFilter}
         ${stockFilter}
       ORDER BY r.[Desc], p.Nombre

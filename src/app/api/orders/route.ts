@@ -4,6 +4,9 @@ import { authOptions } from "@/lib/auth";
 import { getPool, getDbName } from "@/lib/mssql";
 import type { CartItem } from "@/types";
 
+const SUCURSAL = (process.env.PUNTOUCH_SUCURSAL || "7").padEnd(3, " ");
+const TERMINAL = parseInt(process.env.PUNTOUCH_TERMINAL || "7");
+
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session?.user) {
@@ -160,6 +163,8 @@ export async function POST(req: NextRequest) {
 
     headerReq.input("nroTransa", nextNroTransa);
     headerReq.input("nroMostra", nextNroMostra);
+    headerReq.input("sucursal", SUCURSAL);
+    headerReq.input("terminal", TERMINAL);
 
     await headerReq.query(`
       INSERT INTO [${dbPedidos}].dbo.Pedidos
@@ -174,7 +179,7 @@ export async function POST(req: NextRequest) {
          FillerNum1, FillerNum2, FillerNum3, FillerNum4, FillerNum5,
          FillerBit1, FillerBit2, FillerBit3, FillerBit4, FillerBit5)
       VALUES
-        (@cod, @boleta, '0  ', 'V', ' ', '6  ', '0  ', 6, @fechora,
+        (@cod, @boleta, '0  ', 'V', ' ', @sucursal, '0  ', @terminal, @fechora,
          '       ', @cant, 0, @impo, @total, 0, 0, 0, 0, 0, 0,
          0, 0, 0, 0, 0, 0, 0,
          @obs, ' ', '', '    ', '', 0,
@@ -219,6 +224,8 @@ export async function POST(req: NextRequest) {
       itemReq.input("listaPrecio", listaPrecio);
       itemReq.input("nroTransa", nextNroTransa);
       itemReq.input("nroMostra", nextNroMostra);
+      itemReq.input("sucursal", SUCURSAL);
+      itemReq.input("terminal", TERMINAL);
 
       await itemReq.query(`
         INSERT INTO [${dbPedidos}].dbo.Pedidos
@@ -233,7 +240,7 @@ export async function POST(req: NextRequest) {
            FillerNum1, FillerNum2, FillerNum3, FillerNum4, FillerNum5,
            FillerBit1, FillerBit2, FillerBit3, FillerBit4, FillerBit5)
         VALUES
-          (@cod, @boleta, @itm, 'I', ' ', '6  ', '0  ', 6, @fechora,
+          (@cod, @boleta, @itm, 'I', ' ', @sucursal, '0  ', @terminal, @fechora,
            @producto, @cant, @precio, @impo, @total, 0, 0, 0, 0, 0, 0,
            0, 0, 0, 0, 0, 0, 0,
            '', ' ', '', '    ', '', @listaPrecio,

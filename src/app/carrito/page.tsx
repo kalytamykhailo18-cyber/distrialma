@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCart } from "@/components/CartProvider";
 import { formatPrice } from "@/lib/utils";
+import { HiOutlineShoppingCart, HiX } from "react-icons/hi";
 
 export default function CarritoPage() {
   const { items, removeItem, updateQuantity, clearCart, totalPrice } = useCart();
@@ -10,9 +11,7 @@ export default function CarritoPage() {
   if (items.length === 0) {
     return (
       <div className="max-w-3xl mx-auto px-4 py-16 text-center">
-        <svg className="w-16 h-16 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z" />
-        </svg>
+        <HiOutlineShoppingCart className="w-16 h-16 mx-auto text-gray-300 mb-4" />
         <p className="text-gray-500 mb-4">Tu carrito está vacío</p>
         <Link
           href="/productos"
@@ -62,9 +61,7 @@ export default function CarritoPage() {
                   onClick={() => removeItem(item.sku, item.mode)}
                   className="text-gray-400 hover:text-red-500 shrink-0"
                 >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
+                  <HiX className="w-5 h-5" />
                 </button>
               </div>
 
