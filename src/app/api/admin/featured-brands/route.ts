@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { requireStaff } from "@/lib/api-auth";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -39,6 +40,10 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  if (!(await requireStaff())) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  }
+
   const { brandId, featured } = (await req.json()) as {
     brandId: string;
     featured: boolean;
@@ -59,6 +64,10 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+  if (!(await requireStaff())) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  }
+
   const { brandId } = (await req.json()) as { brandId: string };
   const sku = `brand-${brandId}`;
 

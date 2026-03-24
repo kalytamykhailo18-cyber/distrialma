@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getPool, getDbName } from "@/lib/mssql";
+import { requireStaff } from "@/lib/api-auth";
 
 // GET — list archived orders
 export async function GET(req: NextRequest) {
@@ -34,13 +35,9 @@ export async function POST(req: NextRequest) {
     cronSecret?: string;
   };
 
-  // Allow access from admin session OR cron secret
+  // Allow access from admin/staff session OR cron secret
   if (cronSecret !== process.env.NEXTAUTH_SECRET) {
-    // Check admin session if no cron secret
-    const { getServerSession } = await import("next-auth");
-    const { authOptions } = await import("@/lib/auth");
-    const session = await getServerSession(authOptions);
-    if (!session?.user || (session.user as { role?: string }).role !== "admin") {
+    if (!(await requireStaff())) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
   }

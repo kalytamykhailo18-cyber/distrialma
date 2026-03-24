@@ -147,7 +147,8 @@ model User {
   id           Int      @id @default(autoincrement())
   username     String   @unique @db.VarChar(50)
   passwordHash String   @db.VarChar(255)
-  role         String   @default("customer") @db.VarChar(20)
+  role         String   @default("staff") @db.VarChar(20)
+  permissions  String   @default("[]") @db.Text
   createdAt    DateTime @default(now())
 
   @@map("users")

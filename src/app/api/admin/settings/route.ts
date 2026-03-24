@@ -1,14 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { requireStaff } from "@/lib/api-auth";
 
 export async function GET() {
-  const session = await getServerSession(authOptions);
-  if (
-    !session?.user ||
-    (session.user as { role?: string }).role !== "admin"
-  ) {
+  if (!(await requireStaff())) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
@@ -21,11 +16,7 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (
-    !session?.user ||
-    (session.user as { role?: string }).role !== "admin"
-  ) {
+  if (!(await requireStaff())) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 

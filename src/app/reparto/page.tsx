@@ -5,6 +5,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { formatPrice } from "@/lib/utils";
+import { hasPermission, isStaffUser } from "@/lib/permissions";
 
 interface Client {
   cod: string;
@@ -34,8 +35,8 @@ export default function RepartoPage() {
   const [selectedDay, setSelectedDay] = useState<string>("");
   const [filter, setFilter] = useState("");
 
-  const role = (session?.user as { role?: string } | undefined)?.role;
-  const allowed = role === "admin" || role === "reparto";
+  const user = session?.user as { role?: string; permissions?: string[] } | undefined;
+  const allowed = hasPermission(user?.role, user?.permissions, "reparto");
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -88,7 +89,7 @@ export default function RepartoPage() {
       <div className="flex items-center justify-between mb-2">
         <h1 className="text-2xl font-bold text-gray-900">Panel de Reparto</h1>
         <Link
-          href={role === "admin" ? "/admin" : "/"}
+          href={isStaffUser(user?.role) && hasPermission(user?.role, user?.permissions, "productos") ? "/admin" : "/"}
           className="bg-white text-gray-700 px-4 py-2 rounded-lg text-sm font-medium border border-gray-200 hover:border-brand-400 hover:text-brand-600 transition-colors"
         >
           Volver

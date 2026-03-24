@@ -38,7 +38,7 @@ export default function ListaPreciosPage() {
       }
 
       const { generatePriceListPdf } = await import("@/lib/price-list-pdf");
-      const doc = generatePriceListPdf(format, data.products);
+      const doc = generatePriceListPdf(format, data.products, data.isEspecial);
       const blob = doc.output("blob");
       const url = URL.createObjectURL(blob);
       window.open(url, "_blank");

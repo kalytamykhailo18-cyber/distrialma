@@ -10,7 +10,7 @@ export async function GET() {
   }
 
   const user = session.user as { clientId?: string; role?: string };
-  if (!user.clientId || user.role === "admin") {
+  if (!user.clientId || user.role === "admin" || user.role === "staff") {
     return NextResponse.json({ error: "Solo clientes" }, { status: 403 });
   }
 

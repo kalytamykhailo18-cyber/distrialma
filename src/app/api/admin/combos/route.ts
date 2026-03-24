@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { requireStaff } from "@/lib/api-auth";
 
 // GET — list all combos with items
 export async function GET() {
+  if (!(await requireStaff())) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  }
+
   const combos = await prisma.combo.findMany({
     include: { items: true },
     orderBy: { createdAt: "desc" },
@@ -12,6 +17,10 @@ export async function GET() {
 
 // POST — create a new combo
 export async function POST(req: NextRequest) {
+  if (!(await requireStaff())) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  }
+
   const body = await req.json();
   const { name, description, price, items } = body as {
     name: string;
@@ -44,6 +53,10 @@ export async function POST(req: NextRequest) {
 
 // PUT — update a combo
 export async function PUT(req: NextRequest) {
+  if (!(await requireStaff())) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  }
+
   const body = await req.json();
   const { id, name, description, price, active, items } = body as {
     id: number;
@@ -80,6 +93,10 @@ export async function PUT(req: NextRequest) {
 
 // DELETE — delete a combo
 export async function DELETE(req: NextRequest) {
+  if (!(await requireStaff())) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  }
+
   const { id } = await req.json();
   await prisma.combo.delete({ where: { id } });
   return NextResponse.json({ ok: true });

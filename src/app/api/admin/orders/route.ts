@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
 import { getPool, getDbName } from "@/lib/mssql";
+import { requireStaff } from "@/lib/api-auth";
 
 export async function GET() {
+  if (!(await requireStaff())) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  }
+
   try {
     const pool = await getPool();
     const dbPed = getDbName("pedidos");

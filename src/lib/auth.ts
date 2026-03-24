@@ -57,10 +57,16 @@ export const authOptions: NextAuthOptions = {
         );
         if (!valid) return null;
 
+        let permissions: string[] = [];
+        try {
+          permissions = JSON.parse(user.permissions || "[]");
+        } catch { /* ignore */ }
+
         return {
           id: String(user.id),
           name: user.username,
           role: user.role,
+          permissions,
         };
       },
     }),
@@ -68,15 +74,19 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
-        token.role = (user as unknown as { role: string }).role;
-        token.clientId = (user as unknown as { id: string }).id;
+        const u = user as unknown as { role: string; id: string; permissions?: string[] };
+        token.role = u.role;
+        token.clientId = u.id;
+        token.permissions = u.permissions || [];
       }
       return token;
     },
     async session({ session, token }) {
       if (session.user) {
-        (session.user as { role?: string; clientId?: string }).role = token.role as string;
-        (session.user as { clientId?: string }).clientId = token.clientId as string;
+        const u = session.user as { role?: string; clientId?: string; permissions?: string[] };
+        u.role = token.role as string;
+        u.clientId = token.clientId as string;
+        u.permissions = (token.permissions as string[]) || [];
       }
       return session;
     },

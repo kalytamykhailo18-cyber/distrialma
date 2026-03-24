@@ -3,6 +3,7 @@
 import { useSession } from "next-auth/react";
 import { useRouter, usePathname } from "next/navigation";
 import { useEffect } from "react";
+import { PAGE_PERMISSION_MAP, hasPermission, isStaffUser } from "@/lib/permissions";
 
 export default function AdminLayout({
   children,
@@ -13,23 +14,36 @@ export default function AdminLayout({
   const router = useRouter();
   const pathname = usePathname();
 
-  const role = (session?.user as { role?: string } | undefined)?.role;
-  const isAdmin = role === "admin";
-  const isEtiquetas = role === "etiquetas";
-  const onEtiquetasPage = pathname === "/admin/etiquetas";
+  const user = session?.user as { role?: string; permissions?: string[] } | undefined;
+  const role = user?.role;
+  const permissions = user?.permissions;
+  const isStaff = isStaffUser(role);
 
-  const allowed = isAdmin || (isEtiquetas && onEtiquetasPage);
+  // Find the required permission for this page
+  const requiredPerm = PAGE_PERMISSION_MAP[pathname] ||
+    Object.entries(PAGE_PERMISSION_MAP).find(([path]) => pathname.startsWith(path + "/"))?.[1];
+
+  const allowed = isStaff && (!requiredPerm || hasPermission(role, permissions, requiredPerm));
 
   useEffect(() => {
     if (status === "loading") return;
-    if (!session?.user || !allowed) {
-      if (isEtiquetas && !onEtiquetasPage) {
-        router.push("/admin/etiquetas");
-      } else {
-        router.push("/login");
-      }
+    if (!session?.user || !isStaff) {
+      router.push("/login");
+      return;
     }
-  }, [session, status, router, allowed, isEtiquetas, onEtiquetasPage]);
+    if (!allowed) {
+      // Redirect to first page they have access to
+      const firstPerm = permissions?.[0];
+      if (firstPerm) {
+        const entry = Object.entries(PAGE_PERMISSION_MAP).find(([, p]) => p === firstPerm);
+        if (entry) {
+          router.push(entry[0]);
+          return;
+        }
+      }
+      router.push("/");
+    }
+  }, [session, status, router, allowed, isStaff, permissions]);
 
   if (status === "loading" || !session?.user || !allowed) {
     return (

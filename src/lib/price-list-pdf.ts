@@ -15,6 +15,7 @@ interface PriceProduct {
   brand: string;
   unit: string;
   precioMayorista: number;
+  precioEspecial?: number;
   precioCajaCerrada: number;
   cantidadPorCaja: string;
 }
@@ -24,13 +25,16 @@ function fmtPrice(price: number): string {
   return "$" + price.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-function addHeader(doc: jsPDF, pageW: number, date: string) {
+function addHeader(doc: jsPDF, pageW: number, date: string, isEspecial: boolean) {
   doc.setFillColor(251, 161, 71);
   doc.rect(0, 0, pageW, 14, "F");
   doc.setFont("helvetica", "bold");
   doc.setFontSize(16);
   doc.setTextColor(255);
-  doc.text("DISTRIALMA — Lista de Precios", pageW / 2, 8, { align: "center" });
+  const title = isEspecial
+    ? "DISTRIALMA — Lista de Precios Especial"
+    : "DISTRIALMA — Lista de Precios";
+  doc.text(title, pageW / 2, 8, { align: "center" });
   doc.setFontSize(9);
   doc.text(date, pageW / 2, 12, { align: "center" });
   doc.setTextColor(0);
@@ -44,7 +48,7 @@ function addFooter(doc: jsPDF, pageW: number, pageH: number, pageNum: number) {
   doc.setTextColor(0);
 }
 
-function tableHeader(doc: jsPDF, y: number, showBrand: boolean): number {
+function tableHeader(doc: jsPDF, y: number, showBrand: boolean, isEspecial: boolean): number {
   doc.setFillColor(240, 240, 240);
   doc.rect(10, y - 3, 190, 5, "F");
   doc.setFont("helvetica", "bold");
@@ -52,37 +56,47 @@ function tableHeader(doc: jsPDF, y: number, showBrand: boolean): number {
   doc.setTextColor(80);
   doc.text("SKU", 12, y);
   doc.text("Producto", 28, y);
-  if (showBrand) doc.text("Marca", 110, y);
-  doc.text("UN", 135, y);
-  doc.text("Mayorista", 148, y);
-  doc.text("Caja Cerr.", 170, y);
-  doc.text("x Caja", 192, y);
+  if (showBrand) doc.text("Marca", 105, y);
+  doc.text("UN", 130, y);
+  if (isEspecial) {
+    doc.text("Especial", 142, y);
+  } else {
+    doc.text("Mayorista", 142, y);
+  }
+  doc.text("Caja Cerr.", 165, y);
+  doc.text("x Caja", 190, y);
   doc.setTextColor(0);
   return y + 5;
 }
 
-function tableRow(doc: jsPDF, p: PriceProduct, y: number, showBrand: boolean): number {
+function tableRow(doc: jsPDF, p: PriceProduct, y: number, showBrand: boolean, isEspecial: boolean): number {
   doc.setFont("helvetica", "normal");
   doc.setFontSize(7);
   doc.text(p.sku, 12, y);
-  doc.text(p.name.substring(0, 50), 28, y);
-  if (showBrand) doc.text((p.brand || "").substring(0, 15), 110, y);
-  doc.text(p.unit || "UN", 135, y);
+  doc.text(p.name.substring(0, 48), 28, y);
+  if (showBrand) doc.text((p.brand || "").substring(0, 15), 105, y);
+  doc.text(p.unit || "UN", 130, y);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(0, 100, 0);
-  doc.text(fmtPrice(p.precioMayorista), 148, y);
+  if (isEspecial) {
+    const precio = p.precioEspecial && p.precioEspecial > 0 ? p.precioEspecial : p.precioMayorista;
+    doc.text(fmtPrice(precio), 142, y);
+  } else {
+    doc.text(fmtPrice(p.precioMayorista), 142, y);
+  }
   doc.setTextColor(200, 80, 0);
-  doc.text(p.precioCajaCerrada > 0 ? fmtPrice(p.precioCajaCerrada) : "-", 170, y);
+  doc.text(p.precioCajaCerrada > 0 ? fmtPrice(p.precioCajaCerrada) : "-", 165, y);
   doc.setTextColor(0);
   doc.setFont("helvetica", "normal");
   const caja = parseInt(p.cantidadPorCaja) || 0;
-  doc.text(caja > 0 ? `x${caja}` : "-", 192, y);
+  doc.text(caja > 0 ? `x${caja}` : "-", 190, y);
   return y + 4;
 }
 
 export function generatePriceListPdf(
   format: PriceListFormat,
-  products: PriceProduct[]
+  products: PriceProduct[],
+  isEspecial = false
 ): jsPDF {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const pageW = 210;
@@ -91,25 +105,23 @@ export function generatePriceListPdf(
   let pageNum = 1;
   let y = 20;
 
-  addHeader(doc, pageW, date);
+  addHeader(doc, pageW, date, isEspecial);
   y = 20;
 
   if (format === "lista") {
-    // Simple list — all products alphabetically
-    y = tableHeader(doc, y, true);
+    y = tableHeader(doc, y, true, isEspecial);
     for (const p of products) {
       if (y > pageH - 15) {
         addFooter(doc, pageW, pageH, pageNum);
         doc.addPage();
         pageNum++;
-        addHeader(doc, pageW, date);
+        addHeader(doc, pageW, date, isEspecial);
         y = 20;
-        y = tableHeader(doc, y, true);
+        y = tableHeader(doc, y, true, isEspecial);
       }
-      y = tableRow(doc, p, y, true);
+      y = tableRow(doc, p, y, true, isEspecial);
     }
   } else if (format === "catalogo") {
-    // Group by category
     const byCategory = new Map<string, PriceProduct[]>();
     for (const p of products) {
       const cat = p.category || "SIN RUBRO";
@@ -122,11 +134,10 @@ export function generatePriceListPdf(
         addFooter(doc, pageW, pageH, pageNum);
         doc.addPage();
         pageNum++;
-        addHeader(doc, pageW, date);
+        addHeader(doc, pageW, date, isEspecial);
         y = 20;
       }
 
-      // Category header
       doc.setFillColor(251, 161, 71);
       doc.rect(10, y - 3, 190, 6, "F");
       doc.setFont("helvetica", "bold");
@@ -136,23 +147,22 @@ export function generatePriceListPdf(
       doc.setTextColor(0);
       y += 6;
 
-      y = tableHeader(doc, y, true);
+      y = tableHeader(doc, y, true, isEspecial);
 
       for (const p of prods) {
         if (y > pageH - 15) {
           addFooter(doc, pageW, pageH, pageNum);
           doc.addPage();
           pageNum++;
-          addHeader(doc, pageW, date);
+          addHeader(doc, pageW, date, isEspecial);
           y = 20;
-          y = tableHeader(doc, y, true);
+          y = tableHeader(doc, y, true, isEspecial);
         }
-        y = tableRow(doc, p, y, true);
+        y = tableRow(doc, p, y, true, isEspecial);
       }
       y += 3;
     }
   } else {
-    // Combinado — group by category, then by brand within each
     const byCategory = new Map<string, Map<string, PriceProduct[]>>();
     for (const p of products) {
       const cat = p.category || "SIN RUBRO";
@@ -168,11 +178,10 @@ export function generatePriceListPdf(
         addFooter(doc, pageW, pageH, pageNum);
         doc.addPage();
         pageNum++;
-        addHeader(doc, pageW, date);
+        addHeader(doc, pageW, date, isEspecial);
         y = 20;
       }
 
-      // Category header
       doc.setFillColor(251, 161, 71);
       doc.rect(10, y - 3, 190, 6, "F");
       doc.setFont("helvetica", "bold");
@@ -187,11 +196,10 @@ export function generatePriceListPdf(
           addFooter(doc, pageW, pageH, pageNum);
           doc.addPage();
           pageNum++;
-          addHeader(doc, pageW, date);
+          addHeader(doc, pageW, date, isEspecial);
           y = 20;
         }
 
-        // Brand subheader
         doc.setFont("helvetica", "bold");
         doc.setFontSize(8);
         doc.setTextColor(100);
@@ -199,18 +207,18 @@ export function generatePriceListPdf(
         doc.setTextColor(0);
         y += 4;
 
-        y = tableHeader(doc, y, false);
+        y = tableHeader(doc, y, false, isEspecial);
 
         for (const p of prods) {
           if (y > pageH - 15) {
             addFooter(doc, pageW, pageH, pageNum);
             doc.addPage();
             pageNum++;
-            addHeader(doc, pageW, date);
+            addHeader(doc, pageW, date, isEspecial);
             y = 20;
-            y = tableHeader(doc, y, false);
+            y = tableHeader(doc, y, false, isEspecial);
           }
-          y = tableRow(doc, p, y, false);
+          y = tableRow(doc, p, y, false, isEspecial);
         }
         y += 2;
       }

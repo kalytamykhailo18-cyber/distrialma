@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { requireStaff } from "@/lib/api-auth";
 
 export async function GET(req: NextRequest) {
+  if (!(await requireStaff())) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  }
+
   const { searchParams } = new URL(req.url);
   const days = parseInt(searchParams.get("days") || "7");
   const since = new Date();
@@ -27,6 +32,10 @@ export async function GET(req: NextRequest) {
 }
 
 export async function DELETE() {
+  if (!(await requireStaff())) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  }
+
   // Clear old changes (e.g. after generating labels)
   await prisma.priceChange.deleteMany({});
   return NextResponse.json({ ok: true });

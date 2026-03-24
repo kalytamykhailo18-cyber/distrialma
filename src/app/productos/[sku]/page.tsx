@@ -16,8 +16,8 @@ export default function ProductDetailPage() {
   const [loading, setLoading] = useState(true);
   const [activeImage, setActiveImage] = useState(0);
 
-  const isAdmin =
-    (session?.user as { role?: string } | undefined)?.role === "admin";
+  const _user = session?.user as { role?: string; permissions?: string[] } | undefined;
+  const isAdmin = _user?.role === "admin" || (_user?.role === "staff" && (_user?.permissions?.includes("productos") ?? false));
   const { addItem, updateQuantity, removeItem, findItem } = useCart();
   const inCartUnit = findItem(sku, "unit");
   const inCartBox = findItem(sku, "box");

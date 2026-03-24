@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 import { getPool, getDbName } from "@/lib/mssql";
 import { prisma } from "@/lib/prisma";
 
@@ -11,6 +13,10 @@ async function getSetting(key: string): Promise<string | null> {
 
 export async function GET() {
   try {
+    const session = await getServerSession(authOptions);
+    const userRole = (session?.user as { role?: string } | undefined)?.role;
+    const isEspecial = userRole === "especial";
+
     const pool = await getPool();
     const db = getDbName("productos");
 
@@ -42,6 +48,7 @@ export async function GET() {
         LTRIM(RTRIM(ISNULL(m.[Desc], ''))) AS brand,
         LTRIM(RTRIM(ISNULL(p.Unidad, ''))) AS unit,
         s.Precio2 AS precioMayorista,
+        s.Precio3 AS precioEspecial,
         s.Precio4 AS precioCajaCerrada,
         LTRIM(RTRIM(ISNULL(p.Palabra3, ''))) AS cantidadPorCaja
       FROM [${db}].dbo.Productos p
@@ -57,9 +64,9 @@ export async function GET() {
       ORDER BY r.[Desc], p.Nombre
     `);
 
-    return NextResponse.json({ products: result.recordset });
+    return NextResponse.json({ products: result.recordset, isEspecial });
   } catch (error) {
     console.error("Price list error:", error);
-    return NextResponse.json({ products: [] });
+    return NextResponse.json({ products: [], isEspecial: false });
   }
 }

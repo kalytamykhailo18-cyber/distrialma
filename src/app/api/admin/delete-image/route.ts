@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { v2 as cloudinary } from "cloudinary";
+import { requireStaff } from "@/lib/api-auth";
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -11,11 +10,7 @@ cloudinary.config({
 });
 
 export async function DELETE(request: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (
-    !session?.user ||
-    (session.user as { role?: string }).role !== "admin"
-  ) {
+  if (!(await requireStaff())) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 

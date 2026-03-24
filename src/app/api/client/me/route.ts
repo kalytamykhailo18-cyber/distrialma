@@ -13,7 +13,7 @@ export async function GET() {
   const user = session.user as { name?: string; role?: string; clientId?: string };
 
   // Admin users don't have client records in SQL Server
-  if (user.role === "admin") {
+  if (user.role === "admin" || user.role === "staff") {
     return NextResponse.json({
       name: user.name,
       role: user.role,

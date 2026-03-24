@@ -46,67 +46,7 @@ export default function AdminPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 mb-3">
-          Admin — Productos
-        </h1>
-        <div className="flex flex-wrap gap-2">
-          <Link
-            href="/admin/configuracion"
-            className="bg-white text-gray-700 px-4 py-2 rounded-lg text-sm font-medium border border-gray-200 hover:border-brand-400 hover:text-brand-600 transition-colors"
-          >
-            Configuración
-          </Link>
-          <Link
-            href="/admin/categorias"
-            className="bg-white text-gray-700 px-4 py-2 rounded-lg text-sm font-medium border border-gray-200 hover:border-brand-400 hover:text-brand-600 transition-colors"
-          >
-            Categorías
-          </Link>
-          <Link
-            href="/admin/marcas"
-            className="bg-white text-gray-700 px-4 py-2 rounded-lg text-sm font-medium border border-gray-200 hover:border-brand-400 hover:text-brand-600 transition-colors"
-          >
-            Marcas
-          </Link>
-          <Link
-            href="/admin/combos"
-            className="bg-white text-gray-700 px-4 py-2 rounded-lg text-sm font-medium border border-gray-200 hover:border-brand-400 hover:text-brand-600 transition-colors"
-          >
-            Combos
-          </Link>
-          <Link
-            href="/admin/pedidos"
-            className="bg-white text-gray-700 px-4 py-2 rounded-lg text-sm font-medium border border-gray-200 hover:border-brand-400 hover:text-brand-600 transition-colors"
-          >
-            Pedidos
-          </Link>
-          <Link
-            href="/reparto"
-            className="bg-white text-gray-700 px-4 py-2 rounded-lg text-sm font-medium border border-gray-200 hover:border-brand-400 hover:text-brand-600 transition-colors"
-          >
-            Reparto
-          </Link>
-          <Link
-            href="/admin/dias-entrega"
-            className="bg-white text-gray-700 px-4 py-2 rounded-lg text-sm font-medium border border-gray-200 hover:border-brand-400 hover:text-brand-600 transition-colors"
-          >
-            Días Entrega
-          </Link>
-          <Link
-            href="/admin/informes"
-            className="bg-white text-gray-700 px-4 py-2 rounded-lg text-sm font-medium border border-gray-200 hover:border-brand-400 hover:text-brand-600 transition-colors"
-          >
-            Informes
-          </Link>
-          <Link
-            href="/admin/etiquetas"
-            className="bg-white text-gray-700 px-4 py-2 rounded-lg text-sm font-medium border border-gray-200 hover:border-brand-400 hover:text-brand-600 transition-colors"
-          >
-            Etiquetas
-          </Link>
-        </div>
-      </div>
+      <h1 className="text-2xl font-bold text-gray-900 mb-4">Productos</h1>
 
       <div className="mb-4 flex gap-2 max-w-md">
         <input

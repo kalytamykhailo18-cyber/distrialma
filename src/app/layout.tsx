@@ -15,6 +15,9 @@ export const metadata: Metadata = {
   title: "Distrialma — Distribuidora Mayorista",
   description:
     "Tienda online de productos mayoristas. Bebidas, alimentos, limpieza y más.",
+  icons: {
+    icon: "/favicon.png",
+  },
 };
 
 export default function RootLayout({

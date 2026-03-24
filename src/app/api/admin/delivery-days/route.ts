@@ -1,11 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getPool, getDbName } from "@/lib/mssql";
+import { requireStaff } from "@/lib/api-auth";
 
 const DAYS = ["LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO"];
 
 // GET — list clients with their delivery days
 export async function GET(req: NextRequest) {
+  if (!(await requireStaff())) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  }
+
   const { searchParams } = new URL(req.url);
   const search = searchParams.get("search") || "";
 
@@ -62,6 +67,10 @@ export async function GET(req: NextRequest) {
 
 // POST — set delivery days for a client
 export async function POST(req: NextRequest) {
+  if (!(await requireStaff())) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  }
+
   const { clientId, days } = (await req.json()) as {
     clientId: string;
     days: string[];

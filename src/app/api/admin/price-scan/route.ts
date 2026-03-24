@@ -2,10 +2,15 @@ import { NextResponse } from "next/server";
 import { getPool, getDbName } from "@/lib/mssql";
 import { prisma } from "@/lib/prisma";
 import { Decimal } from "@prisma/client/runtime/library";
+import { requireStaff } from "@/lib/api-auth";
 
 const db = () => getDbName("productos");
 
 export async function POST() {
+  if (!(await requireStaff())) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  }
+
   try {
     const pool = await getPool();
 

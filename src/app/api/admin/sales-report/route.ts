@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getPool, getDbName } from "@/lib/mssql";
+import { requireStaff } from "@/lib/api-auth";
 
 export async function GET(req: NextRequest) {
+  if (!(await requireStaff())) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  }
+
   const { searchParams } = new URL(req.url);
   const clienteCod = searchParams.get("cliente") || undefined;
   const days = parseInt(searchParams.get("days") || "7");

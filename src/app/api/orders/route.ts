@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
   }
 
   const user = session.user as { name?: string; role?: string; clientId?: string };
-  if (!user.clientId || user.role === "admin") {
+  if (!user.clientId || user.role === "admin" || user.role === "staff") {
     return NextResponse.json({ error: "Solo clientes pueden hacer pedidos" }, { status: 403 });
   }
 
