@@ -40,7 +40,14 @@ export default function ListaPreciosPage() {
       const doc = generatePriceListPdf(format, data.products, data.isEspecial);
       const blob = doc.output("blob");
       const url = URL.createObjectURL(blob);
-      window.open(url, "_blank");
+      // Use anchor click for Safari compatibility (window.open blocked after async)
+      const a = document.createElement("a");
+      a.href = url;
+      a.target = "_blank";
+      a.rel = "noopener";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
     } catch (err) {
       console.error("Error generating PDF:", err);
       alert("Error al generar el PDF");

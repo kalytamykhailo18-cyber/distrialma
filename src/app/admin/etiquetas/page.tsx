@@ -222,7 +222,13 @@ export default function EtiquetasPage() {
       const doc = await generateLabelPdf(format, labels, isMinorista ? "minorista" : "mayorista");
       const blob = doc.output("blob");
       const url = URL.createObjectURL(blob);
-      window.open(url, "_blank");
+      const a = document.createElement("a");
+      a.href = url;
+      a.target = "_blank";
+      a.rel = "noopener";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
     } catch (err) {
       console.error("Error generating PDF:", err);
       alert("Error al generar el PDF");

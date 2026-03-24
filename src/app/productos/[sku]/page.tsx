@@ -355,6 +355,11 @@ export default function ProductDetailPage() {
                       <span className="text-sm text-gray-500 ml-2">
                         {product.unit === "KG" ? "KG" : "un."} en carrito
                       </span>
+                      {product.precioCajaCerrada > 0 && product.cantidadPorCaja > 0 && inCartUnit.quantity >= product.cantidadPorCaja && (
+                        <span className="text-xs bg-brand-100 text-brand-700 px-2 py-0.5 rounded-full font-medium ml-1">
+                          Precio caja cerrada
+                        </span>
+                      )}
                     </>
                   ) : (
                     <button
