@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getPool, getDbName } from "@/lib/mssql";
+import { prisma } from "@/lib/prisma";
 
 export async function GET() {
   const session = await getServerSession(authOptions);
@@ -48,12 +49,22 @@ export async function GET() {
     }
 
     const client = result.recordset[0];
+
+    // Check our delivery days first, fallback to PunTouch Zona
+    const ourDays = await prisma.clientDeliveryDay.findMany({
+      where: { clientId: user.clientId! },
+    });
+    const deliveryDays = ourDays.length > 0
+      ? ourDays.map((d) => d.day)
+      : client.zona ? [client.zona] : [];
+
     return NextResponse.json({
       name: client.nombre,
       role: user.role,
       address: [client.calle, client.numero].filter(Boolean).join(" "),
       phone: client.celular || client.tel1 || "",
-      deliveryDay: client.zona || null,
+      deliveryDay: deliveryDays.length > 0 ? deliveryDays.join(" - ") : null,
+      deliveryDays,
     });
   } catch (error) {
     console.error("Error fetching client info:", error);

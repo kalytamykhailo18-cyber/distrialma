@@ -103,10 +103,16 @@ export async function GET() {
     const transactions = transResult.recordset.map((t) => {
       let type: string;
       let amount: number;
-      if (t.movCaja === "P") {
+      const isPago = t.movCaja === "P";
+      // Cuenta corriente: Deuda < 0 (Tipo N) OR Deuda > 0 with no payment (Tipo V)
+      const isCuentaCorriente = !isPago && (
+        (t.deuda < 0 && t.tipo !== "M") ||
+        (t.deuda > 0 && t.efectivo === 0 && t.tarjeta === 0)
+      );
+      if (isPago) {
         type = "Pago";
         amount = Math.abs(t.deuda);
-      } else if (t.deuda < 0) {
+      } else if (isCuentaCorriente) {
         type = "Venta (cuenta corriente)";
         amount = t.total;
       } else {
@@ -132,8 +138,8 @@ export async function GET() {
         deuda: t.deuda,
         efectivo: t.efectivo,
         tarjeta: t.tarjeta,
-        isPago: t.movCaja === "P",
-        isDeuda: t.deuda < 0 && t.movCaja !== "P",
+        isPago,
+        isDeuda: isCuentaCorriente,
       };
     });
 

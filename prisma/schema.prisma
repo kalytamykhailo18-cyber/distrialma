@@ -133,6 +133,16 @@ model ArchivedOrderItem {
   @@map("archived_order_items")
 }
 
+model ClientDeliveryDay {
+  id        Int    @id @default(autoincrement())
+  clientId  String @db.VarChar(7)
+  day       String @db.VarChar(20)
+
+  @@unique([clientId, day])
+  @@index([clientId])
+  @@map("client_delivery_days")
+}
+
 model User {
   id           Int      @id @default(autoincrement())
   username     String   @unique @db.VarChar(50)

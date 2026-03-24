@@ -59,6 +59,8 @@ export async function POST(req: NextRequest) {
              ISNULL(MAX(CAST(LTRIM(RTRIM(Nroped)) AS INT)), 0) AS maxNroped,
              ISNULL(MAX(CAST(LTRIM(RTRIM(NroTransa)) AS INT)), 0) AS maxNroTransa
       FROM [${dbPedidos}].dbo.Pedidos
+      WHERE LTRIM(RTRIM(Cod)) NOT LIKE '%[^0-9 ]%'
+        AND LTRIM(RTRIM(Nroped)) NOT LIKE '%[^0-9 ]%'
     `);
 
     // NroMostra (turno) must come from Transas table for correct sequencing
