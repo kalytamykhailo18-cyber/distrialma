@@ -42,6 +42,10 @@ export default function Navbar() {
             <Link href="/admin/etiquetas" className="text-sm text-gray-600 hover:text-brand-600" onClick={() => setMenuOpen(false)}>
               Etiquetas
             </Link>
+          ) : (session.user as { role?: string }).role === "reparto" ? (
+            <Link href="/reparto" className="text-sm text-gray-600 hover:text-brand-600" onClick={() => setMenuOpen(false)}>
+              Reparto
+            </Link>
           ) : (
             <>
               <Link href="/mis-pedidos" className="text-sm text-gray-600 hover:text-brand-600" onClick={() => setMenuOpen(false)}>

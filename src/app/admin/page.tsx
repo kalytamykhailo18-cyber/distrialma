@@ -82,6 +82,12 @@ export default function AdminPage() {
             Pedidos
           </Link>
           <Link
+            href="/reparto"
+            className="bg-white text-gray-700 px-4 py-2 rounded-lg text-sm font-medium border border-gray-200 hover:border-brand-400 hover:text-brand-600 transition-colors"
+          >
+            Reparto
+          </Link>
+          <Link
             href="/admin/dias-entrega"
             className="bg-white text-gray-700 px-4 py-2 rounded-lg text-sm font-medium border border-gray-200 hover:border-brand-400 hover:text-brand-600 transition-colors"
           >
