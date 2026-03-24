@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { formatPrice } from "@/lib/utils";
 
 interface Transaction {
@@ -62,10 +61,7 @@ export default function EstadoCuentaPage() {
   if (!data) {
     return (
       <div className="max-w-2xl mx-auto px-4 py-16 text-center">
-        <p className="text-gray-500 mb-4">No se pudo cargar el estado de cuenta.</p>
-        <Link href="/productos" className="text-brand-600 hover:underline">
-          Volver a productos
-        </Link>
+        <p className="text-gray-500">No se pudo cargar el estado de cuenta.</p>
       </div>
     );
   }

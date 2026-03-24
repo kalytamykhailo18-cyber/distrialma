@@ -121,11 +121,13 @@ export async function POST(req: NextRequest) {
       } else {
         // Regular product
         const isBox = item.mode === "box" && item.precioCajaCerrada > 0;
+        // Unit mode auto-switch: when qty >= cantidadPorCaja, use caja cerrada price
+        const unitAutoBox = item.mode === "unit" && item.precioCajaCerrada > 0 && item.cantidadPorCaja > 0 && item.quantity >= item.cantidadPorCaja;
         expandedItems.push({
           sku: item.sku,
           cant: isBox ? item.cantidadPorCaja * item.quantity : item.quantity,
-          price: isBox ? item.precioCajaCerrada : item.precioMayorista,
-          listaPrecio: isBox ? 4 : 2,
+          price: isBox ? item.precioCajaCerrada : unitAutoBox ? item.precioCajaCerrada : item.precioMayorista,
+          listaPrecio: (isBox || unitAutoBox) ? 4 : 2,
         });
       }
     }

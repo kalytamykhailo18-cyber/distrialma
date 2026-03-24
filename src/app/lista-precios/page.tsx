@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import type { PriceListFormat } from "@/lib/price-list-pdf";
 import { FORMAT_LABELS } from "@/lib/price-list-pdf";
 
@@ -52,12 +51,7 @@ export default function ListaPreciosPage() {
 
   return (
     <div className="max-w-md mx-auto px-4 py-8">
-      <Link
-        href="/productos"
-        className="text-sm text-brand-600 hover:underline mb-4 inline-block"
-      >
-        &larr; Volver a productos
-      </Link>
+
 
       <h1 className="text-2xl font-bold text-gray-900 mb-2">Lista de Precios</h1>
       <p className="text-sm text-gray-500 mb-6">

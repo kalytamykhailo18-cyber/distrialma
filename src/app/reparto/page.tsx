@@ -3,9 +3,8 @@
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { formatPrice } from "@/lib/utils";
-import { hasPermission, isStaffUser } from "@/lib/permissions";
+import { hasPermission } from "@/lib/permissions";
 import { FaWhatsapp } from "react-icons/fa";
 
 interface Client {
@@ -87,15 +86,7 @@ export default function RepartoPage() {
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-6">
-      <div className="flex items-center justify-between mb-2">
-        <h1 className="text-2xl font-bold text-gray-900">Panel de Reparto</h1>
-        <Link
-          href={isStaffUser(user?.role) && hasPermission(user?.role, user?.permissions, "productos") ? "/admin" : "/"}
-          className="bg-white text-gray-700 px-4 py-2 rounded-lg text-sm font-medium border border-gray-200 hover:border-brand-400 hover:text-brand-600 transition-colors"
-        >
-          Volver
-        </Link>
-      </div>
+      <h1 className="text-2xl font-bold text-gray-900 mb-2">Panel de Reparto</h1>
       <p className="text-sm text-gray-500 mb-4">Seguimiento de pedidos por día de entrega</p>
 
       {/* Day selector */}

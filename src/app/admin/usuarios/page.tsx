@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import ConfirmModal from "@/components/ConfirmModal";
 import { ALL_PERMISSIONS } from "@/lib/permissions";
 
@@ -175,21 +174,13 @@ export default function UsuariosPage() {
           <h1 className="text-2xl font-bold text-gray-900">Usuarios</h1>
           <p className="text-sm text-gray-500 mt-1">Crear y administrar usuarios con acceso al panel.</p>
         </div>
-        <div className="flex gap-2">
-          <button
-            onClick={openCreateForm}
-            disabled={showForm}
-            className="px-4 py-2 bg-brand-400 text-white rounded-lg text-sm font-medium hover:bg-brand-500 disabled:opacity-50"
-          >
-            Nuevo usuario
-          </button>
-          <Link
-            href="/admin"
-            className="bg-white text-gray-700 px-4 py-2 rounded-lg text-sm font-medium border border-gray-200 hover:border-brand-400 hover:text-brand-600 transition-colors"
-          >
-            Volver
-          </Link>
-        </div>
+        <button
+          onClick={openCreateForm}
+          disabled={showForm}
+          className="px-4 py-2 bg-brand-400 text-white rounded-lg text-sm font-medium hover:bg-brand-500 disabled:opacity-50"
+        >
+          Nuevo usuario
+        </button>
       </div>
 
       {error && !showForm && (

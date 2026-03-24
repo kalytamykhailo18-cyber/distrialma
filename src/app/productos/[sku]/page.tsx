@@ -139,23 +139,13 @@ export default function ProductDetailPage() {
   if (!product) {
     return (
       <div className="max-w-4xl mx-auto px-4 py-12 text-center">
-        <p className="text-gray-500 mb-4">Producto no encontrado</p>
-        <Link href="/productos" className="text-brand-600 hover:underline">
-          Volver a productos
-        </Link>
+        <p className="text-gray-500">Producto no encontrado</p>
       </div>
     );
   }
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
-      <Link
-        href={product.categoryId ? `/categoria/${product.categoryId}` : "/productos"}
-        className="text-sm text-brand-600 hover:underline mb-4 inline-block"
-      >
-        &larr; {product.category ? `Volver a ${product.category}` : "Volver a productos"}
-      </Link>
-
       {message && (
         <div className="bg-brand-50 text-brand-600 px-4 py-2 rounded-lg text-sm mb-4">
           {message}

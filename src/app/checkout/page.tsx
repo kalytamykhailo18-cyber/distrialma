@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { useCart } from "@/components/CartProvider";
 import { formatPrice } from "@/lib/utils";
 import { HiExclamation } from "react-icons/hi";
@@ -70,12 +69,15 @@ export default function CheckoutPage() {
         msg += `  ${formatPrice(item.precioMayorista * item.quantity)}\n`;
       } else {
         const isBox = item.mode === "box" && item.precioCajaCerrada > 0;
-        const unitPrice = isBox ? item.precioCajaCerrada : item.precioMayorista;
+        const unitAutoBox = item.mode === "unit" && item.precioCajaCerrada > 0 && item.cantidadPorCaja > 0 && item.quantity >= item.cantidadPorCaja;
+        const unitPrice = isBox ? item.precioCajaCerrada : unitAutoBox ? item.precioCajaCerrada : item.precioMayorista;
         const label = isBox
           ? `Caja x${item.cantidadPorCaja}`
           : item.unit === "KG" ? "KG" : "Un.";
         const lineTotal = isBox
           ? item.precioCajaCerrada * item.cantidadPorCaja * item.quantity
+          : unitAutoBox
+          ? item.precioCajaCerrada * item.quantity
           : item.precioMayorista * item.quantity;
         msg += `- ${item.name} (${item.sku})\n`;
         msg += `  ${item.quantity} x ${formatPrice(unitPrice)}/${label} = ${formatPrice(lineTotal)}\n`;
@@ -109,13 +111,6 @@ export default function CheckoutPage() {
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-6">
-      <Link
-        href="/carrito"
-        className="text-sm text-brand-600 hover:underline mb-4 inline-block"
-      >
-        &larr; Volver al carrito
-      </Link>
-
       <h1 className="text-2xl font-bold text-gray-900 mb-6">Finalizar pedido</h1>
 
       {/* Client info */}

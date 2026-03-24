@@ -103,10 +103,14 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const totalItems = items.reduce((sum, i) => sum + i.quantity, 0);
 
   const totalPrice = items.reduce((sum, i) => {
-    const price = i.mode === "box" && i.precioCajaCerrada > 0
-      ? i.precioCajaCerrada * i.cantidadPorCaja
-      : i.precioMayorista;
-    return sum + price * i.quantity;
+    if (i.mode === "box" && i.precioCajaCerrada > 0) {
+      return sum + i.precioCajaCerrada * i.cantidadPorCaja * i.quantity;
+    }
+    // Unit mode: auto-switch to caja cerrada price when qty >= cantidadPorCaja
+    if (i.mode === "unit" && i.precioCajaCerrada > 0 && i.cantidadPorCaja > 0 && i.quantity >= i.cantidadPorCaja) {
+      return sum + i.precioCajaCerrada * i.quantity;
+    }
+    return sum + i.precioMayorista * i.quantity;
   }, 0);
 
   return (

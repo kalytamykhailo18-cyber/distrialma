@@ -3,7 +3,6 @@
 import { useEffect, useState, useRef } from "react";
 import { useParams } from "next/navigation";
 import { useSession } from "next-auth/react";
-import Link from "next/link";
 import { formatPrice } from "@/lib/utils";
 import { useCart } from "@/components/CartProvider";
 import type { Product } from "@/types";
@@ -221,10 +220,7 @@ export default function ComboDetailPage() {
   if (!combo) {
     return (
       <div className="max-w-4xl mx-auto px-4 py-12 text-center">
-        <p className="text-gray-500 mb-4">Combo no encontrado</p>
-        <Link href="/productos" className="text-brand-600 hover:underline">
-          Volver a productos
-        </Link>
+        <p className="text-gray-500">Combo no encontrado</p>
       </div>
     );
   }
@@ -241,13 +237,6 @@ export default function ComboDetailPage() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
-      <Link
-        href="/productos"
-        className="text-sm text-brand-600 hover:underline mb-4 inline-block"
-      >
-        &larr; Volver a COMBOS
-      </Link>
-
       {message && (
         <div className="bg-brand-50 text-brand-600 px-4 py-2 rounded-lg text-sm mb-4">
           {message}

@@ -41,11 +41,17 @@ export default function CarritoPage() {
           const unitLabel = isKg ? "KG" : "un.";
           const minQty = item.mode === "unit" && item.pesoMayorista > 0 ? item.pesoMayorista : 1;
           const step = 1;
+          // Auto-switch to caja cerrada price when unit qty >= cantidadPorCaja
+          const unitAutoBox = item.mode === "unit" && item.precioCajaCerrada > 0 && item.cantidadPorCaja > 0 && item.quantity >= item.cantidadPorCaja;
           const unitPrice = item.mode === "box" && item.precioCajaCerrada > 0
+            ? item.precioCajaCerrada
+            : unitAutoBox
             ? item.precioCajaCerrada
             : item.precioMayorista;
           const lineTotal = item.mode === "box" && item.precioCajaCerrada > 0
             ? item.precioCajaCerrada * item.cantidadPorCaja * item.quantity
+            : unitAutoBox
+            ? item.precioCajaCerrada * item.quantity
             : item.precioMayorista * item.quantity;
 
           return (
@@ -75,9 +81,15 @@ export default function CarritoPage() {
                   <span className={`text-xs px-2 py-1 rounded-full font-medium ${
                     item.mode === "box"
                       ? "bg-brand-100 text-brand-700"
+                      : unitAutoBox
+                      ? "bg-brand-100 text-brand-700"
                       : "bg-green-100 text-green-700"
                   }`}>
-                    {item.mode === "box" ? `Caja x${item.cantidadPorCaja} ${unitLabel}` : (isKg ? "Por KG" : "Por unidad")}
+                    {item.mode === "box"
+                      ? `Caja x${item.cantidadPorCaja} ${unitLabel}`
+                      : unitAutoBox
+                      ? `Precio caja cerrada`
+                      : (isKg ? "Por KG" : "Por unidad")}
                   </span>
                 )}
 

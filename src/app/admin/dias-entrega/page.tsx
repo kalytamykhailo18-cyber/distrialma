@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Link from "next/link";
 
 interface ClientDay {
   cod: string;
@@ -68,15 +67,7 @@ export default function DiasEntregaPage() {
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-6">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Días de Entrega</h1>
-        <Link
-          href="/admin"
-          className="bg-white text-gray-700 px-4 py-2 rounded-lg text-sm font-medium border border-gray-200 hover:border-brand-400 hover:text-brand-600 transition-colors"
-        >
-          Volver
-        </Link>
-      </div>
+      <h1 className="text-2xl font-bold text-gray-900 mb-6">Días de Entrega</h1>
 
       <p className="text-sm text-gray-500 mb-4">
         Asigná uno o más días de entrega por cliente. Reemplaza la zona de PunTouch.

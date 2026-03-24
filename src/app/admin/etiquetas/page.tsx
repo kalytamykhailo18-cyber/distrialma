@@ -2,7 +2,6 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useSession } from "next-auth/react";
-import Link from "next/link";
 import type { Product } from "@/types";
 import type { LabelFormat, LabelProduct } from "@/lib/label-pdf";
 import ConfirmModal from "@/components/ConfirmModal";
@@ -236,15 +235,7 @@ export default function EtiquetasPage() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-6">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Etiquetas</h1>
-        <Link
-          href="/admin"
-          className="bg-white text-gray-700 px-4 py-2 rounded-lg text-sm font-medium border border-gray-200 hover:border-brand-400 hover:text-brand-600 transition-colors"
-        >
-          Volver
-        </Link>
-      </div>
+      <h1 className="text-2xl font-bold text-gray-900 mb-6">Etiquetas</h1>
 
       {/* Price changes */}
       <div className="bg-white rounded-lg border p-4 mb-4">

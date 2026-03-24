@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import Link from "next/link";
 import type { Product } from "@/types";
 
 export default function AdminProductEditPage() {
@@ -77,13 +76,6 @@ export default function AdminProductEditPage() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-6">
-      <Link
-        href="/admin"
-        className="text-sm text-brand-600 hover:underline mb-4 inline-block"
-      >
-        &larr; Volver al panel
-      </Link>
-
       <h1 className="text-2xl font-bold text-gray-900 mb-2">{product.name}</h1>
       <p className="text-sm text-gray-500 mb-6">SKU: {sku}</p>
 

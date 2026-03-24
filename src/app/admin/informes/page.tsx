@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Link from "next/link";
 import { formatPrice } from "@/lib/utils";
 
 interface SalesProduct {
@@ -95,15 +94,7 @@ export default function InformesPage() {
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-6">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Informes — Local 1</h1>
-        <Link
-          href="/admin"
-          className="bg-white text-gray-700 px-4 py-2 rounded-lg text-sm font-medium border border-gray-200 hover:border-brand-400 hover:text-brand-600 transition-colors"
-        >
-          Volver
-        </Link>
-      </div>
+      <h1 className="text-2xl font-bold text-gray-900 mb-6">Informes — Local 1</h1>
 
       {/* Archive action */}
       <div className="bg-white rounded-lg border p-4 mb-4">
