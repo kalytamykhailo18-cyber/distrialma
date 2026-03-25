@@ -211,10 +211,10 @@ export default function Navbar() {
       {/* Mobile slide-down */}
       <div
         className={`md:hidden overflow-hidden transition-all duration-300 ease-in-out ${
-          menuOpen ? "max-h-[500px] opacity-100" : "max-h-0 opacity-0"
+          menuOpen ? "max-h-[calc(100vh-56px)] opacity-100" : "max-h-0 opacity-0"
         }`}
       >
-        <div className="border-t bg-white px-4 py-3 space-y-3">
+        <div className="border-t bg-white px-4 py-3 space-y-3 overflow-y-auto max-h-[calc(100vh-56px)] scroll-auto">
           <div className="flex flex-col gap-3">
             {navLinks}
           </div>
