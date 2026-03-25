@@ -11,6 +11,7 @@ import {
   HiOutlineGift, HiOutlineClipboardList, HiOutlineTruck, HiOutlineCalendar,
   HiOutlineChartBar, HiOutlineUserGroup, HiOutlinePrinter,
   HiOutlineDocumentText, HiOutlineCreditCard, HiOutlineLogout,
+  HiOutlineOfficeBuilding,
 } from "react-icons/hi";
 import type { IconType } from "react-icons";
 
@@ -24,6 +25,8 @@ const ICON_MAP: Record<string, IconType> = {
   reparto: HiOutlineTruck,
   "dias-entrega": HiOutlineCalendar,
   informes: HiOutlineChartBar,
+  compras: HiOutlineShoppingCart,
+  proveedores: HiOutlineOfficeBuilding,
   usuarios: HiOutlineUserGroup,
   etiquetas: HiOutlinePrinter,
   "mis-pedidos": HiOutlineClipboardList,
@@ -84,6 +87,8 @@ export default function Navbar() {
     { href: "/reparto", label: "Reparto", perm: "reparto", iconKey: "reparto" },
     { href: "/admin/dias-entrega", label: "Días Entrega", perm: "dias-entrega", iconKey: "dias-entrega" },
     { href: "/admin/informes", label: "Informes", perm: "informes", iconKey: "informes" },
+    { href: "/admin/compras", label: "Compras", perm: "compras", iconKey: "compras" },
+    { href: "/admin/proveedores", label: "Proveedores", perm: "compras", iconKey: "proveedores" },
     { href: "/admin/usuarios", label: "Usuarios", perm: "usuarios", iconKey: "usuarios" },
     { href: "/admin/etiquetas", label: "Etiquetas", perm: "etiquetas", iconKey: "etiquetas" },
   ];

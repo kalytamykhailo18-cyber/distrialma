@@ -153,3 +153,43 @@ model User {
 
   @@map("users")
 }
+
+model StockEntry {
+  id            Int      @id @default(autoincrement())
+  proveedorCod  String   @db.VarChar(7)
+  proveedorName String   @db.VarChar(60)
+  usuario       String   @db.VarChar(50)
+  estado        String   @default("pendiente") @db.VarChar(20)
+  total         Decimal  @default(0) @db.Decimal(12, 2)
+  notas         String?  @db.Text
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  items         StockEntryItem[]
+
+  @@index([estado])
+  @@index([createdAt])
+  @@map("stock_entries")
+}
+
+model StockEntryItem {
+  id          Int      @id @default(autoincrement())
+  entryId     Int
+  sku         String   @db.VarChar(7)
+  productName String   @db.VarChar(60)
+  cantidad    Decimal  @db.Decimal(12, 3)
+  costo       Decimal? @db.Decimal(12, 2)
+  costeado    Boolean  @default(false)
+  isNewProduct Boolean @default(false)
+  entry       StockEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+
+  @@index([entryId])
+  @@map("stock_entry_items")
+}
+
+model PriceMargin {
+  id     Int     @id @default(autoincrement())
+  lista  Int     @unique
+  margen Decimal @db.Decimal(6, 2)
+
+  @@map("price_margins")
+}

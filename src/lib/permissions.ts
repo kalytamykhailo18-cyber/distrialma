@@ -9,6 +9,8 @@ export const ALL_PERMISSIONS = [
   { key: "dias-entrega", label: "Días Entrega" },
   { key: "informes", label: "Informes" },
   { key: "etiquetas", label: "Etiquetas" },
+  { key: "compras", label: "Compras" },
+  { key: "costeo", label: "Costeo" },
   { key: "usuarios", label: "Usuarios" },
 ] as const;
 
@@ -35,6 +37,8 @@ export const PAGE_PERMISSION_MAP: Record<string, Permission> = {
   "/admin/dias-entrega": "dias-entrega",
   "/admin/informes": "informes",
   "/admin/etiquetas": "etiquetas",
+  "/admin/compras": "compras",
+  "/admin/proveedores": "compras",
   "/admin/usuarios": "usuarios",
   "/reparto": "reparto",
 };
