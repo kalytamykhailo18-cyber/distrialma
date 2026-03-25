@@ -70,7 +70,7 @@ export async function GET(req: NextRequest) {
     `);
 
     // Calculate date range for the selected delivery day
-    const dbTransas = "c:\\puntouch\\bdtransas.mdf";
+    const dbTransas = getDbName("transas");
     const now = new Date(Date.now() - 3 * 60 * 60 * 1000);
     const dayMap: Record<string, number> = { DOMINGO: 0, LUNES: 1, MARTES: 2, MIERCOLES: 3, JUEVES: 4, VIERNES: 5, SABADO: 6 };
     const targetDayNum = dayMap[day] ?? 1;

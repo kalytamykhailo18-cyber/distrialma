@@ -24,6 +24,10 @@ body {
   scroll-behavior: smooth;
 }
 
+.scroll-auto {
+  scroll-behavior: auto;
+}
+
 @layer utilities {
   .text-balance {
     text-wrap: balance;

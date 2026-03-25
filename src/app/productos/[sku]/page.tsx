@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
+import { HiArrowLeft } from "react-icons/hi";
 import Link from "next/link";
 import { formatPrice } from "@/lib/utils";
 import ConfirmModal from "@/components/ConfirmModal";
@@ -11,6 +12,7 @@ import type { Product } from "@/types";
 
 export default function ProductDetailPage() {
   const { sku } = useParams<{ sku: string }>();
+  const router = useRouter();
   const { data: session } = useSession();
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
@@ -146,6 +148,20 @@ export default function ProductDetailPage() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
+      <button
+        onClick={() => {
+          const savedPath = sessionStorage.getItem("productListPath");
+          if (savedPath) {
+            router.push(savedPath);
+          } else {
+            router.back();
+          }
+        }}
+        className="flex items-center gap-1 text-sm text-brand-600 hover:text-brand-700 mb-4"
+      >
+        <HiArrowLeft className="w-4 h-4" />
+        Volver a productos
+      </button>
       {message && (
         <div className="bg-brand-50 text-brand-600 px-4 py-2 rounded-lg text-sm mb-4">
           {message}

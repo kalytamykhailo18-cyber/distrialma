@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useCategories } from "./CategoriesProvider";
 import { HiMenu } from "react-icons/hi";
 
@@ -15,18 +15,67 @@ export default function CategorySidebar({
   const { categories, brands, filter, setFilter, brandFilter, setBrandFilter } = useCategories();
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<"categorias" | "marcas">(activeBrandId ? "marcas" : "categorias");
+  const catListRef = useRef<HTMLUListElement>(null);
+  const brandListRef = useRef<HTMLUListElement>(null);
 
-  const saveScroll = useCallback(() => {
-    sessionStorage.setItem("sidebarScrollY", String(window.scrollY));
-  }, []);
+  // Persist sidebar state continuously so it's available on any navigation
+  useEffect(() => {
+    sessionStorage.setItem("sidebarTab", tab);
+  }, [tab]);
 
   useEffect(() => {
-    const saved = sessionStorage.getItem("sidebarScrollY");
-    if (saved) {
-      window.scrollTo(0, parseInt(saved, 10));
-      sessionStorage.removeItem("sidebarScrollY");
+    const catEl = catListRef.current;
+    const brandEl = brandListRef.current;
+    const onCatScroll = () => {
+      if (catEl) sessionStorage.setItem("sidebarCatScrollY", String(catEl.scrollTop));
+    };
+    const onBrandScroll = () => {
+      if (brandEl) sessionStorage.setItem("sidebarBrandScrollY", String(brandEl.scrollTop));
+    };
+    catEl?.addEventListener("scroll", onCatScroll, { passive: true });
+    brandEl?.addEventListener("scroll", onBrandScroll, { passive: true });
+    return () => {
+      catEl?.removeEventListener("scroll", onCatScroll);
+      brandEl?.removeEventListener("scroll", onBrandScroll);
+    };
+  });
+
+  const saveScrollPositions = useCallback(() => {
+    sessionStorage.setItem("sidebarPageScrollY", String(window.scrollY));
+  }, []);
+
+  // Restore scroll positions on mount
+  useEffect(() => {
+    const savedPageScroll = sessionStorage.getItem("sidebarPageScrollY");
+    if (savedPageScroll) {
+      window.scrollTo(0, parseInt(savedPageScroll, 10));
+      sessionStorage.removeItem("sidebarPageScrollY");
+    }
+
+    const savedTab = sessionStorage.getItem("sidebarTab");
+    if (savedTab === "categorias" || savedTab === "marcas") {
+      setTab(savedTab);
     }
   }, []);
+
+  // Restore sidebar list scroll after categories/brands load
+  useEffect(() => {
+    if (categories.length > 0 && catListRef.current) {
+      const saved = sessionStorage.getItem("sidebarCatScrollY");
+      if (saved) {
+        catListRef.current.scrollTop = parseInt(saved, 10);
+      }
+    }
+  }, [categories]);
+
+  useEffect(() => {
+    if (brands.length > 0 && brandListRef.current) {
+      const saved = sessionStorage.getItem("sidebarBrandScrollY");
+      if (saved) {
+        brandListRef.current.scrollTop = parseInt(saved, 10);
+      }
+    }
+  }, [brands]);
 
   useEffect(() => {
     if (open) {
@@ -87,12 +136,12 @@ export default function CategorySidebar({
             placeholder="Filtrar categorías..."
             className="w-full px-3 py-1.5 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 mb-2"
           />
-          <ul className="space-y-1 overflow-y-auto max-h-[calc(100vh-220px)]">
+          <ul ref={catListRef} className="space-y-1 overflow-y-auto max-h-[calc(100vh-220px)] scroll-auto">
             <li>
               <Link
                 scroll={false}
                 href="/productos"
-                onClick={() => { saveScroll(); setOpen(false); }}
+                onClick={() => { saveScrollPositions(); setOpen(false); }}
                 className={`block px-3 py-2 text-sm rounded-lg ${
                   !activeId && !activeBrandId
                     ? "bg-brand-50 text-brand-600 font-medium"
@@ -107,7 +156,7 @@ export default function CategorySidebar({
                 <Link
                   scroll={false}
                   href={`/categoria/${cat.id}`}
-                  onClick={() => { saveScroll(); setOpen(false); }}
+                  onClick={() => { saveScrollPositions(); setOpen(false); }}
                   className={`block px-3 py-2 text-sm rounded-lg ${
                     activeId === cat.id
                       ? "bg-brand-50 text-brand-600 font-medium"
@@ -135,13 +184,13 @@ export default function CategorySidebar({
             placeholder="Filtrar marcas..."
             className="w-full px-3 py-1.5 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 mb-2"
           />
-          <ul className="space-y-1 overflow-y-auto max-h-[calc(100vh-220px)]">
+          <ul ref={brandListRef} className="space-y-1 overflow-y-auto max-h-[calc(100vh-220px)] scroll-auto">
             {filteredBrands.map((brand) => (
               <li key={brand.id}>
                 <Link
                   scroll={false}
                   href={`/marca/${brand.id}`}
-                  onClick={() => { saveScroll(); setOpen(false); }}
+                  onClick={() => { saveScrollPositions(); setOpen(false); }}
                   className={`block px-3 py-2 text-sm rounded-lg ${
                     activeBrandId === brand.id
                       ? "bg-brand-50 text-brand-600 font-medium"

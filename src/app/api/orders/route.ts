@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
     const client = clientResult.recordset[0];
 
     // Get next Cod and Nroped
-    const dbTransas = "c:\\puntouch\\bdtransas.mdf";
+    const dbTransas = getDbName("transas");
 
     const maxResult = await pool.request().query(`
       SELECT ISNULL(MAX(CAST(LTRIM(RTRIM(Cod)) AS INT)), 0) AS maxCod,

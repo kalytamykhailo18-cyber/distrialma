@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import ConfirmModal from "@/components/ConfirmModal";
-import { ALL_PERMISSIONS } from "@/lib/permissions";
+import { ALL_PERMISSIONS, USER_FLAGS } from "@/lib/permissions";
 
 interface UserRecord {
   id: number;
@@ -255,6 +255,25 @@ export default function UsuariosPage() {
                   </label>
                 ))}
               </div>
+              {/* User flags */}
+              {USER_FLAGS.length > 0 && (
+                <div className="mt-3 pt-3 border-t">
+                  <span className="text-xs text-gray-500 block mb-2">Opciones</span>
+                  {USER_FLAGS.map((f) => (
+                    <label key={f.key} className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formPerms.includes(f.key)}
+                        onChange={() => togglePerm(f.key)}
+                        disabled={saving}
+                        className="rounded border-gray-300 text-brand-500 focus:ring-brand-500"
+                      />
+                      <span className="text-sm text-gray-700">{f.label}</span>
+                      <span className="text-xs text-gray-400">— {f.description}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
@@ -319,11 +338,18 @@ export default function UsuariosPage() {
                   ? ALL_PERMISSIONS.map((p) => p.key)
                   : user.permissions
                 ).map((perm) => {
-                  const label = ALL_PERMISSIONS.find((p) => p.key === perm)?.label || perm;
+                  const permLabel = ALL_PERMISSIONS.find((p) => p.key === perm)?.label;
+                  const flagLabel = USER_FLAGS.find((f) => f.key === perm)?.label;
+                  const label = permLabel || flagLabel || perm;
+                  const isFlag = !!flagLabel;
                   return (
                     <span
                       key={perm}
-                      className="inline-block px-2 py-0.5 rounded-full text-xs font-medium bg-brand-50 text-brand-700 border border-brand-200"
+                      className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${
+                        isFlag
+                          ? "bg-purple-50 text-purple-700 border border-purple-200"
+                          : "bg-brand-50 text-brand-700 border border-brand-200"
+                      }`}
                     >
                       {label}
                     </span>

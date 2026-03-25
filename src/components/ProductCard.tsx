@@ -9,6 +9,10 @@ export default function ProductCard({ product }: { product: Product }) {
   return (
     <Link
       href={`/productos/${product.sku}`}
+      onClick={() => {
+        sessionStorage.setItem("productListScrollY", String(window.scrollY));
+        sessionStorage.setItem("productListPath", window.location.pathname + window.location.search);
+      }}
       className="bg-white rounded-lg border hover:shadow-md transition-shadow p-4 flex flex-col"
     >
       <div className="w-full h-40 bg-gray-100 rounded mb-3 flex items-center justify-center overflow-hidden">

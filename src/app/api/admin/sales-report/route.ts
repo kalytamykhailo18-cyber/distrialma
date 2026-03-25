@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
       fechora: { gte: sinceStr },
     },
     include: { items: true },
-    orderBy: { fechora: "asc" },
+    orderBy: { fechora: "desc" },
   });
 
   // Group by day, then by product

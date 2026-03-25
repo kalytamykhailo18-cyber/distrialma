@@ -31,7 +31,7 @@ const FIELD_LABELS: Record<string, string> = {
 export default function EtiquetasPage() {
   const { data: session } = useSession();
   const user = session?.user as { role?: string; permissions?: string[] } | undefined;
-  const isMinorista = user?.role === "staff" && user?.permissions?.length === 1 && user?.permissions?.[0] === "etiquetas";
+  const isMinorista = user?.permissions?.includes("minorista") ?? false;
   const [format, setFormat] = useState<LabelFormat>("gondola");
   const [search, setSearch] = useState("");
   const [results, setResults] = useState<Product[]>([]);

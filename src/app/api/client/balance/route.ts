@@ -17,7 +17,7 @@ export async function GET() {
   try {
     const pool = await getPool();
     const dbClientes = getDbName("clientes");
-    const dbTransas = "c:\\puntouch\\bdtransas.mdf";
+    const dbTransas = getDbName("transas");
 
     // Get client balance
     const clientResult = await pool

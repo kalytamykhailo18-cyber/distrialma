@@ -12,9 +12,17 @@ export const ALL_PERMISSIONS = [
   { key: "usuarios", label: "Usuarios" },
 ] as const;
 
+// Special flags (not page permissions, but user config options)
+export const USER_FLAGS = [
+  { key: "minorista", label: "Etiquetas Minorista", description: "Muestra precios minoristas en etiquetas" },
+] as const;
+
 export type Permission = (typeof ALL_PERMISSIONS)[number]["key"];
 
-export const VALID_PERM_KEYS: string[] = ALL_PERMISSIONS.map((p) => p.key);
+export const VALID_PERM_KEYS: string[] = [
+  ...ALL_PERMISSIONS.map((p) => p.key),
+  ...USER_FLAGS.map((f) => f.key),
+];
 
 // Map admin pages to their required permission
 export const PAGE_PERMISSION_MAP: Record<string, Permission> = {

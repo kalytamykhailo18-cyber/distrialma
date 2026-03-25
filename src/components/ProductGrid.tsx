@@ -34,6 +34,7 @@ export default function ProductGrid({
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(!initialProducts);
   const prevFilters = useRef({ categoryId, brandId, search });
+  const scrollRestored = useRef(false);
 
   useEffect(() => {
     if (onPaginationReady) {
@@ -76,6 +77,20 @@ export default function ProductGrid({
       setTotal(0);
     } finally {
       setLoading(false);
+      // Restore scroll position when returning from product detail
+      if (!scrollRestored.current) {
+        scrollRestored.current = true;
+        const savedPath = sessionStorage.getItem("productListPath");
+        const savedScroll = sessionStorage.getItem("productListScrollY");
+        const currentPath = window.location.pathname + window.location.search;
+        if (savedPath === currentPath && savedScroll) {
+          requestAnimationFrame(() => {
+            window.scrollTo(0, parseInt(savedScroll, 10));
+          });
+        }
+        sessionStorage.removeItem("productListScrollY");
+        sessionStorage.removeItem("productListPath");
+      }
     }
   }
 
