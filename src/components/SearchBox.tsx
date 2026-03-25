@@ -9,13 +9,30 @@ interface Props {
 }
 
 export default function SearchBox({ initialValue, onSearch }: Props) {
-  const [value, setValue] = useState(initialValue || "");
+  const restoredRef = useRef(false);
+  const [value, setValue] = useState(() => {
+    if (initialValue) return initialValue;
+    if (typeof window !== "undefined") {
+      const saved = sessionStorage.getItem("productSearchText");
+      if (saved) return saved;
+    }
+    return "";
+  });
   const timerRef = useRef<ReturnType<typeof setTimeout>>();
+
+  // Fire initial search if restored from sessionStorage
+  useEffect(() => {
+    if (!restoredRef.current && value && !initialValue) {
+      restoredRef.current = true;
+      onSearch(value.trim());
+    }
+  }, []);
 
   useEffect(() => {
     clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {
       onSearch(value.trim());
+      sessionStorage.setItem("productSearchText", value.trim());
     }, 400);
     return () => clearTimeout(timerRef.current);
   }, [value]);

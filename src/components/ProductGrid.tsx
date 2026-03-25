@@ -29,7 +29,13 @@ export default function ProductGrid({
   onPaginationReady,
 }: Props) {
   const [products, setProducts] = useState<Product[]>(initialProducts || []);
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = sessionStorage.getItem("productListPage");
+      if (saved) return parseInt(saved, 10) || 1;
+    }
+    return 1;
+  });
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(!initialProducts);
@@ -55,6 +61,7 @@ export default function ProductGrid({
       return;
     }
 
+    sessionStorage.setItem("productListPage", String(page));
     fetchProducts();
   }, [page, categoryId, brandId, search]);
 

@@ -7,9 +7,16 @@ import CategorySidebar from "@/components/CategorySidebar";
 import PaginationCompact from "@/components/PaginationCompact";
 import SearchBox from "@/components/SearchBox";
 
+function getRestoredSearch(): string {
+  if (typeof window !== "undefined") {
+    return sessionStorage.getItem("productSearchText") || "";
+  }
+  return "";
+}
+
 function ProductosContent() {
   const searchParams = useSearchParams();
-  const initialSearch = searchParams.get("search") || "";
+  const initialSearch = searchParams.get("search") || getRestoredSearch();
   const [search, setSearch] = useState(initialSearch);
   const [pag, setPag] = useState<PaginationState | null>(null);
 

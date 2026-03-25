@@ -15,7 +15,12 @@ export default function CategoriaPage() {
   const category = categories.find((c) => c.id === id);
   const categoryName = category?.name;
   const isComboCategory = categoryName?.toUpperCase() === "COMBOS";
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(() => {
+    if (typeof window !== "undefined") {
+      return sessionStorage.getItem("productSearchText") || "";
+    }
+    return "";
+  });
   const [pag, setPag] = useState<PaginationState | null>(null);
 
   return (

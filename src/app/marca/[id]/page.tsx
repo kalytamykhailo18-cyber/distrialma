@@ -12,7 +12,12 @@ export default function MarcaPage() {
   const { id } = useParams<{ id: string }>();
   const { brands } = useCategories();
   const brandName = brands.find((b) => b.id === id)?.name;
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(() => {
+    if (typeof window !== "undefined") {
+      return sessionStorage.getItem("productSearchText") || "";
+    }
+    return "";
+  });
   const [pag, setPag] = useState<PaginationState | null>(null);
 
   return (

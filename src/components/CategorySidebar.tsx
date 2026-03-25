@@ -42,6 +42,9 @@ export default function CategorySidebar({
 
   const saveScrollPositions = useCallback(() => {
     sessionStorage.setItem("sidebarPageScrollY", String(window.scrollY));
+    // Clear search/page state when switching category/brand
+    sessionStorage.removeItem("productSearchText");
+    sessionStorage.removeItem("productListPage");
   }, []);
 
   // Restore scroll positions on mount
