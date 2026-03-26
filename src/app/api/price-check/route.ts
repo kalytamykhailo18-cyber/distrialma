@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPool, getDbName } from "@/lib/mssql";
+import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
@@ -52,7 +53,20 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ product: null });
     }
 
-    return NextResponse.json({ product: result.recordset[0] });
+    const product = result.recordset[0];
+
+    // Get product image from PostgreSQL
+    const image = await prisma.productImage.findFirst({
+      where: { sku: product.sku },
+      orderBy: { position: "asc" },
+    });
+
+    return NextResponse.json({
+      product: {
+        ...product,
+        image: image?.filename || null,
+      },
+    });
   } catch (error) {
     console.error("Price check error:", error);
     return NextResponse.json({ product: null });

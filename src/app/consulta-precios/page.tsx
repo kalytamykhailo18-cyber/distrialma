@@ -12,6 +12,7 @@ interface Product {
   precioMinorista: number;
   precioMayorista: number;
   precioCajaCerrada: number;
+  image: string | null;
   precioLista5: number;
   stock: number;
   cantidadPorCaja: string;
@@ -82,119 +83,125 @@ export default function ConsultaPreciosPage() {
   return (
     <div className="min-h-screen bg-gray-900 flex flex-col">
       {/* Header */}
-      <div className="bg-brand-400 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <img src="/logo.png" alt="Distrialma" className="h-10 brightness-0 invert" />
-          <h1 className="text-white text-2xl font-bold">Consulta de Precios</h1>
+      <div className="bg-brand-400 px-4 py-3 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <img src="/logo.png" alt="Distrialma" className="h-8 sm:h-10 brightness-0 invert" />
+          <h1 className="text-white text-base sm:text-xl font-bold">Consulta de Precios</h1>
         </div>
-        <span className="text-white/70 text-sm">
+        <span className="text-white/70 text-xs sm:text-sm hidden sm:block">
           {new Date().toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
         </span>
       </div>
 
       {/* Search bar */}
-      <div className="px-6 py-6 bg-gray-800">
-        <div className="max-w-2xl mx-auto">
-          <input
-            ref={inputRef}
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                handleSearch();
-              }
-            }}
-            placeholder="Escanee el código de barras o escriba el nombre..."
-            autoFocus
-            autoComplete="off"
-            className="w-full text-center text-2xl py-4 px-6 rounded-xl border-2 border-brand-400 bg-gray-700 text-white placeholder-gray-400 focus:outline-none focus:border-brand-300 focus:ring-2 focus:ring-brand-400"
-          />
-        </div>
+      <div className="px-4 py-4 bg-gray-800">
+        <input
+          ref={inputRef}
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              handleSearch();
+            }
+          }}
+          placeholder="Escanee o escriba el nombre..."
+          autoFocus
+          autoComplete="off"
+          className="w-full text-center text-base sm:text-xl py-3 px-4 rounded-xl border-2 border-brand-400 bg-gray-700 text-white placeholder-gray-400 focus:outline-none focus:border-brand-300 focus:ring-2 focus:ring-brand-400"
+        />
       </div>
 
       {/* Content */}
-      <div className="flex-1 flex items-center justify-center px-6 py-8">
+      <div className="flex-1 flex items-center justify-center px-4 py-4 sm:py-8">
         {loading && (
-          <p className="text-3xl text-gray-400 animate-pulse">Buscando...</p>
+          <p className="text-xl sm:text-3xl text-gray-400 animate-pulse">Buscando...</p>
         )}
 
         {notFound && (
           <div className="text-center">
-            <p className="text-4xl text-red-400 font-bold mb-2">Producto no encontrado</p>
-            <p className="text-xl text-gray-500">Intente con otro código</p>
+            <p className="text-2xl sm:text-4xl text-red-400 font-bold mb-2">Producto no encontrado</p>
+            <p className="text-base sm:text-xl text-gray-500">Intente con otro código</p>
           </div>
         )}
 
         {product && (
-          <div className="w-full max-w-3xl">
-            {/* Product name */}
-            <div className="text-center mb-8">
-              <h2 className="text-4xl font-bold text-white mb-2">{product.name}</h2>
-              <div className="flex items-center justify-center gap-4 text-lg text-gray-400">
-                {product.brand && <span>{product.brand}</span>}
-                {product.category && <span>{product.category}</span>}
-                <span>SKU {product.sku}</span>
-                {product.barcode && <span>EAN {product.barcode}</span>}
+          <div className="w-full max-w-4xl">
+            <div className="flex flex-col md:flex-row gap-6">
+              {/* Left: Image */}
+              <div className="flex flex-col items-center md:items-start gap-3 md:w-1/2">
+                {product.image ? (
+                  <div className="w-48 h-48 sm:w-64 sm:h-64 md:w-80 md:h-80 bg-white rounded-2xl overflow-hidden flex items-center justify-center">
+                    <img src={product.image} alt={product.name} className="max-w-full max-h-full object-contain" />
+                  </div>
+                ) : (
+                  <div className="w-48 h-48 sm:w-64 sm:h-64 md:w-80 md:h-80 bg-gray-800 rounded-2xl flex items-center justify-center">
+                    <span className="text-gray-600 text-lg">Sin imagen</span>
+                  </div>
+                )}
+                <div className="text-center md:text-left">
+                  <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-white mb-1">{product.name}</h2>
+                  <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 text-sm text-gray-400">
+                    {product.brand && <span>{product.brand}</span>}
+                    {product.category && <span>| {product.category}</span>}
+                    <span>| SKU {product.sku}</span>
+                  </div>
+                  <div className="mt-2">
+                    <span className={`text-sm ${product.stock > 0 ? "text-green-400" : "text-red-400"}`}>
+                      Stock: {product.stock} {product.unit || "UN"}
+                    </span>
+                  </div>
+                </div>
               </div>
-            </div>
 
-            {/* Prices */}
-            <div className="grid grid-cols-2 gap-4">
-              {product.precioMinorista > 0 && (
-                <div className="bg-green-900/50 border-2 border-green-500 rounded-2xl p-6 text-center">
-                  <p className="text-green-400 text-lg font-medium mb-1">Minorista</p>
-                  <p className="text-white text-5xl font-bold">{formatPrice(product.precioMinorista)}</p>
-                  {product.unit === "KG" && <p className="text-green-400 text-base mt-1">por KG</p>}
-                </div>
-              )}
+              {/* Right: Prices stacked */}
+              <div className="flex flex-col gap-3 md:w-1/2">
+                {product.precioMinorista > 0 && (
+                  <div className="bg-green-900/50 border-2 border-green-500 rounded-2xl p-4 sm:p-5 flex items-center justify-between">
+                    <p className="text-green-400 text-base sm:text-lg font-medium">Minorista</p>
+                    <div className="text-right">
+                      <p className="text-white text-2xl sm:text-4xl font-bold">{formatPrice(product.precioMinorista)}</p>
+                      {product.unit === "KG" && <p className="text-green-400 text-xs">por KG</p>}
+                    </div>
+                  </div>
+                )}
 
-              {product.precioMayorista > 0 && (
-                <div className="bg-blue-900/50 border-2 border-blue-500 rounded-2xl p-6 text-center">
-                  <p className="text-blue-400 text-lg font-medium mb-1">Mayorista</p>
-                  <p className="text-white text-5xl font-bold">{formatPrice(product.precioMayorista)}</p>
-                  {product.unit === "KG" && <p className="text-blue-400 text-base mt-1">por KG</p>}
-                </div>
-              )}
+                {product.precioMayorista > 0 && (
+                  <div className="bg-blue-900/50 border-2 border-blue-500 rounded-2xl p-4 sm:p-5 flex items-center justify-between">
+                    <p className="text-blue-400 text-base sm:text-lg font-medium">Mayorista</p>
+                    <div className="text-right">
+                      <p className="text-white text-2xl sm:text-4xl font-bold">{formatPrice(product.precioMayorista)}</p>
+                      {product.unit === "KG" && <p className="text-blue-400 text-xs">por KG</p>}
+                    </div>
+                  </div>
+                )}
 
-              {product.precioCajaCerrada > 0 && (
-                <div className="bg-purple-900/50 border-2 border-purple-500 rounded-2xl p-6 text-center">
-                  <p className="text-purple-400 text-lg font-medium mb-1">Caja Cerrada</p>
-                  <p className="text-white text-5xl font-bold">{formatPrice(product.precioCajaCerrada)}</p>
-                  {caja > 0 && <p className="text-purple-400 text-base mt-1">x{caja} {product.unit === "KG" ? "KG" : "un."}</p>}
-                </div>
-              )}
-
-              {product.precioLista5 > 0 && (
-                <div className="bg-amber-900/50 border-2 border-amber-500 rounded-2xl p-6 text-center">
-                  <p className="text-amber-400 text-lg font-medium mb-1">Lista 5</p>
-                  <p className="text-white text-5xl font-bold">{formatPrice(product.precioLista5)}</p>
-                  {product.unit === "KG" && <p className="text-amber-400 text-base mt-1">por KG</p>}
-                </div>
-              )}
-            </div>
-
-            {/* Stock */}
-            <div className="text-center mt-6">
-              <span className={`text-lg ${product.stock > 0 ? "text-green-400" : "text-red-400"}`}>
-                Stock: {product.stock} {product.unit || "UN"}
-              </span>
+                {product.precioCajaCerrada > 0 && (
+                  <div className="bg-purple-900/50 border-2 border-purple-500 rounded-2xl p-4 sm:p-5 flex items-center justify-between">
+                    <p className="text-purple-400 text-base sm:text-lg font-medium">Caja Cerrada</p>
+                    <div className="text-right">
+                      <p className="text-white text-2xl sm:text-4xl font-bold">{formatPrice(product.precioCajaCerrada)}</p>
+                      {caja > 0 && <p className="text-purple-400 text-xs">x{caja} {product.unit === "KG" ? "KG" : "un."}</p>}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}
 
         {!loading && !product && !notFound && (
           <div className="text-center">
-            <p className="text-3xl text-gray-500 font-medium">Escanee un producto</p>
-            <p className="text-xl text-gray-600 mt-2">o escriba el nombre y presione Enter</p>
+            <p className="text-xl sm:text-3xl text-gray-500 font-medium">Escanee un producto</p>
+            <p className="text-sm sm:text-lg text-gray-600 mt-2">o escriba el nombre y presione Enter</p>
           </div>
         )}
       </div>
 
       {/* Footer */}
-      <div className="bg-gray-800 px-6 py-3 text-center">
-        <p className="text-gray-500 text-sm">Precios sujetos a cambio sin previo aviso</p>
+      <div className="bg-gray-800 px-4 py-2 text-center">
+        <p className="text-gray-500 text-xs">Precios sujetos a cambio sin previo aviso</p>
       </div>
     </div>
   );
