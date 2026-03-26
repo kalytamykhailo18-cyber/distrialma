@@ -132,11 +132,11 @@ export default function ConsultaPreciosPage() {
               {/* Left: Image */}
               <div className="flex flex-col items-center md:items-start gap-3 md:w-1/2">
                 {product.image ? (
-                  <div className="w-48 h-48 sm:w-64 sm:h-64 md:w-80 md:h-80 bg-white rounded-2xl overflow-hidden flex items-center justify-center">
+                  <div className="w-full h-48 sm:h-56 md:w-80 md:h-80 bg-white rounded-2xl overflow-hidden flex items-center justify-center">
                     <img src={product.image} alt={product.name} className="max-w-full max-h-full object-contain" />
                   </div>
                 ) : (
-                  <div className="w-48 h-48 sm:w-64 sm:h-64 md:w-80 md:h-80 bg-gray-800 rounded-2xl flex items-center justify-center">
+                  <div className="w-full h-48 sm:h-56 md:w-80 md:h-80 bg-gray-800 rounded-2xl flex items-center justify-center">
                     <span className="text-gray-600 text-lg">Sin imagen</span>
                   </div>
                 )}

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { useState, useRef, useEffect } from "react";
 import { useCart } from "./CartProvider";
@@ -36,6 +37,7 @@ const ICON_MAP: Record<string, IconType> = {
 };
 
 export default function Navbar() {
+  const pathname = usePathname();
   const { data: session } = useSession();
   const [signingOut, setSigningOut] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -61,20 +63,42 @@ export default function Navbar() {
     }
   }, [dropdownOpen]);
 
+  const NAV_TABS = [
+    { href: "/productos", label: "Productos", match: "/productos" },
+    { href: "/#novedades", label: "Novedades", match: null },
+    { href: "/#marcas", label: "Marcas", match: null },
+    { href: "/#locales", label: "Locales", match: null },
+  ];
+
   const navLinks = (
     <>
-      <Link href="/productos" className="text-sm text-gray-600 hover:text-brand-600" onClick={() => setMenuOpen(false)}>
-        Productos
-      </Link>
-      <a href="/#novedades" className="text-sm text-gray-600 hover:text-brand-600" onClick={() => setMenuOpen(false)}>
-        Novedades
-      </a>
-      <a href="/#marcas" className="text-sm text-gray-600 hover:text-brand-600" onClick={() => setMenuOpen(false)}>
-        Marcas
-      </a>
-      <a href="/#locales" className="text-sm text-gray-600 hover:text-brand-600" onClick={() => setMenuOpen(false)}>
-        Locales
-      </a>
+      {NAV_TABS.map((tab) => {
+        const isActive = tab.match && (pathname === tab.match || pathname.startsWith(tab.match + "/") || pathname.startsWith("/categoria") || pathname.startsWith("/marca"));
+        const baseClass = "text-sm font-medium px-3 py-1.5 rounded-full transition-colors";
+        const activeClass = isActive
+          ? "bg-brand-400 text-white"
+          : "text-gray-600 hover:bg-gray-100 hover:text-gray-900";
+
+        return tab.href.startsWith("/") && !tab.href.includes("#") ? (
+          <Link
+            key={tab.href}
+            href={tab.href}
+            onClick={() => setMenuOpen(false)}
+            className={`${baseClass} ${activeClass}`}
+          >
+            {tab.label}
+          </Link>
+        ) : (
+          <a
+            key={tab.href}
+            href={tab.href}
+            onClick={() => setMenuOpen(false)}
+            className={`${baseClass} ${activeClass}`}
+          >
+            {tab.label}
+          </a>
+        );
+      })}
     </>
   );
 
@@ -114,7 +138,7 @@ export default function Navbar() {
   const menuItems = getUserMenuItems();
 
   return (
-    <nav className="bg-white shadow-sm border-b sticky top-0 z-40">
+    <nav className="bg-white shadow-md border-b border-gray-200 sticky top-0 z-40">
       <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-between gap-4">
         {/* Logo */}
         <Link href="/" className="shrink-0">

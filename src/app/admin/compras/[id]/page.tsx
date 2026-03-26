@@ -126,6 +126,8 @@ export default function EntryDetailPage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [applyingId, setApplyingId] = useState<number | null>(null);
+  const [confirmApply, setConfirmApply] = useState<{ itemId: number; sku: string; costo: number; products: { sku: string; nombre: string }[] } | null>(null);
+  const [loadingPreview, setLoadingPreview] = useState(false);
 
   // Add product to pending entry
   const [addQuery, setAddQuery] = useState("");
@@ -722,30 +724,22 @@ export default function EntryDetailPage() {
                 <div className="border-t-2 px-5 py-3">
                   <button
                     onClick={async () => {
-                      setApplyingId(item.id);
-                      setApplyResult(null);
+                      setLoadingPreview(true);
                       try {
-                        const res = await fetch("/api/admin/stock-entries/apply-similar", {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ sku: item.sku, costo: parseFloat(costeoRow.costo) }),
-                        });
+                        const res = await fetch(`/api/admin/stock-entries/apply-similar?sku=${item.sku}`);
                         const data = await res.json();
-                        if (data.updated > 0) {
-                          setApplyResult({
-                            message: `${data.updated} productos actualizados (${data.nameBase}...)`,
-                            products: data.products || [],
-                          });
+                        if (data.products?.length > 0) {
+                          setConfirmApply({ itemId: item.id, sku: item.sku, costo: parseFloat(costeoRow.costo), products: data.products });
                         } else {
                           setApplyResult({ message: "No se encontraron productos similares", products: [] });
                         }
                       } catch {
-                        setApplyResult({ message: "Error al aplicar", products: [] });
+                        setApplyResult({ message: "Error al buscar similares", products: [] });
                       } finally {
-                        setApplyingId(null);
+                        setLoadingPreview(false);
                       }
                     }}
-                    disabled={saving || applyingId === item.id}
+                    disabled={saving || applyingId === item.id || loadingPreview}
                     className="w-full py-2.5 text-sm font-semibold text-blue-700 bg-blue-50 border-2 border-blue-200 rounded-lg hover:bg-blue-100 disabled:opacity-50 transition-colors"
                   >
                     {applyingId === item.id ? "Aplicando..." : "Aplicar a similares"}
@@ -1044,6 +1038,66 @@ export default function EntryDetailPage() {
         >
           {saving ? "Guardando costeo..." : "Confirmar costeo"}
         </button>
+      )}
+
+      {/* Apply similar confirmation modal */}
+      {confirmApply && (
+        <>
+          <div className="fixed inset-0 bg-black/50 z-50" onClick={() => setConfirmApply(null)} />
+          <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 bg-white rounded-lg shadow-xl p-6 w-[420px] max-w-[90vw] max-h-[80vh] overflow-y-auto">
+            <h3 className="text-base font-bold text-gray-900 mb-2">Aplicar costo ${confirmApply.costo} a similares</h3>
+            <p className="text-sm text-gray-500 mb-3">Se actualizará el costo y se recalcularán los precios manteniendo los márgenes actuales en estos {confirmApply.products.length} productos:</p>
+            <ul className="space-y-1 mb-4 max-h-48 overflow-y-auto">
+              {confirmApply.products.map((p) => (
+                <li key={p.sku} className="text-sm text-gray-700 py-1 px-2 bg-gray-50 rounded">
+                  {p.nombre} <span className="text-gray-400">({p.sku})</span>
+                </li>
+              ))}
+            </ul>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setConfirmApply(null)}
+                disabled={applyingId !== null}
+                className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={async () => {
+                  setApplyingId(confirmApply.itemId);
+                  setApplyResult(null);
+                  const data_sku = confirmApply.sku;
+                  const data_costo = confirmApply.costo;
+                  setConfirmApply(null);
+                  try {
+                    const res = await fetch("/api/admin/stock-entries/apply-similar", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ sku: data_sku, costo: data_costo }),
+                    });
+                    const data = await res.json();
+                    if (data.updated > 0) {
+                      setApplyResult({
+                        message: `${data.updated} productos actualizados`,
+                        products: data.products || [],
+                      });
+                    } else {
+                      setApplyResult({ message: "No se encontraron productos similares", products: [] });
+                    }
+                  } catch {
+                    setApplyResult({ message: "Error al aplicar", products: [] });
+                  } finally {
+                    setApplyingId(null);
+                  }
+                }}
+                disabled={applyingId !== null}
+                className="px-4 py-2 text-sm text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              >
+                {applyingId !== null ? "Aplicando..." : "Confirmar"}
+              </button>
+            </div>
+          </div>
+        </>
       )}
     </div>
   );

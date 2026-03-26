@@ -12,6 +12,52 @@ function getNameBase(name: string): string {
   return words.slice(0, 2).join(" ");
 }
 
+export async function GET(req: NextRequest) {
+  if (!(await requireStaff())) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  }
+
+  try {
+    const sku = req.nextUrl.searchParams.get("sku");
+    if (!sku) {
+      return NextResponse.json({ products: [] });
+    }
+
+    const pool = await getPool();
+    const dbProd = getDbName("productos");
+    const codPadded = String(sku).padStart(7, " ");
+
+    const prodResult = await pool.request().input("cod", codPadded).query(`
+      SELECT LTRIM(RTRIM(Nombre)) AS nombre FROM [${dbProd}].dbo.Productos WHERE Cod = @cod
+    `);
+
+    if (prodResult.recordset.length === 0) {
+      return NextResponse.json({ products: [] });
+    }
+
+    const nameBase = getNameBase(prodResult.recordset[0].nombre);
+
+    const similar = await pool.request().input("pattern", nameBase + "%").input("excludeSku", sku).query(`
+      SELECT
+        LTRIM(RTRIM(p.Cod)) AS sku,
+        LTRIM(RTRIM(p.Nombre)) AS nombre,
+        ISNULL(s.Costo, 0) AS costo
+      FROM [${dbProd}].dbo.Productos p
+      JOIN [${dbProd}].dbo.Stock s ON s.CodProducto = p.Cod
+      WHERE p.Nombre LIKE @pattern
+        AND LTRIM(RTRIM(s.Deposito)) = '0'
+        AND LTRIM(RTRIM(p.Cod)) != @excludeSku
+        AND (p.DeBaja = 0 OR p.DeBaja IS NULL)
+      ORDER BY p.Nombre
+    `);
+
+    return NextResponse.json({ products: similar.recordset, nameBase });
+  } catch (error) {
+    console.error("Error previewing similar:", error);
+    return NextResponse.json({ products: [] });
+  }
+}
+
 export async function POST(req: NextRequest) {
   if (!(await requireStaff())) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
