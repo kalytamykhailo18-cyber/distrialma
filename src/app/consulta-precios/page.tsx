@@ -2,6 +2,53 @@
 
 import { useState, useRef, useEffect } from "react";
 
+function BrandCarousel() {
+  const [brands, setBrands] = useState<{ id: string; name: string; logo?: string }[]>([]);
+
+  useEffect(() => {
+    Promise.all([
+      fetch("/api/brands").then((r) => r.json()),
+      fetch("/api/admin/featured-brands?logos=1").then((r) => r.json()),
+    ])
+      .then(([allBrands, featuredData]) => {
+        const featuredSet = new Set(featuredData.brandIds || []);
+        const logos: Record<string, string> = featuredData.logos || {};
+        const filtered = (allBrands || [])
+          .filter((b: { id: string }) => featuredSet.has(b.id))
+          .map((b: { id: string; name: string }) => ({
+            ...b,
+            logo: logos[b.id] || undefined,
+          }));
+        setBrands(filtered);
+      })
+      .catch(() => setBrands([]));
+  }, []);
+
+  if (brands.length === 0) return null;
+
+  const items = [...brands, ...brands];
+  const duration = brands.length * 3;
+
+  return (
+    <div className="overflow-hidden w-full mt-8">
+      <div
+        className="flex items-center gap-12 animate-carousel"
+        style={{ width: "max-content", animationDuration: `${duration}s` }}
+      >
+        {items.map((brand, i) => (
+          <div key={`${brand.id}-${i}`} className="flex items-center justify-center shrink-0">
+            {brand.logo ? (
+              <img src={brand.logo} alt={brand.name} className="h-16 sm:h-20 object-contain" />
+            ) : (
+              <span className="text-lg font-medium text-gray-600 whitespace-nowrap">{brand.name}</span>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 interface Product {
   sku: string;
   name: string;
@@ -85,7 +132,7 @@ export default function ConsultaPreciosPage() {
       {/* Header */}
       <div className="bg-brand-400 px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <img src="/logo.png" alt="Distrialma" className="h-8 sm:h-10 brightness-0 invert" />
+          <img src="/logo.png" alt="Distrialma" className="h-8 sm:h-10" />
           <h1 className="text-white text-base sm:text-xl font-bold">Consulta de Precios</h1>
         </div>
         <span className="text-white/70 text-xs sm:text-sm hidden sm:block">
@@ -192,9 +239,11 @@ export default function ConsultaPreciosPage() {
         )}
 
         {!loading && !product && !notFound && (
-          <div className="text-center">
+          <div className="text-center w-full">
+            <img src="/logo.png" alt="Distrialma" className="h-20 sm:h-28 mx-auto mb-6 brightness-0 invert opacity-30" />
             <p className="text-xl sm:text-3xl text-gray-500 font-medium">Escanee un producto</p>
             <p className="text-sm sm:text-lg text-gray-600 mt-2">o escriba el nombre y presione Enter</p>
+            <BrandCarousel />
           </div>
         )}
       </div>
