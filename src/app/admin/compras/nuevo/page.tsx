@@ -1,8 +1,16 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { HiOutlineTrash, HiOutlinePlus, HiOutlineSearch } from "react-icons/hi";
+import { HiOutlineTrash, HiOutlinePlus, HiOutlineSearch, HiOutlineCamera, HiOutlineX } from "react-icons/hi";
+
+declare global {
+  interface Window {
+    BarcodeDetector?: new (options?: { formats: string[] }) => {
+      detect: (source: HTMLVideoElement) => Promise<{ rawValue: string }[]>;
+    };
+  }
+}
 
 interface Proveedor {
   cod: string;
@@ -37,6 +45,7 @@ export default function NuevoIngresoPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
+
   // Search state
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
@@ -44,6 +53,12 @@ export default function NuevoIngresoPage() {
   const [showResults, setShowResults] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
   const searchTimeout = useRef<NodeJS.Timeout | null>(null);
+
+  // Scanner state
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [scanning, setScanning] = useState(false);
+  const [scanError, setScanError] = useState("");
+  const scanningRef = useRef(false);
 
   // New product form
   const [showNewProduct, setShowNewProduct] = useState(false);
@@ -66,6 +81,91 @@ export default function NuevoIngresoPage() {
     }
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  const stopScanner = useCallback(() => {
+    scanningRef.current = false;
+    setScanning(false);
+    if (videoRef.current?.srcObject) {
+      (videoRef.current.srcObject as MediaStream).getTracks().forEach((t) => t.stop());
+      videoRef.current.srcObject = null;
+    }
+  }, []);
+
+  function handleBarcodeDetected(code: string) {
+    stopScanner();
+    setSearchQuery(code);
+    setSearching(true);
+    fetch(`/api/admin/stock-entries/search-products?q=${encodeURIComponent(code)}`)
+      .then((r) => r.json())
+      .then((data) => {
+        const products = data.products || [];
+        setSearchResults(products);
+        setShowResults(true);
+        if (products.length === 1) {
+          addProduct(products[0]);
+        }
+      })
+      .catch(() => setSearchResults([]))
+      .finally(() => setSearching(false));
+  }
+
+  async function startScanner() {
+    setScanError("");
+    if (!window.BarcodeDetector) {
+      setScanError("Tu navegador no soporta el escaner de camara. Usa Chrome.");
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment" },
+      });
+      scanningRef.current = true;
+      setScanning(true);
+      // Wait for video element to be in DOM
+      requestAnimationFrame(() => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.play();
+        }
+        const detector = new window.BarcodeDetector!({
+          formats: ["ean_13", "ean_8", "upc_a"],
+        });
+        const scanLoop = async () => {
+          if (!videoRef.current || !scanningRef.current) return;
+          try {
+            const barcodes = await detector.detect(videoRef.current);
+            if (barcodes.length > 0) {
+              handleBarcodeDetected(barcodes[0].rawValue);
+              return;
+            }
+          } catch {
+            // detection can fail on some frames, continue
+          }
+          if (scanningRef.current) {
+            requestAnimationFrame(scanLoop);
+          }
+        };
+        scanLoop();
+      });
+    } catch {
+      setScanError("No se pudo acceder a la camara.");
+      setScanning(false);
+      scanningRef.current = false;
+    }
+  }
+
+  // Cleanup scanner on unmount
+  useEffect(() => {
+    return () => {
+      if (scanningRef.current) {
+        scanningRef.current = false;
+        if (videoRef.current?.srcObject) {
+          // eslint-disable-next-line react-hooks/exhaustive-deps
+          (videoRef.current.srcObject as MediaStream).getTracks().forEach((t) => t.stop());
+        }
+      }
+    };
   }, []);
 
   function handleSearch(q: string) {
@@ -214,22 +314,64 @@ export default function NuevoIngresoPage() {
         <label className="block text-sm font-medium text-gray-700 mb-1">
           Buscar producto
         </label>
-        <div className="relative">
-          <HiOutlineSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => handleSearch(e.target.value)}
-            onFocus={() => searchResults.length > 0 && setShowResults(true)}
-            placeholder="Buscar por nombre, código o código de barras..."
-            className="w-full pl-9 pr-4 py-2 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
-          />
-          {searching && (
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">
-              Buscando...
-            </span>
-          )}
+        <div className="relative flex gap-2">
+          <div className="relative flex-1">
+            <HiOutlineSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => handleSearch(e.target.value)}
+              onFocus={() => searchResults.length > 0 && setShowResults(true)}
+              placeholder="Buscar por nombre, codigo o codigo de barras..."
+              className="w-full pl-9 pr-4 py-2 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
+            />
+            {searching && (
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">
+                Buscando...
+              </span>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={startScanner}
+            disabled={scanning}
+            className="flex items-center gap-1.5 px-3 py-2 text-sm text-white bg-brand-400 rounded-lg hover:bg-brand-500 disabled:opacity-50 transition-colors shrink-0"
+            title="Escanear con camara"
+          >
+            <HiOutlineCamera className="w-4 h-4" />
+            <span className="hidden sm:inline">Escanear</span>
+          </button>
         </div>
+        {scanError && (
+          <p className="text-xs text-red-600 mt-1">{scanError}</p>
+        )}
+
+        {/* Camera scanner overlay */}
+        {scanning && (
+          <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center">
+            <div className="relative w-full max-w-md mx-4">
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
+                className="w-full rounded-lg"
+              />
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div className="w-3/4 h-16 border-2 border-white/60 rounded-lg" />
+              </div>
+              <button
+                onClick={stopScanner}
+                className="absolute top-3 right-3 p-2 bg-black/50 text-white rounded-full hover:bg-black/70 transition-colors"
+              >
+                <HiOutlineX className="w-5 h-5" />
+              </button>
+              <p className="text-white text-center text-sm mt-3">
+                Apunta la camara al codigo de barras
+              </p>
+            </div>
+          </div>
+        )}
 
         {showResults && searchResults.length > 0 && (
           <div className="absolute z-30 bg-white border rounded-lg shadow-lg mt-1 max-h-60 overflow-y-auto w-full max-w-4xl">

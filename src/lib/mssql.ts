@@ -46,6 +46,49 @@ export async function getPool(): Promise<sql.ConnectionPool> {
   }
 }
 
+// Secondary pool for compras module (test server)
+const testConfig: sql.config = {
+  server: process.env.MSSQL_TEST_HOST || process.env.MSSQL_HOST!,
+  port: parseInt(process.env.MSSQL_TEST_PORT || process.env.MSSQL_PORT || "1433"),
+  user: process.env.MSSQL_USER!,
+  password: process.env.MSSQL_PASSWORD!,
+  options: {
+    encrypt: false,
+    trustServerCertificate: true,
+  },
+  connectionTimeout: 15000,
+  requestTimeout: 15000,
+  pool: {
+    max: 3,
+    min: 0,
+    idleTimeoutMillis: 30000,
+  },
+};
+
+let testPool: sql.ConnectionPool | null = null;
+let testLastFailure = 0;
+
+export async function getTestPool(): Promise<sql.ConnectionPool> {
+  if (testPool && testPool.connected) {
+    return testPool;
+  }
+
+  const now = Date.now();
+  if (testLastFailure && now - testLastFailure < RETRY_COOLDOWN) {
+    throw new Error("SQL Server de prueba no disponible.");
+  }
+
+  try {
+    testPool = await new sql.ConnectionPool(testConfig).connect();
+    testLastFailure = 0;
+    return testPool;
+  } catch (err) {
+    testLastFailure = Date.now();
+    testPool = null;
+    throw err;
+  }
+}
+
 export function getDbName(key: string): string {
   const map: Record<string, string> = {
     productos: process.env.MSSQL_DB_PRODUCTOS!,

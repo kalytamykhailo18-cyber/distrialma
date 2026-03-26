@@ -2,18 +2,38 @@
 
 import { useEffect, useState } from "react";
 
+const PRICE_LISTS = [
+  { lista: 1, label: "Minorista" },
+  { lista: 2, label: "Mayorista" },
+  { lista: 3, label: "Especial" },
+  { lista: 4, label: "Caja Cerrada" },
+  { lista: 5, label: "Lista 5" },
+];
+
 export default function AdminConfigPage() {
   const [hideOutOfStock, setHideOutOfStock] = useState(false);
   const [stockThreshold, setStockThreshold] = useState("0");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
+  // Margins
+  const [margins, setMargins] = useState<Record<number, string>>({});
+  const [savingMargins, setSavingMargins] = useState(false);
+  const [marginSaved, setMarginSaved] = useState(false);
+
   useEffect(() => {
-    fetch("/api/admin/settings")
-      .then((r) => r.json())
-      .then((data) => {
-        setHideOutOfStock(data.hide_out_of_stock === "true");
-        setStockThreshold(data.stock_threshold || "0");
+    Promise.all([
+      fetch("/api/admin/settings").then((r) => r.json()),
+      fetch("/api/admin/price-margins").then((r) => r.json()),
+    ])
+      .then(([settings, marginData]) => {
+        setHideOutOfStock(settings.hide_out_of_stock === "true");
+        setStockThreshold(settings.stock_threshold || "0");
+        const m: Record<number, string> = {};
+        for (const mg of marginData.margins || []) {
+          m[mg.lista] = String(mg.margen);
+        }
+        setMargins(m);
       })
       .finally(() => setLoading(false));
   }, []);
@@ -109,6 +129,56 @@ export default function AdminConfigPage() {
               </div>
             </div>
           )}
+
+          {/* Price margins */}
+          <div className="bg-white rounded-lg border p-6">
+            <h2 className="font-semibold text-gray-900 mb-1">
+              Márgenes de ganancia por lista
+            </h2>
+            <p className="text-sm text-gray-500 mb-4">
+              Al costear un ingreso, los precios se calculan automáticamente: Costo × (1 + Margen%). Se redondea sin decimales.
+            </p>
+            <div className="space-y-2">
+              {PRICE_LISTS.map((pl) => (
+                <div key={pl.lista} className="flex items-center gap-3">
+                  <span className="text-sm text-gray-700 w-28">{pl.label}</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.1"
+                    value={margins[pl.lista] || ""}
+                    onChange={(e) => setMargins((prev) => ({ ...prev, [pl.lista]: e.target.value }))}
+                    placeholder="0"
+                    className="w-24 px-3 py-2 border border-brand-400 rounded-lg text-sm text-right focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
+                  />
+                  <span className="text-sm text-gray-400">%</span>
+                </div>
+              ))}
+            </div>
+            <button
+              onClick={async () => {
+                setSavingMargins(true);
+                setMarginSaved(false);
+                await fetch("/api/admin/price-margins", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    margins: PRICE_LISTS.map((pl) => ({
+                      lista: pl.lista,
+                      margen: parseFloat(margins[pl.lista] || "0") || 0,
+                    })),
+                  }),
+                });
+                setSavingMargins(false);
+                setMarginSaved(true);
+                setTimeout(() => setMarginSaved(false), 2000);
+              }}
+              disabled={savingMargins}
+              className="mt-4 px-4 py-2 bg-brand-400 text-white rounded-lg text-sm font-medium hover:bg-brand-500 disabled:opacity-50"
+            >
+              {savingMargins ? "..." : marginSaved ? "Guardado!" : "Guardar márgenes"}
+            </button>
+          </div>
         </div>
       )}
     </div>

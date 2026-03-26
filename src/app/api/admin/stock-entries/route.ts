@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getPool, getDbName } from "@/lib/mssql";
+import { getTestPool as getPool, getDbName } from "@/lib/mssql";
 import { requireStaff } from "@/lib/api-auth";
 import { prisma } from "@/lib/prisma";
 
@@ -10,12 +10,15 @@ export async function GET(req: NextRequest) {
   }
 
   const estado = req.nextUrl.searchParams.get("estado") || "pendiente";
+  const proveedor = req.nextUrl.searchParams.get("proveedor");
   const page = parseInt(req.nextUrl.searchParams.get("page") || "1");
   const limit = parseInt(req.nextUrl.searchParams.get("limit") || "50");
   const skip = (page - 1) * limit;
 
   try {
-    const where = estado === "all" ? {} : { estado };
+    const where: Record<string, unknown> = {};
+    if (estado !== "all") where.estado = estado;
+    if (proveedor) where.proveedorCod = proveedor;
 
     const [entries, total] = await Promise.all([
       prisma.stockEntry.findMany({
@@ -34,6 +37,10 @@ export async function GET(req: NextRequest) {
       proveedorName: e.proveedorName,
       usuario: e.usuario,
       estado: e.estado,
+      subtotal: Number(e.subtotal),
+      iva: Number(e.iva),
+      iibb: Number(e.iibb),
+      percepciones: Number(e.percepciones),
       total: Number(e.total),
       notas: e.notas,
       createdAt: e.createdAt.toISOString(),
@@ -75,7 +82,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { proveedorCod, proveedorName, notas, items } = body;
+    const { proveedorCod, proveedorName, notas, items, subtotal: subIn, iva: ivaIn, iibb: iibbIn, percepciones: percIn, total: totalIn } = body;
 
     if (!proveedorCod || !items?.length) {
       return NextResponse.json(
@@ -105,7 +112,11 @@ export async function POST(req: NextRequest) {
     // Header row gets its own Cod, then each item gets the next Cod
     const boletaCod = padLeft(nextCompraCod, 9);
     nextCompraCod++;
-    const totalAmount = 0;
+    const subtotal = parseFloat(subIn) || 0;
+    const iva = parseFloat(ivaIn) || 0;
+    const iibb = parseFloat(iibbIn) || 0;
+    const percepciones = parseFloat(percIn) || 0;
+    const totalAmount = parseFloat(totalIn) || (subtotal + iva + iibb + percepciones);
 
     // Write Compras header row first
     const provPaddedHeader = padLeft(proveedorCod, 7);
@@ -217,19 +228,8 @@ export async function POST(req: NextRequest) {
       nextCompraCod++;
     }
 
-    // Update Proveedores.Saldo if total > 0
-    if (totalAmount > 0) {
-      const provPadded = padLeft(proveedorCod, 7);
-      await pool
-        .request()
-        .input("cod", provPadded)
-        .input("total", totalAmount)
-        .query(`
-          UPDATE [${dbProd}].dbo.Proveedores
-          SET Saldo = ISNULL(Saldo, 0) + @total
-          WHERE Cod = @cod
-        `);
-    }
+    // Supplier saldo is updated during costeo (PUT handler in [id]/route.ts),
+    // not here, to avoid double-charging when taxes are entered later.
 
     // Save in PostgreSQL
     const entry = await prisma.stockEntry.create({
@@ -238,6 +238,10 @@ export async function POST(req: NextRequest) {
         proveedorName,
         usuario,
         estado: "pendiente",
+        subtotal,
+        iva,
+        iibb,
+        percepciones,
         total: totalAmount,
         notas: notas || null,
         items: {

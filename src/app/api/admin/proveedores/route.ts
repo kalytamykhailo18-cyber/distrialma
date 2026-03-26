@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getPool, getDbName } from "@/lib/mssql";
+import { getTestPool as getPool, getDbName } from "@/lib/mssql";
 import { requireStaff } from "@/lib/api-auth";
 
 export async function GET() {
@@ -75,6 +75,66 @@ export async function POST(req: NextRequest) {
     console.error("Error creating proveedor:", error);
     return NextResponse.json(
       { error: "Error al crear proveedor" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PUT(req: NextRequest) {
+  const session = await requireStaff();
+  if (!session) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  }
+
+  const user = session.user as { role?: string; permissions?: string[] };
+  const hasCosteo = user.role === "admin" || (user.permissions?.includes("costeo") ?? false);
+  if (!hasCosteo) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+  }
+
+  try {
+    const { cod, monto, concepto } = await req.json();
+    if (!cod || !monto || monto <= 0) {
+      return NextResponse.json(
+        { error: "Proveedor y monto requeridos" },
+        { status: 400 }
+      );
+    }
+
+    const pool = await getPool();
+    const dbProd = getDbName("productos");
+    const codPadded = String(cod).padStart(7, " ");
+
+    // Subtract payment from supplier balance
+    await pool
+      .request()
+      .input("cod", codPadded)
+      .input("monto", parseFloat(monto))
+      .query(`
+        UPDATE [${dbProd}].dbo.Proveedores
+        SET Saldo = ISNULL(Saldo, 0) - @monto
+        WHERE Cod = @cod
+      `);
+
+    // Get updated saldo
+    const result = await pool
+      .request()
+      .input("cod", codPadded)
+      .query(`
+        SELECT ISNULL(Saldo, 0) AS saldo
+        FROM [${dbProd}].dbo.Proveedores
+        WHERE Cod = @cod
+      `);
+
+    return NextResponse.json({
+      ok: true,
+      nuevoSaldo: result.recordset[0]?.saldo || 0,
+      concepto: concepto || "Pago",
+    });
+  } catch (error) {
+    console.error("Error registering payment:", error);
+    return NextResponse.json(
+      { error: "Error al registrar pago" },
       { status: 500 }
     );
   }

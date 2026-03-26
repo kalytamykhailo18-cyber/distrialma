@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getPool, getDbName } from "@/lib/mssql";
+import { getTestPool as getPool, getDbName } from "@/lib/mssql";
 import { requireStaff } from "@/lib/api-auth";
 
 export async function GET(req: NextRequest) {
@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
     const pool = await getPool();
     const dbProd = getDbName("productos");
 
-    const result = await pool.request().input("q", `%${q}%`).query(`
+    const result = await pool.request().input("q", `%${q}%`).input("exact", q).query(`
       SELECT TOP 20
         LTRIM(RTRIM(p.Cod)) AS sku,
         LTRIM(RTRIM(p.Nombre)) AS name,
@@ -29,7 +29,8 @@ export async function GET(req: NextRequest) {
       WHERE LTRIM(RTRIM(p.Nombre)) LIKE @q
          OR LTRIM(RTRIM(p.Cod)) LIKE @q
          OR LTRIM(RTRIM(ISNULL(p.Codbar,''))) LIKE @q
-      ORDER BY p.Nombre
+         OR LTRIM(RTRIM(p.Cod)) = @exact
+      ORDER BY CASE WHEN LTRIM(RTRIM(p.Cod)) = @exact THEN 0 WHEN LTRIM(RTRIM(ISNULL(p.Codbar,''))) = @exact THEN 1 ELSE 2 END, p.Nombre
     `);
 
     return NextResponse.json({ products: result.recordset });

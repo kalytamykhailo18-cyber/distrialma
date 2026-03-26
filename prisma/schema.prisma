@@ -160,6 +160,10 @@ model StockEntry {
   proveedorName String   @db.VarChar(60)
   usuario       String   @db.VarChar(50)
   estado        String   @default("pendiente") @db.VarChar(20)
+  subtotal      Decimal  @default(0) @db.Decimal(12, 2)
+  iva           Decimal  @default(0) @db.Decimal(12, 2)
+  iibb          Decimal  @default(0) @db.Decimal(12, 2)
+  percepciones  Decimal  @default(0) @db.Decimal(12, 2)
   total         Decimal  @default(0) @db.Decimal(12, 2)
   notas         String?  @db.Text
   createdAt     DateTime @default(now())
