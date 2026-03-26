@@ -111,11 +111,16 @@ export async function POST(req: NextRequest) {
     }
 
     const newCosto = parseFloat(costo);
-    const updated: { sku: string; nombre: string; newCosto: number }[] = [];
+    const updated: { sku: string; nombre: string; newCosto: number; precio: number; precio2: number; precio4: number }[] = [];
 
     for (const prod of similar.recordset) {
       const prodCod = prod.sku.padStart(7, " ");
       const oldCosto = prod.oldCosto;
+
+      // Calculate new prices before updating
+      const newPrecio = oldCosto > 0 && prod.precio > 0 ? Math.round(newCosto * prod.precio / oldCosto) : prod.precio;
+      const newPrecio2 = oldCosto > 0 && prod.precio2 > 0 ? Math.round(newCosto * prod.precio2 / oldCosto) : prod.precio2;
+      const newPrecio4 = oldCosto > 0 && prod.precio4 > 0 ? Math.round(newCosto * prod.precio4 / oldCosto) : prod.precio4;
 
       const updateReq = pool.request()
         .input("cod", prodCod)
@@ -137,7 +142,7 @@ export async function POST(req: NextRequest) {
         WHERE CodProducto = @cod AND LTRIM(RTRIM(Deposito)) = '0'
       `);
 
-      updated.push({ sku: prod.sku, nombre: prod.nombre, newCosto });
+      updated.push({ sku: prod.sku, nombre: prod.nombre, newCosto, precio: newPrecio, precio2: newPrecio2, precio4: newPrecio4 });
     }
 
     return NextResponse.json({

@@ -161,7 +161,7 @@ export async function POST(req: NextRequest) {
     headerReq.input("cuit", client.cuit.padEnd(14, " "));
     headerReq.input("iva", client.iva.padEnd(1, " "));
     headerReq.input("telefono", client.telefono.padEnd(14, " "));
-    headerReq.input("obs", notes);
+    headerReq.input("obs", (notes || "").substring(0, 80));
 
     headerReq.input("nroTransa", nextNroTransa);
     headerReq.input("nroMostra", nextNroMostra);

@@ -147,7 +147,7 @@ export default function EntryDetailPage() {
   const [taxIibb, setTaxIibb] = useState("");
   const [taxPercPct, setTaxPercPct] = useState("");
   const [taxPerc, setTaxPerc] = useState("");
-  const [applyResult, setApplyResult] = useState<{ message: string; products: { sku: string; nombre: string }[] } | null>(null);
+  const [applyResult, setApplyResult] = useState<{ message: string; products: { sku: string; nombre: string; newCosto?: number; precio?: number; precio2?: number; precio4?: number }[] } | null>(null);
   const [deletingItemId, setDeletingItemId] = useState<number | null>(null);
 
   // Costeo form state
@@ -859,13 +859,32 @@ export default function EntryDetailPage() {
 
       {applyResult && (
         <div className="bg-blue-50 border-2 border-blue-200 rounded-lg px-4 py-3 mb-5">
-          <p className="text-base text-blue-700 font-semibold">{applyResult.message}</p>
+          <p className="text-base text-blue-700 font-semibold mb-2">{applyResult.message}</p>
           {applyResult.products.length > 0 && (
-            <ul className="mt-2 text-sm text-blue-600 space-y-1 max-h-48 overflow-y-auto">
-              {applyResult.products.map((p) => (
-                <li key={p.sku}>• {p.nombre} (SKU {p.sku})</li>
-              ))}
-            </ul>
+            <div className="max-h-64 overflow-y-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-xs text-blue-500 border-b border-blue-200">
+                    <th className="text-left py-1">Producto</th>
+                    <th className="text-right py-1">Costo</th>
+                    <th className="text-right py-1">Minorista</th>
+                    <th className="text-right py-1">Mayorista</th>
+                    <th className="text-right py-1">Caja</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {applyResult.products.map((p) => (
+                    <tr key={p.sku} className="border-b border-blue-100 last:border-0">
+                      <td className="py-1 text-blue-700">{p.nombre} <span className="text-blue-400 text-xs">({p.sku})</span></td>
+                      <td className="py-1 text-right text-blue-600">{p.newCosto ? formatPrice(p.newCosto) : "—"}</td>
+                      <td className="py-1 text-right text-blue-600">{p.precio ? formatPrice(p.precio) : "—"}</td>
+                      <td className="py-1 text-right text-blue-600">{p.precio2 ? formatPrice(p.precio2) : "—"}</td>
+                      <td className="py-1 text-right text-blue-600">{p.precio4 ? formatPrice(p.precio4) : "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       )}
