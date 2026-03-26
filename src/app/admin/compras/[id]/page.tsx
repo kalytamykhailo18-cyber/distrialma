@@ -456,32 +456,6 @@ export default function EntryDetailPage() {
         </div>
       )}
 
-      {/* Invoice type toggle */}
-      {isPendiente && (
-        <div className="flex gap-3 mb-5">
-          <button
-            onClick={() => setInvoiceType("A")}
-            className={`px-6 py-3 rounded-lg text-base font-bold border-2 transition-colors ${
-              invoiceType === "A"
-                ? "bg-brand-400 text-white border-brand-400"
-                : "bg-white text-gray-600 border-gray-300 hover:border-brand-400"
-            }`}
-          >
-            Factura A
-          </button>
-          <button
-            onClick={() => setInvoiceType("X")}
-            className={`px-6 py-3 rounded-lg text-base font-bold border-2 transition-colors ${
-              invoiceType === "X"
-                ? "bg-brand-400 text-white border-brand-400"
-                : "bg-white text-gray-600 border-gray-300 hover:border-brand-400"
-            }`}
-          >
-            Factura X
-          </button>
-        </div>
-      )}
-
       {/* Add product to pending entry */}
       {isPendiente && (
         <div className="mb-5">
@@ -558,7 +532,7 @@ export default function EntryDetailPage() {
           return (
             <div key={item.id} className="bg-white rounded-lg border-2">
               {/* Header row */}
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-5 py-4 border-b-2 bg-gray-50">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-5 py-3 border-b-2 bg-green-50 rounded-t-lg">
                 <span className="text-lg font-bold text-gray-900">{item.productName}</span>
                 {item.isNewProduct && (
                   <span className="text-sm px-2.5 py-1 bg-blue-100 text-blue-700 rounded font-semibold">
@@ -902,7 +876,31 @@ export default function EntryDetailPage() {
         </div>
       )}
 
-      {/* Invoice taxes — Argentine logic: subtotal includes IVA, IIBB/Perc on neto */}
+      {/* Invoice type toggle + taxes */}
+      {isPendiente && (
+        <div className="flex gap-3 mb-4">
+          <button
+            onClick={() => setInvoiceType("A")}
+            className={`px-5 py-2 rounded-lg text-base font-bold border-2 transition-colors ${
+              invoiceType === "A"
+                ? "bg-brand-400 text-white border-brand-400"
+                : "bg-white text-gray-600 border-gray-300 hover:border-brand-400"
+            }`}
+          >
+            Factura A
+          </button>
+          <button
+            onClick={() => setInvoiceType("X")}
+            className={`px-5 py-2 rounded-lg text-base font-bold border-2 transition-colors ${
+              invoiceType === "X"
+                ? "bg-brand-400 text-white border-brand-400"
+                : "bg-white text-gray-600 border-gray-300 hover:border-brand-400"
+            }`}
+          >
+            Factura X
+          </button>
+        </div>
+      )}
       {isPendiente && invoiceType === "A" && (() => {
         const sub = parseFloat(taxSubtotal) || 0;
         const ivaPctVal = parseFloat(taxIvaPct) || 0;
