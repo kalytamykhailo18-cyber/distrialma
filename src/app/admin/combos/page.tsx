@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import type { Product } from "@/types";
 import { formatPrice } from "@/lib/utils";
+import ConfirmModal from "@/components/ConfirmModal";
 
 interface ComboItem {
   sku: string;
@@ -30,6 +31,10 @@ export default function CombosPage() {
   const [price, setPrice] = useState("");
   const [items, setItems] = useState<ComboItem[]>([]);
   const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState("");
+  const [togglingId, setTogglingId] = useState<number | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
 
   // Product search
   const [search, setSearch] = useState("");
@@ -114,8 +119,9 @@ export default function CombosPage() {
   }
 
   async function handleSave() {
+    setFormError("");
     if (!name.trim() || items.length < 2) {
-      alert("Completá nombre y al menos 2 productos");
+      setFormError("Completá nombre y al menos 2 productos");
       return;
     }
     setSaving(true);
@@ -138,36 +144,46 @@ export default function CombosPage() {
         await loadCombos();
       } else {
         const data = await res.json();
-        alert(data.error || "Error al guardar");
+        setFormError(data.error || "Error al guardar");
       }
     } catch {
-      alert("Error al guardar");
+      setFormError("Error al guardar");
     } finally {
       setSaving(false);
     }
   }
 
   async function handleDelete(id: number) {
-    if (!confirm("¿Eliminar este combo?")) return;
-    await fetch("/api/admin/combos", {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id }),
-    });
-    await loadCombos();
+    setDeletingId(id);
+    try {
+      await fetch("/api/admin/combos", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      await loadCombos();
+    } finally {
+      setDeletingId(null);
+      setConfirmDeleteId(null);
+    }
   }
 
   async function handleToggle(combo: Combo) {
-    await fetch("/api/admin/combos", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ...combo,
-        active: !combo.active,
-        items: combo.items.map((i) => ({ sku: i.sku, quantity: i.quantity })),
-      }),
-    });
-    await loadCombos();
+    setTogglingId(combo.id);
+    try {
+      await fetch("/api/admin/combos", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...combo,
+          active: !combo.active,
+          items: combo.items.map((i) => ({ sku: i.sku, quantity: i.quantity })),
+        }),
+      });
+      await loadCombos();
+    } finally {
+      setTogglingId(null);
+    }
   }
 
   return (
@@ -272,6 +288,10 @@ export default function CombosPage() {
           </div>
         )}
 
+        {formError && (
+          <p className="text-sm text-red-600 mb-2">{formError}</p>
+        )}
+
         <div className="flex gap-2">
           <button
             onClick={handleSave}
@@ -332,21 +352,31 @@ export default function CombosPage() {
                 </button>
                 <button
                   onClick={() => handleToggle(combo)}
-                  className="text-amber-600 hover:underline"
+                  disabled={togglingId === combo.id}
+                  className="text-amber-600 hover:underline disabled:opacity-50"
                 >
-                  {combo.active ? "Desactivar" : "Activar"}
+                  {togglingId === combo.id ? "..." : combo.active ? "Desactivar" : "Activar"}
                 </button>
                 <button
-                  onClick={() => handleDelete(combo.id)}
-                  className="text-red-600 hover:underline"
+                  onClick={() => setConfirmDeleteId(combo.id)}
+                  disabled={deletingId === combo.id}
+                  className="text-red-600 hover:underline disabled:opacity-50"
                 >
-                  Eliminar
+                  {deletingId === combo.id ? "..." : "Eliminar"}
                 </button>
               </div>
             </div>
           ))}
         </div>
       )}
+
+      <ConfirmModal
+        open={confirmDeleteId !== null}
+        message="¿Eliminar este combo?"
+        loading={deletingId !== null}
+        onConfirm={() => confirmDeleteId !== null && handleDelete(confirmDeleteId)}
+        onCancel={() => setConfirmDeleteId(null)}
+      />
     </div>
   );
 }

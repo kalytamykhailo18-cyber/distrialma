@@ -14,6 +14,8 @@ export default function MarcasPage() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("");
   const [uploading, setUploading] = useState<string | null>(null);
+  const [deletingLogo, setDeletingLogo] = useState<string | null>(null);
+  const [togglingBrand, setTogglingBrand] = useState<string | null>(null);
 
   function loadData() {
     Promise.all([
@@ -35,14 +37,19 @@ export default function MarcasPage() {
   }, []);
 
   async function toggleBrand(brandId: string) {
-    const isFeatured = featured.has(brandId);
-    const res = await fetch("/api/admin/featured-brands", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ brandId, featured: !isFeatured }),
-    });
-    const data = await res.json();
-    setFeatured(new Set(data.brandIds || []));
+    setTogglingBrand(brandId);
+    try {
+      const isFeatured = featured.has(brandId);
+      const res = await fetch("/api/admin/featured-brands", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ brandId, featured: !isFeatured }),
+      });
+      const data = await res.json();
+      setFeatured(new Set(data.brandIds || []));
+    } finally {
+      setTogglingBrand(null);
+    }
   }
 
   async function uploadLogo(brandId: string, file: File) {
@@ -64,7 +71,7 @@ export default function MarcasPage() {
   async function deleteLogo(brandId: string) {
     const logoUrl = logos[brandId];
     if (!logoUrl) return;
-    // Find the image ID by fetching
+    setDeletingLogo(brandId);
     try {
       const res = await fetch("/api/admin/featured-brands", {
         method: "DELETE",
@@ -75,6 +82,9 @@ export default function MarcasPage() {
         loadData();
       }
     } catch { /* */ }
+    finally {
+      setDeletingLogo(null);
+    }
   }
 
   const filtered = filter.trim()
@@ -110,7 +120,8 @@ export default function MarcasPage() {
                 type="checkbox"
                 checked={featured.has(brand.id)}
                 onChange={() => toggleBrand(brand.id)}
-                className="w-4 h-4 rounded border-gray-300 text-brand-400 focus:ring-brand-400 shrink-0"
+                disabled={togglingBrand === brand.id}
+                className="w-4 h-4 rounded border-gray-300 text-brand-400 focus:ring-brand-400 shrink-0 disabled:opacity-50"
               />
 
               {/* Logo thumbnail */}
@@ -123,7 +134,8 @@ export default function MarcasPage() {
                   />
                   <button
                     onClick={() => deleteLogo(brand.id)}
-                    className="absolute -top-1 -right-1 w-4 h-4 bg-red-600 text-white text-xs rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100"
+                    disabled={deletingLogo === brand.id}
+                    className="absolute -top-1 -right-1 w-4 h-4 bg-red-600 text-white text-xs rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 disabled:opacity-50"
                   >
                     ✕
                   </button>

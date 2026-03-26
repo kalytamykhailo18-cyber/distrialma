@@ -23,8 +23,8 @@ function CostoSinIva({ costoConIva, ivaPct, onSync, disabled }: {
   }, [costoConIva, ivaPct, focused]);
 
   return (
-    <div>
-      <label className="block text-xs text-gray-500 mb-1">Costo sin IVA</label>
+    <div className="min-w-[150px] flex-1">
+      <label className="block text-sm font-semibold text-gray-700 mb-1">Costo sin IVA</label>
       <input
         type="number"
         min="0"
@@ -44,7 +44,7 @@ function CostoSinIva({ costoConIva, ivaPct, onSync, disabled }: {
         onBlur={() => setFocused(false)}
         disabled={disabled}
         placeholder="0.00"
-        className="w-full text-right px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 disabled:opacity-50 disabled:bg-gray-100"
+        className="w-full text-right px-3 py-1.5 border-2 border-gray-300 rounded-lg text-lg focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 disabled:opacity-50 disabled:bg-gray-100"
       />
     </div>
   );
@@ -146,6 +146,7 @@ export default function EntryDetailPage() {
   const [taxPercPct, setTaxPercPct] = useState("");
   const [taxPerc, setTaxPerc] = useState("");
   const [applyResult, setApplyResult] = useState<{ message: string; products: { sku: string; nombre: string }[] } | null>(null);
+  const [deletingItemId, setDeletingItemId] = useState<number | null>(null);
 
   // Costeo form state
   const [costeoRows, setCosteoRows] = useState<CosteoRow[]>([]);
@@ -190,6 +191,9 @@ export default function EntryDetailPage() {
         // Initialize tax fields — if saved, use saved values; otherwise calc from items
         if (data.entry.subtotal > 0) {
           setTaxSubtotal(String(data.entry.subtotal));
+          if (data.entry.iva > 0) setTaxIva(String(data.entry.iva));
+          if (data.entry.iibb > 0) setTaxIibb(String(data.entry.iibb));
+          if (data.entry.percepciones > 0) setTaxPerc(String(data.entry.percepciones));
         } else {
           // Auto-calculate subtotal from item costs
           let sub = 0;
@@ -197,11 +201,14 @@ export default function EntryDetailPage() {
             const c = item.costo || 0;
             if (c > 0) sub += c * item.cantidad;
           }
-          if (sub > 0) setTaxSubtotal(sub.toFixed(2));
+          if (sub > 0) {
+            setTaxSubtotal(sub.toFixed(2));
+            // Auto-calculate IVA (Argentine: subtotal includes IVA)
+            const ivaPct = 21;
+            const neto = sub / (1 + ivaPct / 100);
+            setTaxIva((sub - neto).toFixed(2));
+          }
         }
-        if (data.entry.iva > 0) setTaxIva(String(data.entry.iva));
-        if (data.entry.iibb > 0) setTaxIibb(String(data.entry.iibb));
-        if (data.entry.percepciones > 0) setTaxPerc(String(data.entry.percepciones));
         // Initialize costeo rows
         setCosteoRows(
           data.entry.items.map((item: EntryItem) => ({
@@ -288,13 +295,15 @@ export default function EntryDetailPage() {
     }
     if (sub > 0) {
       setTaxSubtotal(sub.toFixed(2));
-      // Recalc taxes from percentages
+      // Recalc taxes — Argentine logic: subtotal includes IVA, IIBB/Perc on neto
       const iPct = parseFloat(taxIvaPct) || 0;
+      const neto = iPct > 0 ? sub / (1 + iPct / 100) : sub;
+      const ivaAmount = sub - neto;
+      if (iPct > 0) setTaxIva(ivaAmount.toFixed(2));
       const bPct = parseFloat(taxIibbPct) || 0;
+      if (bPct > 0) setTaxIibb((neto * bPct / 100).toFixed(2));
       const pPct = parseFloat(taxPercPct) || 0;
-      if (iPct > 0) setTaxIva((sub * iPct / 100).toFixed(2));
-      if (bPct > 0) setTaxIibb((sub * bPct / 100).toFixed(2));
-      if (pPct > 0) setTaxPerc((sub * pPct / 100).toFixed(2));
+      if (pPct > 0) setTaxPerc((neto * pPct / 100).toFixed(2));
     }
   }
 
@@ -389,9 +398,9 @@ export default function EntryDetailPage() {
       {/* Back */}
       <button
         onClick={() => router.push("/admin/compras")}
-        className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-brand-600 mb-4 transition-colors"
+        className="flex items-center gap-2 text-base text-gray-600 hover:text-brand-600 mb-5 transition-colors font-medium"
       >
-        <HiOutlineArrowLeft className="w-4 h-4" />
+        <HiOutlineArrowLeft className="w-5 h-5" />
         Volver a compras
       </button>
 
@@ -401,18 +410,18 @@ export default function EntryDetailPage() {
           <h1 className="text-2xl font-bold text-gray-900">
             Ingreso #{entry.id}
           </h1>
-          <div className="text-sm text-gray-500 mt-1 space-y-0.5">
-            <p>Proveedor: {entry.proveedorName}</p>
-            <p>Fecha: {formatDate(entry.createdAt)}</p>
-            <p>Usuario: {entry.usuario}</p>
-            {entry.notas && <p>Notas: {entry.notas}</p>}
+          <div className="text-base text-gray-600 mt-2 space-y-1">
+            <p><span className="font-semibold">Proveedor:</span> {entry.proveedorName}</p>
+            <p><span className="font-semibold">Fecha:</span> {formatDate(entry.createdAt)}</p>
+            <p><span className="font-semibold">Usuario:</span> {entry.usuario}</p>
+            {entry.notas && <p><span className="font-semibold">Notas:</span> {entry.notas}</p>}
           </div>
         </div>
         <span
-          className={`text-sm px-3 py-1 rounded-full font-medium ${
+          className={`text-base px-4 py-1.5 rounded-full font-bold ${
             entry.estado === "costeado"
-              ? "bg-green-100 text-green-700"
-              : "bg-amber-100 text-amber-700"
+              ? "bg-green-100 text-green-700 border-2 border-green-300"
+              : "bg-amber-100 text-amber-700 border-2 border-amber-300"
           }`}
         >
           {entry.estado === "costeado" ? "Costeado" : "Pendiente"}
@@ -421,27 +430,27 @@ export default function EntryDetailPage() {
 
       {/* Total */}
       {entry.total > 0 && (
-        <div className="mb-4 bg-gray-50 rounded-lg border p-3">
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-sm">
+        <div className="mb-5 bg-blue-50 rounded-lg border-2 border-blue-200 p-5">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-base">
             <div>
-              <span className="text-gray-500 text-xs block">Subtotal</span>
-              <span className="font-medium">{formatPrice(entry.subtotal)}</span>
+              <span className="text-gray-600 text-sm font-semibold block">Subtotal</span>
+              <span className="font-medium text-gray-900">{formatPrice(entry.subtotal)}</span>
             </div>
             <div>
-              <span className="text-gray-500 text-xs block">IVA</span>
-              <span className="font-medium">{entry.iva > 0 ? formatPrice(entry.iva) : "—"}</span>
+              <span className="text-gray-600 text-sm font-semibold block">IVA</span>
+              <span className="font-medium text-gray-900">{entry.iva > 0 ? formatPrice(entry.iva) : "—"}</span>
             </div>
             <div>
-              <span className="text-gray-500 text-xs block">IIBB</span>
-              <span className="font-medium">{entry.iibb > 0 ? formatPrice(entry.iibb) : "—"}</span>
+              <span className="text-gray-600 text-sm font-semibold block">IIBB</span>
+              <span className="font-medium text-gray-900">{entry.iibb > 0 ? formatPrice(entry.iibb) : "—"}</span>
             </div>
             <div>
-              <span className="text-gray-500 text-xs block">Percepciones</span>
-              <span className="font-medium">{entry.percepciones > 0 ? formatPrice(entry.percepciones) : "—"}</span>
+              <span className="text-gray-600 text-sm font-semibold block">Percepciones</span>
+              <span className="font-medium text-gray-900">{entry.percepciones > 0 ? formatPrice(entry.percepciones) : "—"}</span>
             </div>
             <div>
-              <span className="text-gray-500 text-xs block">Total</span>
-              <span className="font-bold text-gray-900">{formatPrice(entry.total)}</span>
+              <span className="text-gray-600 text-sm font-semibold block">Total</span>
+              <span className="font-bold text-lg text-gray-900">{formatPrice(entry.total)}</span>
             </div>
           </div>
         </div>
@@ -449,23 +458,23 @@ export default function EntryDetailPage() {
 
       {/* Invoice type toggle */}
       {isPendiente && (
-        <div className="flex gap-2 mb-4">
+        <div className="flex gap-3 mb-5">
           <button
             onClick={() => setInvoiceType("A")}
-            className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
+            className={`px-6 py-3 rounded-lg text-base font-bold border-2 transition-colors ${
               invoiceType === "A"
                 ? "bg-brand-400 text-white border-brand-400"
-                : "bg-white text-gray-600 border-gray-200 hover:border-brand-400"
+                : "bg-white text-gray-600 border-gray-300 hover:border-brand-400"
             }`}
           >
             Factura A
           </button>
           <button
             onClick={() => setInvoiceType("X")}
-            className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
+            className={`px-6 py-3 rounded-lg text-base font-bold border-2 transition-colors ${
               invoiceType === "X"
                 ? "bg-brand-400 text-white border-brand-400"
-                : "bg-white text-gray-600 border-gray-200 hover:border-brand-400"
+                : "bg-white text-gray-600 border-gray-300 hover:border-brand-400"
             }`}
           >
             Factura X
@@ -475,9 +484,9 @@ export default function EntryDetailPage() {
 
       {/* Add product to pending entry */}
       {isPendiente && (
-        <div className="mb-4">
+        <div className="mb-5">
           <div className="relative">
-            <HiOutlineSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <HiOutlineSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
             <input
               type="text"
               value={addQuery}
@@ -496,12 +505,12 @@ export default function EntryDetailPage() {
               }}
               placeholder="Agregar producto al ingreso..."
               disabled={addingProduct}
-              className="w-full pl-9 pr-4 py-2 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 disabled:opacity-50"
+              className="w-full pl-10 pr-4 py-1.5 border-2 border-brand-400 rounded-lg text-base focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 disabled:opacity-50"
             />
-            {addSearching && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">...</span>}
+            {addSearching && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">...</span>}
           </div>
           {addResults.length > 0 && (
-            <div className="bg-white border rounded-lg shadow-lg mt-1 max-h-48 overflow-y-auto">
+            <div className="bg-white border-2 rounded-lg shadow-lg mt-1 max-h-60 overflow-y-auto">
               {addResults.map((p) => (
                 <button
                   key={p.sku}
@@ -522,11 +531,11 @@ export default function EntryDetailPage() {
                     } catch { /* ignore */ }
                     setAddingProduct(false);
                   }}
-                  className="w-full text-left px-4 py-2 hover:bg-gray-50 text-sm border-b last:border-0 disabled:opacity-30"
+                  className="w-full text-left px-4 py-3 hover:bg-gray-50 text-base border-b last:border-0 disabled:opacity-30"
                 >
-                  <span className="text-gray-900">{p.name}</span>
-                  <span className="text-gray-400 text-xs ml-2">SKU {p.sku}</span>
-                  {entry.items.some((i) => i.sku === p.sku) && <span className="text-xs text-green-600 ml-2">ya agregado</span>}
+                  <span className="text-gray-900 font-medium">{p.name}</span>
+                  <span className="text-gray-500 text-sm ml-2">SKU {p.sku}</span>
+                  {entry.items.some((i) => i.sku === p.sku) && <span className="text-sm text-green-600 ml-2 font-medium">ya agregado</span>}
                 </button>
               ))}
             </div>
@@ -535,7 +544,7 @@ export default function EntryDetailPage() {
       )}
 
       {/* Items cards */}
-      <div className="space-y-4 mb-6">
+      <div className="space-y-6 mb-8">
         {entry.items.map((item) => {
           const costeoRow = costeoRows.find((r) => r.id === item.id);
           const priceFields = [
@@ -547,19 +556,19 @@ export default function EntryDetailPage() {
           ];
 
           return (
-            <div key={item.id} className="bg-white rounded-lg border">
+            <div key={item.id} className="bg-white rounded-lg border-2">
               {/* Header row */}
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3">
-                <span className="text-sm font-medium text-gray-900">{item.productName}</span>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-5 py-4 border-b-2 bg-gray-50">
+                <span className="text-lg font-bold text-gray-900">{item.productName}</span>
                 {item.isNewProduct && (
-                  <span className="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded">
+                  <span className="text-sm px-2.5 py-1 bg-blue-100 text-blue-700 rounded font-semibold">
                     Nuevo
                   </span>
                 )}
-                <span className="text-xs text-gray-400">SKU {item.sku}</span>
+                <span className="text-base text-gray-500">SKU {item.sku}</span>
                 {isPendiente && !item.costeado ? (
-                  <div className="flex items-center gap-1">
-                    <span className="text-xs text-gray-500">Cant:</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-sm font-semibold text-gray-600">Cant:</span>
                     <input
                       type="number"
                       min="0.001"
@@ -585,21 +594,22 @@ export default function EntryDetailPage() {
                           });
                         } catch { /* ignore */ }
                       }}
-                      className="w-16 text-right px-1 py-0.5 border border-gray-300 rounded text-xs focus:outline-none focus:border-brand-600"
+                      className="w-20 text-right px-2 py-1.5 border-2 border-gray-300 rounded text-base focus:outline-none focus:border-brand-600"
                     />
                   </div>
                 ) : (
-                  <span className="text-xs text-gray-500">Cant: {item.cantidad}</span>
+                  <span className="text-base text-gray-600 font-medium">Cant: {item.cantidad}</span>
                 )}
                 {item.costeado ? (
-                  <span className="text-xs text-green-600 font-medium bg-green-50 px-1.5 py-0.5 rounded">OK</span>
+                  <span className="text-sm text-green-700 font-bold bg-green-100 px-3 py-1 rounded border border-green-300">OK</span>
                 ) : (
-                  <span className="text-xs text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">Pend.</span>
+                  <span className="text-sm text-amber-700 font-bold bg-amber-100 px-3 py-1 rounded border border-amber-300">Pend.</span>
                 )}
                 {isPendiente && !item.costeado && (
                   <button
                     onClick={async () => {
                       if (!entry) return;
+                      setDeletingItemId(item.id);
                       try {
                         const res = await fetch(`/api/admin/stock-entries/${params.id}`, {
                           method: "DELETE",
@@ -608,34 +618,36 @@ export default function EntryDetailPage() {
                         });
                         if (res.ok) loadEntry();
                       } catch { /* ignore */ }
+                      finally { setDeletingItemId(null); }
                     }}
-                    className="ml-auto text-xs text-red-500 hover:text-red-700"
+                    disabled={deletingItemId === item.id}
+                    className="ml-auto px-4 py-2 text-sm font-bold text-white bg-red-500 hover:bg-red-600 rounded-lg disabled:opacity-50 transition-colors"
                   >
-                    Quitar
+                    {deletingItemId === item.id ? "..." : "Quitar"}
                   </button>
                 )}
               </div>
 
               {/* Costo — sin IVA / con IVA */}
               {(() => {
-                const costoConIvaVal = parseFloat(costeoRow?.costo || "0");
+                const costoConIvaVal = parseFloat(costeoRow?.costo || "") || (item.costo || 0);
                 const ivaPctVal = parseFloat(taxIvaPct) || 21;
                 const costoSinIvaVal = costoConIvaVal > 0 ? costoConIvaVal / (1 + ivaPctVal / 100) : 0;
                 const subSinIva = costoSinIvaVal * item.cantidad;
                 const subConIva = costoConIvaVal * item.cantidad;
                 return (
-                  <div className="px-4 pb-3">
+                  <div className="px-5 pb-4 pt-3">
                     {isPendiente && !item.costeado ? (
                       <>
-                        <div className="grid grid-cols-2 gap-2">
+                        <div className="flex flex-wrap gap-3">
                           <CostoSinIva
                             costoConIva={costeoRow?.costo || ""}
                             ivaPct={ivaPctVal}
                             onSync={(conIva) => updateCosteo(item.id, conIva)}
                             disabled={saving}
                           />
-                          <div>
-                            <label className="block text-xs text-gray-500 mb-1">Costo con IVA</label>
+                          <div className="min-w-[150px] flex-1">
+                            <label className="block text-sm font-semibold text-gray-700 mb-1">Costo con IVA</label>
                             <input
                               type="number"
                               min="0"
@@ -644,25 +656,25 @@ export default function EntryDetailPage() {
                               onChange={(e) => updateCosteo(item.id, e.target.value)}
                               disabled={saving}
                               placeholder={item.costo != null && item.costo > 0 ? String(item.costo) : "0.00"}
-                              className="w-full text-right px-3 py-2 border border-brand-400 rounded-lg text-sm font-medium focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 disabled:opacity-50 disabled:bg-gray-100"
+                              className="w-full text-right px-3 py-1.5 border-2 border-brand-400 rounded-lg text-lg font-medium focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 disabled:opacity-50 disabled:bg-gray-100"
                             />
                           </div>
                         </div>
                         {costoConIvaVal > 0 && item.cantidad > 1 && (
-                          <div className="grid grid-cols-2 gap-2 mt-1">
-                            <div className="text-xs text-gray-400 text-right">
-                              Subtotal: {formatPrice(subSinIva)}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
+                            <div className="text-sm text-gray-600 text-right bg-gray-50 rounded px-2 py-1.5">
+                              Subtotal s/IVA: <span className="font-semibold">{formatPrice(subSinIva)}</span>
                             </div>
-                            <div className="text-xs text-gray-600 text-right font-medium">
-                              Subtotal: {formatPrice(subConIva)}
+                            <div className="text-sm text-gray-800 text-right bg-amber-50 rounded px-2 py-1.5 font-semibold">
+                              Subtotal c/IVA: {formatPrice(subConIva)}
                             </div>
                           </div>
                         )}
                       </>
                     ) : (
                       <div>
-                        <label className="block text-xs text-gray-500 mb-1">Costo</label>
-                        <span className="block text-right text-gray-700 text-sm">
+                        <label className="block text-sm font-semibold text-gray-700 mb-1">Costo</label>
+                        <span className="block text-right text-gray-900 text-base font-medium">
                           {item.costo != null ? formatPrice(item.costo) : "—"}
                         </span>
                       </div>
@@ -673,24 +685,23 @@ export default function EntryDetailPage() {
 
               {/* Prices grid */}
               {isPendiente && (
-                <div className="px-4 pb-3">
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <div className="px-5 pb-4">
+                  <div className="flex flex-wrap gap-3">
                     {priceFields.map(({ field, label }) => {
                       const costoVal = parseFloat(costeoRow?.costo || "0");
                       const priceVal = parseFloat(costeoRow?.[field] || "0");
                       const currentMargin = costoVal > 0 && priceVal > 0 ? ((priceVal / costoVal - 1) * 100).toFixed(2) : "";
 
                       return (
-                        <div key={field}>
-                          <label className="block text-xs text-gray-500 mb-1">{label}</label>
+                        <div key={field} className="bg-gray-50 rounded-lg p-3 border min-w-[150px] flex-1">
+                          <label className="block text-sm font-medium text-gray-700 mb-1.5">{label}</label>
                           {!item.costeado ? (
-                            <div className="space-y-1">
-                              <div className="flex items-center gap-1">
+                            <div className="space-y-2">
+                              <div className="relative">
                                 <input
                                   type="number"
                                   min="0"
                                   step="0.01"
-                                  placeholder="%"
                                   value={currentMargin}
                                   onChange={(e) => {
                                     const pct = parseFloat(e.target.value);
@@ -703,9 +714,9 @@ export default function EntryDetailPage() {
                                     }
                                   }}
                                   disabled={saving}
-                                  className="w-20 text-right px-1 py-0.5 border border-gray-200 rounded text-xs text-gray-500 focus:outline-none focus:border-brand-600 disabled:opacity-50 disabled:bg-gray-100"
+                                  className="w-full text-right pr-7 pl-3 py-1.5 border-2 border-gray-300 rounded-lg text-base focus:outline-none focus:border-brand-600 disabled:opacity-50 disabled:bg-gray-100"
                                 />
-                                <span className="text-xs text-gray-400">%</span>
+                                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-sm text-gray-400 pointer-events-none">%</span>
                               </div>
                               <input
                                 type="number"
@@ -719,11 +730,11 @@ export default function EntryDetailPage() {
                                 }}
                                 disabled={saving}
                                 placeholder={item[field] > 0 ? String(item[field]) : "0.00"}
-                                className="w-full text-right px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 disabled:opacity-50 disabled:bg-gray-100"
+                                className="w-full text-right px-3 py-1.5 border-2 border-gray-300 rounded-lg text-base focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 disabled:opacity-50 disabled:bg-gray-100"
                               />
                             </div>
                           ) : (
-                            <span className="block text-right text-gray-700 text-xs">{formatPrice(item[field])}</span>
+                            <span className="block text-right text-gray-900 text-base font-medium">{formatPrice(item[field])}</span>
                           )}
                         </div>
                       );
@@ -734,7 +745,7 @@ export default function EntryDetailPage() {
 
               {/* Aplicar a similares */}
               {isPendiente && !item.isNewProduct && costeoRow?.costo && parseFloat(costeoRow.costo) > 0 && (
-                <div className="border-t px-4 py-2">
+                <div className="border-t-2 px-5 py-3">
                   <button
                     onClick={async () => {
                       setApplyingId(item.id);
@@ -761,9 +772,9 @@ export default function EntryDetailPage() {
                       }
                     }}
                     disabled={saving || applyingId === item.id}
-                    className="text-xs text-blue-600 hover:underline disabled:opacity-50 whitespace-nowrap"
+                    className="w-full py-2.5 text-sm font-semibold text-blue-700 bg-blue-50 border-2 border-blue-200 rounded-lg hover:bg-blue-100 disabled:opacity-50 transition-colors"
                   >
-                    {applyingId === item.id ? "..." : "Aplicar a similares"}
+                    {applyingId === item.id ? "Aplicando..." : "Aplicar a similares"}
                   </button>
                 </div>
               )}
@@ -774,24 +785,24 @@ export default function EntryDetailPage() {
 
       {/* New product extra fields */}
       {isPendiente && newProductRows.length > 0 && (
-        <div className="mb-6">
-          <h2 className="text-sm font-medium text-gray-700 mb-3">
+        <div className="mb-8">
+          <h2 className="text-lg font-bold text-gray-800 mb-4">
             Datos de productos nuevos
           </h2>
-          <div className="space-y-3">
+          <div className="space-y-4">
             {newProductRows.map((np) => {
               const item = entry.items.find((i) => i.sku === np.sku);
               return (
                 <div
                   key={np.sku}
-                  className="bg-gray-50 rounded-lg border p-4"
+                  className="bg-blue-50 rounded-lg border-2 border-blue-200 p-5"
                 >
-                  <p className="text-sm font-medium text-gray-800 mb-2">
-                    {item?.productName} (SKU: {np.sku})
+                  <p className="text-base font-bold text-gray-900 mb-3">
+                    {item?.productName} <span className="text-gray-500 font-medium">(SKU: {np.sku})</span>
                   </p>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     <div>
-                      <label className="block text-xs text-gray-500 mb-1">
+                      <label className="block text-sm font-semibold text-gray-700 mb-1">
                         Rubro
                       </label>
                       <select
@@ -800,7 +811,7 @@ export default function EntryDetailPage() {
                           updateNewProduct(np.sku, "rubro", e.target.value)
                         }
                         disabled={saving}
-                        className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 disabled:opacity-50 disabled:bg-gray-100"
+                        className="w-full px-3 py-1.5 border-2 border-gray-300 rounded-lg text-base focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 disabled:opacity-50 disabled:bg-gray-100"
                       >
                         <option value="">—</option>
                         {rubros.map((r) => (
@@ -811,7 +822,7 @@ export default function EntryDetailPage() {
                       </select>
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-500 mb-1">
+                      <label className="block text-sm font-semibold text-gray-700 mb-1">
                         Marca
                       </label>
                       <select
@@ -820,7 +831,7 @@ export default function EntryDetailPage() {
                           updateNewProduct(np.sku, "marca", e.target.value)
                         }
                         disabled={saving}
-                        className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 disabled:opacity-50 disabled:bg-gray-100"
+                        className="w-full px-3 py-1.5 border-2 border-gray-300 rounded-lg text-base focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 disabled:opacity-50 disabled:bg-gray-100"
                       >
                         <option value="">—</option>
                         {marcas.map((m) => (
@@ -831,7 +842,7 @@ export default function EntryDetailPage() {
                       </select>
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-500 mb-1">
+                      <label className="block text-sm font-semibold text-gray-700 mb-1">
                         Unidad
                       </label>
                       <input
@@ -842,11 +853,11 @@ export default function EntryDetailPage() {
                         }
                         disabled={saving}
                         placeholder="Ej: UN, KG"
-                        className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 disabled:opacity-50 disabled:bg-gray-100"
+                        className="w-full px-3 py-1.5 border-2 border-gray-300 rounded-lg text-base focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 disabled:opacity-50 disabled:bg-gray-100"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-500 mb-1">
+                      <label className="block text-sm font-semibold text-gray-700 mb-1">
                         Cant. por caja
                       </label>
                       <input
@@ -863,7 +874,7 @@ export default function EntryDetailPage() {
                         }
                         disabled={saving}
                         placeholder="0"
-                        className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 disabled:opacity-50 disabled:bg-gray-100"
+                        className="w-full px-3 py-1.5 border-2 border-gray-300 rounded-lg text-base focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 disabled:opacity-50 disabled:bg-gray-100"
                       />
                     </div>
                   </div>
@@ -875,14 +886,14 @@ export default function EntryDetailPage() {
       )}
 
       {/* Error / Success */}
-      {error && <p className="text-sm text-red-600 mb-4">{error}</p>}
-      {success && <p className="text-sm text-green-600 mb-4">{success}</p>}
+      {error && <p className="text-base font-semibold text-red-600 mb-5 bg-red-50 border-2 border-red-200 rounded-lg px-4 py-3">{error}</p>}
+      {success && <p className="text-base font-semibold text-green-700 mb-5 bg-green-50 border-2 border-green-200 rounded-lg px-4 py-3">{success}</p>}
 
       {applyResult && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 mb-4">
-          <p className="text-sm text-blue-600 font-medium">{applyResult.message}</p>
+        <div className="bg-blue-50 border-2 border-blue-200 rounded-lg px-4 py-3 mb-5">
+          <p className="text-base text-blue-700 font-semibold">{applyResult.message}</p>
           {applyResult.products.length > 0 && (
-            <ul className="mt-1 text-xs text-blue-500 space-y-0.5 max-h-40 overflow-y-auto">
+            <ul className="mt-2 text-sm text-blue-600 space-y-1 max-h-48 overflow-y-auto">
               {applyResult.products.map((p) => (
                 <li key={p.sku}>• {p.nombre} (SKU {p.sku})</li>
               ))}
@@ -915,12 +926,12 @@ export default function EntryDetailPage() {
         }
 
         return (
-          <div className="bg-white rounded-lg border p-4 mb-6">
-            <h3 className="text-sm font-medium text-gray-700 mb-3">Datos de la factura</h3>
-            <div className="space-y-3">
+          <div className="bg-white rounded-lg border-2 p-5 mb-6">
+            <h3 className="text-lg font-bold text-gray-800 mb-4">Datos de la factura</h3>
+            <div className="space-y-4">
               {/* Subtotal (con IVA) */}
               <div>
-                <label className="block text-xs text-gray-500 mb-1">Subtotal (con IVA)</label>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Subtotal (con IVA)</label>
                 <input type="number" min="0" step="0.01" value={taxSubtotal}
                   onChange={(e) => {
                     setTaxSubtotal(e.target.value);
@@ -928,85 +939,85 @@ export default function EntryDetailPage() {
                   }}
                   disabled={saving}
                   placeholder="0.00"
-                  className="w-full text-right px-3 py-2 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 disabled:opacity-50 disabled:bg-gray-100"
+                  className="w-full text-right px-3 py-1.5 border-2 border-brand-400 rounded-lg text-base focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 disabled:opacity-50 disabled:bg-gray-100"
                 />
               </div>
 
               {/* Neto (sin IVA) — calculated, read-only */}
               {sub > 0 && (
-                <div className="flex justify-between items-center text-sm text-gray-500 px-1">
-                  <span>Neto (sin IVA)</span>
-                  <span className="font-medium">$ {neto.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                <div className="flex justify-between items-center text-base text-gray-600 px-1 bg-gray-50 rounded py-2">
+                  <span className="font-semibold">Neto (sin IVA)</span>
+                  <span className="font-bold">$ {neto.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                 </div>
               )}
 
               {/* IVA / IIBB / Perc */}
-              <div className="grid grid-cols-3 gap-3">
+              <div className="flex flex-wrap gap-3">
                 {/* IVA */}
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">IVA</label>
-                  <div className="flex items-center gap-1 mb-1">
+                <div className="bg-gray-50 rounded-lg p-3 border min-w-[150px] flex-1">
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">IVA</label>
+                  <div className="relative mb-2">
                     <input type="number" min="0" step="0.01" value={taxIvaPct}
                       onChange={(e) => {
                         setTaxIvaPct(e.target.value);
                         recalcAll(taxSubtotal, e.target.value, taxIibbPct, taxPercPct);
                       }}
-                      disabled={saving} placeholder="%"
-                      className="w-full text-right px-2 py-1.5 border border-gray-300 rounded-lg text-xs focus:outline-none focus:border-brand-600 disabled:opacity-50 disabled:bg-gray-100"
+                      disabled={saving}
+                      className="w-full text-right pr-7 pl-2 py-2 border-2 border-gray-300 rounded-lg text-base focus:outline-none focus:border-brand-600 disabled:opacity-50 disabled:bg-gray-100"
                     />
-                    <span className="text-xs text-gray-400 shrink-0">%</span>
+                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-sm text-gray-400 pointer-events-none">%</span>
                   </div>
                   <input type="number" min="0" step="0.01" value={taxIva}
                     onChange={(e) => setTaxIva(e.target.value)}
                     disabled={saving} placeholder="0.00"
-                    className="w-full text-right px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-brand-600 disabled:opacity-50 disabled:bg-gray-100"
+                    className="w-full text-right px-2 py-1.5 border-2 border-gray-300 rounded-lg text-base focus:outline-none focus:border-brand-600 disabled:opacity-50 disabled:bg-gray-100"
                   />
                 </div>
                 {/* IIBB — on neto */}
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">IIBB</label>
-                  <div className="flex items-center gap-1 mb-1">
+                <div className="bg-gray-50 rounded-lg p-3 border min-w-[150px] flex-1">
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">IIBB</label>
+                  <div className="relative mb-2">
                     <input type="number" min="0" step="0.01" value={taxIibbPct}
                       onChange={(e) => {
                         setTaxIibbPct(e.target.value);
                         recalcAll(taxSubtotal, taxIvaPct, e.target.value, taxPercPct);
                       }}
-                      disabled={saving} placeholder="%"
-                      className="w-full text-right px-2 py-1.5 border border-gray-300 rounded-lg text-xs focus:outline-none focus:border-brand-600 disabled:opacity-50 disabled:bg-gray-100"
+                      disabled={saving}
+                      className="w-full text-right pr-7 pl-2 py-2 border-2 border-gray-300 rounded-lg text-base focus:outline-none focus:border-brand-600 disabled:opacity-50 disabled:bg-gray-100"
                     />
-                    <span className="text-xs text-gray-400 shrink-0">%</span>
+                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-sm text-gray-400 pointer-events-none">%</span>
                   </div>
                   <input type="number" min="0" step="0.01" value={taxIibb}
                     onChange={(e) => setTaxIibb(e.target.value)}
                     disabled={saving} placeholder="0.00"
-                    className="w-full text-right px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-brand-600 disabled:opacity-50 disabled:bg-gray-100"
+                    className="w-full text-right px-2 py-1.5 border-2 border-gray-300 rounded-lg text-base focus:outline-none focus:border-brand-600 disabled:opacity-50 disabled:bg-gray-100"
                   />
                 </div>
                 {/* Perc IVA — on neto */}
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">Perc.</label>
-                  <div className="flex items-center gap-1 mb-1">
+                <div className="bg-gray-50 rounded-lg p-3 border min-w-[150px] flex-1">
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Perc.</label>
+                  <div className="relative mb-2">
                     <input type="number" min="0" step="0.01" value={taxPercPct}
                       onChange={(e) => {
                         setTaxPercPct(e.target.value);
                         recalcAll(taxSubtotal, taxIvaPct, taxIibbPct, e.target.value);
                       }}
-                      disabled={saving} placeholder="%"
-                      className="w-full text-right px-2 py-1.5 border border-gray-300 rounded-lg text-xs focus:outline-none focus:border-brand-600 disabled:opacity-50 disabled:bg-gray-100"
+                      disabled={saving}
+                      className="w-full text-right pr-7 pl-2 py-2 border-2 border-gray-300 rounded-lg text-base focus:outline-none focus:border-brand-600 disabled:opacity-50 disabled:bg-gray-100"
                     />
-                    <span className="text-xs text-gray-400 shrink-0">%</span>
+                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-sm text-gray-400 pointer-events-none">%</span>
                   </div>
                   <input type="number" min="0" step="0.01" value={taxPerc}
                     onChange={(e) => setTaxPerc(e.target.value)}
                     disabled={saving} placeholder="0.00"
-                    className="w-full text-right px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-brand-600 disabled:opacity-50 disabled:bg-gray-100"
+                    className="w-full text-right px-2 py-1.5 border-2 border-gray-300 rounded-lg text-base focus:outline-none focus:border-brand-600 disabled:opacity-50 disabled:bg-gray-100"
                   />
                 </div>
               </div>
             </div>
-            <div className="flex justify-between items-center mt-3 pt-3 border-t">
-              <span className="text-sm font-medium text-gray-700">Total factura</span>
-              <span className="text-lg font-bold text-gray-900">
+            <div className="flex justify-between items-center mt-4 pt-4 border-t-2">
+              <span className="text-base font-bold text-gray-800">Total factura</span>
+              <span className="text-2xl font-bold text-gray-900">
                 $ {total.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             </div>
@@ -1016,10 +1027,10 @@ export default function EntryDetailPage() {
 
       {/* Factura X — just total, no tax breakdown */}
       {isPendiente && invoiceType === "X" && (
-        <div className="bg-white rounded-lg border p-4 mb-6">
+        <div className="bg-white rounded-lg border-2 p-5 mb-6">
           <div className="flex justify-between items-center">
-            <span className="text-sm font-medium text-gray-700">Total factura</span>
-            <span className="text-lg font-bold text-gray-900">
+            <span className="text-base font-bold text-gray-800">Total factura</span>
+            <span className="text-2xl font-bold text-gray-900">
               $ {(parseFloat(taxSubtotal) || 0).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </span>
           </div>
@@ -1031,7 +1042,7 @@ export default function EntryDetailPage() {
         <button
           onClick={handleCosteo}
           disabled={saving}
-          className="px-6 py-2 text-sm text-white bg-brand-400 rounded-lg hover:bg-brand-500 disabled:opacity-50 transition-colors"
+          className="w-full sm:w-auto px-8 py-3 text-lg font-bold text-white bg-brand-400 rounded-lg hover:bg-brand-500 disabled:opacity-50 transition-colors"
         >
           {saving ? "Guardando costeo..." : "Confirmar costeo"}
         </button>
