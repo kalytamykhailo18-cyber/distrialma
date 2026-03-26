@@ -4,14 +4,6 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { HiOutlineTrash, HiOutlinePlus, HiOutlineSearch, HiOutlineCamera, HiOutlineX } from "react-icons/hi";
 
-declare global {
-  interface Window {
-    BarcodeDetector?: new (options?: { formats: string[] }) => {
-      detect: (source: HTMLVideoElement) => Promise<{ rawValue: string }[]>;
-    };
-  }
-}
-
 interface Proveedor {
   cod: string;
   nombre: string;
@@ -55,7 +47,6 @@ export default function NuevoIngresoPage() {
   const searchTimeout = useRef<NodeJS.Timeout | null>(null);
 
   // Scanner state
-  const videoRef = useRef<HTMLVideoElement>(null);
   const [scanning, setScanning] = useState(false);
   const [scanError, setScanError] = useState("");
   const scanningRef = useRef(false);
@@ -86,10 +77,9 @@ export default function NuevoIngresoPage() {
   const stopScanner = useCallback(() => {
     scanningRef.current = false;
     setScanning(false);
-    if (videoRef.current?.srcObject) {
-      (videoRef.current.srcObject as MediaStream).getTracks().forEach((t) => t.stop());
-      videoRef.current.srcObject = null;
-    }
+    import("@ericblade/quagga2").then(({ default: Quagga }) => {
+      Quagga.stop();
+    }).catch(() => {});
   }, []);
 
   function handleBarcodeDetected(code: string) {
@@ -112,44 +102,50 @@ export default function NuevoIngresoPage() {
 
   async function startScanner() {
     setScanError("");
-    if (!window.BarcodeDetector) {
-      setScanError("Tu navegador no soporta el escaner de camara. Usa Chrome.");
-      return;
-    }
+    scanningRef.current = true;
+    setScanning(true);
+
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment" },
+      const { default: Quagga } = await import("@ericblade/quagga2");
+
+      // Wait for the scanner container to be in the DOM
+      await new Promise((r) => setTimeout(r, 100));
+
+      const target = document.getElementById("scanner-container");
+      if (!target) {
+        setScanError("Error al iniciar escáner");
+        setScanning(false);
+        scanningRef.current = false;
+        return;
+      }
+
+      await Quagga.init({
+        inputStream: {
+          type: "LiveStream",
+          target,
+          constraints: {
+            facingMode: "environment",
+            width: { ideal: 640 },
+            height: { ideal: 480 },
+          },
+        },
+        decoder: {
+          readers: ["ean_reader", "ean_8_reader", "upc_reader"],
+        },
+        locate: true,
+        numOfWorkers: 0,
       });
-      scanningRef.current = true;
-      setScanning(true);
-      // Wait for video element to be in DOM
-      requestAnimationFrame(() => {
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          videoRef.current.play();
+
+      Quagga.start();
+
+      Quagga.onDetected((result) => {
+        const code = result?.codeResult?.code;
+        if (code && scanningRef.current) {
+          handleBarcodeDetected(code);
         }
-        const detector = new window.BarcodeDetector!({
-          formats: ["ean_13", "ean_8", "upc_a"],
-        });
-        const scanLoop = async () => {
-          if (!videoRef.current || !scanningRef.current) return;
-          try {
-            const barcodes = await detector.detect(videoRef.current);
-            if (barcodes.length > 0) {
-              handleBarcodeDetected(barcodes[0].rawValue);
-              return;
-            }
-          } catch {
-            // detection can fail on some frames, continue
-          }
-          if (scanningRef.current) {
-            requestAnimationFrame(scanLoop);
-          }
-        };
-        scanLoop();
       });
     } catch {
-      setScanError("No se pudo acceder a la camara.");
+      setScanError("No se pudo acceder a la cámara.");
       setScanning(false);
       scanningRef.current = false;
     }
@@ -160,10 +156,9 @@ export default function NuevoIngresoPage() {
     return () => {
       if (scanningRef.current) {
         scanningRef.current = false;
-        if (videoRef.current?.srcObject) {
-          // eslint-disable-next-line react-hooks/exhaustive-deps
-          (videoRef.current.srcObject as MediaStream).getTracks().forEach((t) => t.stop());
-        }
+        import("@ericblade/quagga2").then(({ default: Quagga }) => {
+          Quagga.stop();
+        }).catch(() => {});
       }
     };
   }, []);
@@ -350,24 +345,22 @@ export default function NuevoIngresoPage() {
         {scanning && (
           <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center">
             <div className="relative w-full max-w-md mx-4">
-              <video
-                ref={videoRef}
-                autoPlay
-                playsInline
-                muted
-                className="w-full rounded-lg"
+              <div
+                id="scanner-container"
+                className="w-full rounded-lg overflow-hidden bg-black"
+                style={{ minHeight: 300 }}
               />
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                 <div className="w-3/4 h-16 border-2 border-white/60 rounded-lg" />
               </div>
               <button
                 onClick={stopScanner}
-                className="absolute top-3 right-3 p-2 bg-black/50 text-white rounded-full hover:bg-black/70 transition-colors"
+                className="absolute top-3 right-3 p-2 bg-black/50 text-white rounded-full hover:bg-black/70 transition-colors z-10"
               >
                 <HiOutlineX className="w-5 h-5" />
               </button>
               <p className="text-white text-center text-sm mt-3">
-                Apunta la camara al codigo de barras
+                Apuntá la cámara al código de barras
               </p>
             </div>
           </div>

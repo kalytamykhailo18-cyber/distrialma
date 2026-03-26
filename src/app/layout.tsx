@@ -2,8 +2,7 @@ import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
 import Providers from "@/components/Providers";
-import Navbar from "@/components/Navbar";
-import WhatsAppButton from "@/components/WhatsAppButton";
+import LayoutShell from "@/components/LayoutShell";
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -29,9 +28,7 @@ export default function RootLayout({
     <html lang="es">
       <body className={`${geistSans.variable} antialiased bg-gray-50`}>
         <Providers>
-          <Navbar />
-          <main>{children}</main>
-          <WhatsAppButton />
+          <LayoutShell>{children}</LayoutShell>
         </Providers>
       </body>
     </html>
