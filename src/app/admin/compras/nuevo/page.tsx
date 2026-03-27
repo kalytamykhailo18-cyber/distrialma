@@ -209,7 +209,7 @@ export default function NuevoIngresoPage() {
         })
         .catch(() => setSearchResults([]))
         .finally(() => setSearching(false));
-    }, 300);
+    }, 500);
   }
 
   function addProduct(product: SearchResult) {

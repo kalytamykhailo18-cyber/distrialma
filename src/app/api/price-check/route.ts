@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
         AND (
           LTRIM(RTRIM(ISNULL(p.Codbar, ''))) = @q
           OR LTRIM(RTRIM(p.Cod)) = @q
-          OR LTRIM(RTRIM(p.Nombre)) LIKE @pattern
+          OR p.Nombre LIKE @pattern
         )
       ORDER BY
         CASE

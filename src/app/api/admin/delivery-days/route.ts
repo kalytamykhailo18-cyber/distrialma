@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
 
     const request = pool.request();
     if (search.trim()) {
-      query += ` AND (LTRIM(RTRIM(c.Nombre)) LIKE @search OR LTRIM(RTRIM(c.CUIT)) LIKE @search)`;
+      query += ` AND (c.Nombre LIKE @search OR c.CUIT LIKE @search)`;
       request.input("search", `%${search.trim()}%`);
     }
     query += ` ORDER BY c.Nombre`;

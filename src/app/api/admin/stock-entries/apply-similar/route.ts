@@ -37,7 +37,8 @@ export async function GET(req: NextRequest) {
 
     const nameBase = getNameBase(prodResult.recordset[0].nombre);
 
-    const similar = await pool.request().input("pattern", nameBase + "%").input("excludeSku", sku).query(`
+    const excludePadded = String(sku).padStart(7, " ");
+    const similar = await pool.request().input("pattern", nameBase + "%").input("excludeCod", excludePadded).query(`
       SELECT
         LTRIM(RTRIM(p.Cod)) AS sku,
         LTRIM(RTRIM(p.Nombre)) AS nombre,
@@ -46,7 +47,7 @@ export async function GET(req: NextRequest) {
       JOIN [${dbProd}].dbo.Stock s ON s.CodProducto = p.Cod
       WHERE p.Nombre LIKE @pattern
         AND LTRIM(RTRIM(s.Deposito)) = '0'
-        AND LTRIM(RTRIM(p.Cod)) != @excludeSku
+        AND p.Cod != @excludeCod
         AND (p.DeBaja = 0 OR p.DeBaja IS NULL)
       ORDER BY p.Nombre
     `);
@@ -88,7 +89,8 @@ export async function POST(req: NextRequest) {
     const nameBase = getNameBase(fullName);
 
     // Find similar products (same name base)
-    const similar = await pool.request().input("pattern", nameBase + "%").input("excludeSku", sku).query(`
+    const excludePadded = String(sku).padStart(7, " ");
+    const similar = await pool.request().input("pattern", nameBase + "%").input("excludeCod", excludePadded).query(`
       SELECT
         LTRIM(RTRIM(p.Cod)) AS sku,
         LTRIM(RTRIM(p.Nombre)) AS nombre,
@@ -102,7 +104,7 @@ export async function POST(req: NextRequest) {
       JOIN [${dbProd}].dbo.Stock s ON s.CodProducto = p.Cod
       WHERE p.Nombre LIKE @pattern
         AND LTRIM(RTRIM(s.Deposito)) = '0'
-        AND LTRIM(RTRIM(p.Cod)) != @excludeSku
+        AND p.Cod != @excludeCod
         AND (p.DeBaja = 0 OR p.DeBaja IS NULL)
     `);
 

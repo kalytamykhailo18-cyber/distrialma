@@ -26,9 +26,9 @@ export async function GET(req: NextRequest) {
       FROM [${dbProd}].dbo.Productos p
       LEFT JOIN [${dbProd}].dbo.Stock s
         ON s.CodProducto = p.Cod AND LTRIM(RTRIM(s.Deposito)) = '0'
-      WHERE LTRIM(RTRIM(p.Nombre)) LIKE @q
-         OR LTRIM(RTRIM(p.Cod)) LIKE @q
-         OR LTRIM(RTRIM(ISNULL(p.Codbar,''))) LIKE @q
+      WHERE p.Nombre LIKE @q
+         OR p.Cod LIKE @q
+         OR ISNULL(p.Codbar,'') LIKE @q
          OR LTRIM(RTRIM(p.Cod)) = @exact
       ORDER BY CASE WHEN LTRIM(RTRIM(p.Cod)) = @exact THEN 0 WHEN LTRIM(RTRIM(ISNULL(p.Codbar,''))) = @exact THEN 1 ELSE 2 END, p.Nombre
     `);
