@@ -166,6 +166,8 @@ model StockEntry {
   percepciones  Decimal  @default(0) @db.Decimal(12, 2)
   total         Decimal  @default(0) @db.Decimal(12, 2)
   notas         String?  @db.Text
+  nroFactura    String?  @db.VarChar(30)
+  facturaImage  String?  @db.VarChar(255)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   items         StockEntryItem[]
@@ -188,6 +190,20 @@ model StockEntryItem {
 
   @@index([entryId])
   @@map("stock_entry_items")
+}
+
+model SupplierPayment {
+  id            Int      @id @default(autoincrement())
+  proveedorCod  String   @db.VarChar(7)
+  proveedorName String   @db.VarChar(60)
+  monto         Decimal  @db.Decimal(12, 2)
+  concepto      String?  @db.VarChar(100)
+  usuario       String   @db.VarChar(50)
+  createdAt     DateTime @default(now())
+
+  @@index([proveedorCod])
+  @@index([createdAt])
+  @@map("supplier_payments")
 }
 
 model PriceMargin {

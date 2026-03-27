@@ -12,6 +12,7 @@ interface StockEntry {
   estado: string;
   total: number;
   notas: string | null;
+  nroFactura: string | null;
   createdAt: string;
   itemCount: number;
 }
@@ -112,6 +113,11 @@ export default function ComprasPage() {
                   <div className="text-xs text-gray-400 mt-0.5">
                     {formatDate(entry.createdAt)} — {entry.usuario} —{" "}
                     {entry.itemCount} producto{entry.itemCount !== 1 ? "s" : ""}
+                    {entry.nroFactura && (
+                      <span className="ml-2 text-blue-600">
+                        Fact: {entry.nroFactura}
+                      </span>
+                    )}
                     {entry.notas && (
                       <span className="ml-2 text-amber-600">
                         Nota: {entry.notas}

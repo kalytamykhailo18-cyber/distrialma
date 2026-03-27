@@ -43,6 +43,7 @@ export async function GET(req: NextRequest) {
       percepciones: Number(e.percepciones),
       total: Number(e.total),
       notas: e.notas,
+      nroFactura: e.nroFactura,
       createdAt: e.createdAt.toISOString(),
       itemCount: e.items.length,
     }));
@@ -82,7 +83,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { proveedorCod, proveedorName, notas, items, subtotal: subIn, iva: ivaIn, iibb: iibbIn, percepciones: percIn, total: totalIn } = body;
+    const { proveedorCod, proveedorName, notas, nroFactura, items, subtotal: subIn, iva: ivaIn, iibb: iibbIn, percepciones: percIn, total: totalIn } = body;
 
     if (!proveedorCod || !items?.length) {
       return NextResponse.json(
@@ -142,7 +143,7 @@ export async function POST(req: NextRequest) {
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
       let sku = item.sku;
-      const cantidad = parseFloat(item.cantidad) || 0;
+      const cantidad = Math.round((parseFloat(String(item.cantidad).replace(/,/g, ".")) || 0) * 1000) / 1000;
 
       if (item.isNewProduct) {
         // Create new product in SQL Server
@@ -244,6 +245,7 @@ export async function POST(req: NextRequest) {
         percepciones,
         total: totalAmount,
         notas: notas || null,
+        nroFactura: nroFactura || null,
         items: {
           create: pgItems.map((item) => ({
             sku: item.sku,

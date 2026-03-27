@@ -102,12 +102,17 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   const totalItems = items.reduce((sum, i) => sum + i.quantity, 0);
 
+  // Check which SKUs have a box entry (for pricing unit entries at caja price)
+  const skusWithBox = new Set(
+    items.filter((i) => i.mode === "box" && i.precioCajaCerrada > 0).map((i) => i.sku)
+  );
+
   const totalPrice = items.reduce((sum, i) => {
     if (i.mode === "box" && i.precioCajaCerrada > 0) {
       return sum + i.precioCajaCerrada * i.cantidadPorCaja * i.quantity;
     }
-    // Unit mode: auto-switch to caja cerrada price when qty >= cantidadPorCaja
-    if (i.mode === "unit" && i.precioCajaCerrada > 0 && i.cantidadPorCaja > 0 && i.quantity >= i.cantidadPorCaja) {
+    // Unit mode: use caja cerrada price if same SKU has a box entry, or qty >= cantidadPorCaja
+    if (i.mode === "unit" && i.precioCajaCerrada > 0 && (skusWithBox.has(i.sku) || (i.cantidadPorCaja > 0 && i.quantity >= i.cantidadPorCaja))) {
       return sum + i.precioCajaCerrada * i.quantity;
     }
     return sum + i.precioMayorista * i.quantity;

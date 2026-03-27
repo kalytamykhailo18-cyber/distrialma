@@ -142,6 +142,8 @@ export async function GET(
         percepciones: Number(entry.percepciones),
         total: Number(entry.total),
         notas: entry.notas,
+        nroFactura: entry.nroFactura,
+        facturaImage: entry.facturaImage,
         createdAt: entry.createdAt.toISOString(),
         items,
       },
@@ -361,7 +363,7 @@ export async function PATCH(
       if (!item) return NextResponse.json({ error: "Item no encontrado" }, { status: 404 });
 
       const oldCant = Number(item.cantidad);
-      const newCant = parseFloat(cantidad) || 0;
+      const newCant = Math.round((parseFloat(String(cantidad).replace(/,/g, ".")) || 0) * 1000) / 1000;
       const diff = newCant - oldCant;
 
       if (diff !== 0) {

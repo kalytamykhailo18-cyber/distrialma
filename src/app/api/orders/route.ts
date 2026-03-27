@@ -101,7 +101,6 @@ export async function POST(req: NextRequest) {
       if (item.isCombo && item.comboItems) {
         // Combo: expand into individual products at their regular prices
         for (const ci of item.comboItems) {
-          // Fetch individual product price from SQL Server
           const prodResult = await pool
             .request()
             .input("prodSku", ci.sku.padStart(7, " "))
@@ -119,9 +118,7 @@ export async function POST(req: NextRequest) {
           });
         }
       } else {
-        // Regular product
         const isBox = item.mode === "box" && item.precioCajaCerrada > 0;
-        // Unit mode auto-switch: when qty >= cantidadPorCaja, use caja cerrada price
         const unitAutoBox = item.mode === "unit" && item.precioCajaCerrada > 0 && item.cantidadPorCaja > 0 && item.quantity >= item.cantidadPorCaja;
         expandedItems.push({
           sku: item.sku,
@@ -131,6 +128,26 @@ export async function POST(req: NextRequest) {
         });
       }
     }
+
+    // Merge same SKU entries (box + unit → 1 line at caja cerrada price)
+    const mergedItems: typeof expandedItems = [];
+    for (const item of expandedItems) {
+      const existing = mergedItems.find((m) => m.sku === item.sku);
+      if (existing) {
+        // Same SKU: merge into 1 line at the lower price (caja cerrada)
+        existing.cant += item.cant;
+        if (item.listaPrecio === 4) {
+          existing.price = item.price;
+          existing.listaPrecio = 4;
+        } else if (existing.listaPrecio === 4) {
+          // Keep existing caja price
+        }
+      } else {
+        mergedItems.push({ ...item });
+      }
+    }
+    expandedItems.length = 0;
+    expandedItems.push(...mergedItems);
 
     // Calculate totals
     let totalCant = 0;

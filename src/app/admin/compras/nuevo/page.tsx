@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { HiOutlineTrash, HiOutlinePlus, HiOutlineSearch, HiOutlineCamera, HiOutlineX } from "react-icons/hi";
 
 interface Proveedor {
@@ -22,6 +23,7 @@ interface CartItem {
   sku: string;
   productName: string;
   cantidad: string;
+  unit: string;
   isNewProduct: boolean;
   barcode?: string;
   newProductName?: string;
@@ -29,13 +31,21 @@ interface CartItem {
 
 export default function NuevoIngresoPage() {
   const router = useRouter();
+  const { data: session } = useSession();
+  const user = session?.user as { role?: string; permissions?: string[] } | undefined;
+  const hasCosteo = user?.role === "admin" || (user?.permissions?.includes("costeo") ?? false);
+
   const [proveedores, setProveedores] = useState<Proveedor[]>([]);
   const [selectedProv, setSelectedProv] = useState("");
   const [selectedProvName, setSelectedProvName] = useState("");
   const [items, setItems] = useState<CartItem[]>([]);
   const [notas, setNotas] = useState("");
+  const [nroFactura, setNroFactura] = useState("");
+  const [facturaFile, setFacturaFile] = useState<File | null>(null);
+  const [facturaPreview, setFacturaPreview] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [successMsg, setSuccessMsg] = useState("");
 
 
   // Search state
@@ -43,6 +53,7 @@ export default function NuevoIngresoPage() {
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searching, setSearching] = useState(false);
   const [showResults, setShowResults] = useState(false);
+  const [selectedIdx, setSelectedIdx] = useState(-1);
   const searchRef = useRef<HTMLDivElement>(null);
   const searchTimeout = useRef<NodeJS.Timeout | null>(null);
 
@@ -138,9 +149,26 @@ export default function NuevoIngresoPage() {
 
       Quagga.start();
 
+      // Require same code detected 3 times to avoid false positives
+      let lastCode = "";
+      let codeCount = 0;
+
       Quagga.onDetected((result) => {
         const code = result?.codeResult?.code;
-        if (code && scanningRef.current) {
+        if (!code || !scanningRef.current) return;
+
+        // Validate: must be only digits, 8 or 13 chars (EAN format)
+        if (!/^\d{8}$|^\d{13}$/.test(code)) return;
+
+        if (code === lastCode) {
+          codeCount++;
+        } else {
+          lastCode = code;
+          codeCount = 1;
+        }
+
+        // Only accept after 3 consecutive same reads
+        if (codeCount >= 3) {
           handleBarcodeDetected(code);
         }
       });
@@ -193,6 +221,7 @@ export default function NuevoIngresoPage() {
         sku: product.sku,
         productName: product.name,
         cantidad: "1",
+        unit: product.unit || "UN",
         isNewProduct: false,
       },
     ]);
@@ -209,6 +238,7 @@ export default function NuevoIngresoPage() {
         sku: `new-${Date.now()}`,
         productName: newName.trim(),
         cantidad: "1",
+        unit: "UN",
         isNewProduct: true,
         barcode: newBarcode.trim(),
         newProductName: newName.trim(),
@@ -257,6 +287,7 @@ export default function NuevoIngresoPage() {
           proveedorCod: selectedProv,
           proveedorName: selectedProvName,
           notas: notas.trim() || null,
+          nroFactura: nroFactura.trim() || null,
           items: items.map((i) => ({
             sku: i.isNewProduct ? undefined : i.sku,
             productName: i.productName,
@@ -269,7 +300,28 @@ export default function NuevoIngresoPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Error");
-      router.push(`/admin/compras/${data.entry.id}`);
+
+      // Upload factura photo if selected
+      if (facturaFile && data.entry?.id) {
+        const formData = new FormData();
+        formData.append("image", facturaFile);
+        formData.append("entryId", String(data.entry.id));
+        await fetch("/api/admin/stock-entries/upload-factura", { method: "POST", body: formData }).catch(() => {});
+      }
+
+      if (hasCosteo) {
+        router.push(`/admin/compras/${data.entry.id}`);
+      } else {
+        setSuccessMsg("Ingreso aceptado correctamente");
+        setItems([]);
+        setNotas("");
+        setNroFactura("");
+        setFacturaFile(null);
+        setFacturaPreview(null);
+        setSelectedProv("");
+        setSelectedProvName("");
+        setTimeout(() => setSuccessMsg(""), 5000);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al guardar");
     } finally {
@@ -315,8 +367,22 @@ export default function NuevoIngresoPage() {
             <input
               type="text"
               value={searchQuery}
-              onChange={(e) => handleSearch(e.target.value)}
+              onChange={(e) => { handleSearch(e.target.value); setSelectedIdx(-1); }}
               onFocus={() => searchResults.length > 0 && setShowResults(true)}
+              onKeyDown={(e) => {
+                if (!showResults || searchResults.length === 0) return;
+                if (e.key === "ArrowDown") {
+                  e.preventDefault();
+                  setSelectedIdx((prev) => Math.min(prev + 1, searchResults.length - 1));
+                } else if (e.key === "ArrowUp") {
+                  e.preventDefault();
+                  setSelectedIdx((prev) => Math.max(prev - 1, -1));
+                } else if (e.key === "Enter" && selectedIdx >= 0) {
+                  e.preventDefault();
+                  addProduct(searchResults[selectedIdx]);
+                  setSelectedIdx(-1);
+                }
+              }}
               placeholder="Buscar por nombre, codigo o codigo de barras..."
               className="w-full pl-9 pr-4 py-2 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
             />
@@ -368,11 +434,14 @@ export default function NuevoIngresoPage() {
 
         {showResults && searchResults.length > 0 && (
           <div className="absolute z-30 bg-white border rounded-lg shadow-lg mt-1 max-h-60 overflow-y-auto w-full max-w-4xl">
-            {searchResults.map((p) => (
+            {searchResults.map((p, idx) => (
               <button
                 key={p.sku}
-                onClick={() => addProduct(p)}
-                className="w-full text-left px-4 py-2 hover:bg-gray-50 text-sm flex items-center justify-between"
+                ref={(el) => { if (idx === selectedIdx && el) el.scrollIntoView({ block: "nearest" }); }}
+                onClick={() => { addProduct(p); setSelectedIdx(-1); }}
+                className={`w-full text-left px-4 py-2 text-sm flex items-center justify-between ${
+                  idx === selectedIdx ? "bg-brand-50 text-brand-700" : "hover:bg-gray-50"
+                }`}
               >
                 <div>
                   <span className="text-gray-900">{p.name}</span>
@@ -474,10 +543,13 @@ export default function NuevoIngresoPage() {
                   <td className="px-4 py-2">
                     <input
                       type="number"
-                      min="0.001"
-                      step="any"
+                      min={item.unit === "KG" ? "0.001" : "1"}
+                      step={item.unit === "KG" ? "0.001" : "1"}
                       value={item.cantidad}
-                      onChange={(e) => updateCantidad(idx, e.target.value)}
+                      onChange={(e) => {
+                        const val = item.unit === "KG" ? e.target.value : String(Math.round(parseFloat(e.target.value) || 0));
+                        updateCantidad(idx, val);
+                      }}
                       className="w-full text-right px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
                     />
                   </td>
@@ -496,21 +568,78 @@ export default function NuevoIngresoPage() {
         </div>
       )}
 
-      {/* Notes */}
-      <div className="mb-6">
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Notas (opcional)
-        </label>
-        <textarea
-          value={notas}
-          onChange={(e) => setNotas(e.target.value)}
-          rows={2}
-          placeholder="Observaciones sobre el ingreso..."
-          className="w-full px-4 py-2 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 resize-none"
-        />
+      {/* Photo + Notes + Invoice number */}
+      <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {/* Factura photo */}
+        <div className="sm:col-span-2">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Foto de factura (opcional)
+          </label>
+          <div className="flex items-center gap-3">
+            <label className="cursor-pointer px-4 py-2 text-sm font-medium text-brand-600 bg-brand-50 border border-brand-200 rounded-lg hover:bg-brand-100 transition-colors">
+              {facturaPreview ? "Cambiar foto" : "Sacar foto / Elegir archivo"}
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    setFacturaFile(file);
+                    setFacturaPreview(URL.createObjectURL(file));
+                  }
+                }}
+              />
+            </label>
+            {facturaPreview && (
+              <>
+                <img src={facturaPreview} alt="Factura" className="h-16 rounded border" />
+                <button
+                  onClick={() => { setFacturaFile(null); setFacturaPreview(null); }}
+                  className="text-xs text-red-500 hover:underline"
+                >
+                  Quitar
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+      <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Notas (opcional)
+          </label>
+          <textarea
+            value={notas}
+            onChange={(e) => setNotas(e.target.value)}
+            rows={2}
+            placeholder="Observaciones sobre el ingreso..."
+            className="w-full px-4 py-2 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 resize-none"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Nro. Factura (opcional)
+          </label>
+          <input
+            type="text"
+            value={nroFactura}
+            onChange={(e) => setNroFactura(e.target.value)}
+            maxLength={30}
+            placeholder="Ej: 0001-00012345"
+            className="w-full px-4 py-2 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
+          />
+        </div>
       </div>
 
       {/* Error */}
+      {successMsg && (
+        <div className="mb-4 p-4 bg-green-50 border-2 border-green-300 rounded-lg text-center">
+          <p className="text-lg font-bold text-green-700">{successMsg}</p>
+        </div>
+      )}
       {error && (
         <p className="text-sm text-red-600 mb-4">{error}</p>
       )}

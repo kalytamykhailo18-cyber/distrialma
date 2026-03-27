@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getTestPool as getPool, getDbName } from "@/lib/mssql";
 import { requireStaff } from "@/lib/api-auth";
+import { prisma } from "@/lib/prisma";
 
 export async function GET() {
   if (!(await requireStaff())) {
@@ -116,15 +117,27 @@ export async function PUT(req: NextRequest) {
         WHERE Cod = @cod
       `);
 
-    // Get updated saldo
+    // Get updated saldo and supplier name
     const result = await pool
       .request()
       .input("cod", codPadded)
       .query(`
-        SELECT ISNULL(Saldo, 0) AS saldo
+        SELECT ISNULL(Saldo, 0) AS saldo, LTRIM(RTRIM(Nombre)) AS nombre
         FROM [${dbProd}].dbo.Proveedores
         WHERE Cod = @cod
       `);
+
+    // Record payment in PostgreSQL
+    const userName = (session.user as { name?: string })?.name || "admin";
+    await prisma.supplierPayment.create({
+      data: {
+        proveedorCod: String(cod),
+        proveedorName: result.recordset[0]?.nombre || "",
+        monto: parseFloat(monto),
+        concepto: (concepto || "Pago").substring(0, 100),
+        usuario: userName,
+      },
+    });
 
     return NextResponse.json({
       ok: true,

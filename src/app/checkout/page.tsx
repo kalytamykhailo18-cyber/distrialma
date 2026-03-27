@@ -69,7 +69,8 @@ export default function CheckoutPage() {
         msg += `  ${formatPrice(item.precioMayorista * item.quantity)}\n`;
       } else {
         const isBox = item.mode === "box" && item.precioCajaCerrada > 0;
-        const unitAutoBox = item.mode === "unit" && item.precioCajaCerrada > 0 && item.cantidadPorCaja > 0 && item.quantity >= item.cantidadPorCaja;
+        const hasBoxInCart = items.some((other) => other.sku === item.sku && other.mode === "box" && other.precioCajaCerrada > 0);
+        const unitAutoBox = item.mode === "unit" && item.precioCajaCerrada > 0 && (hasBoxInCart || (item.cantidadPorCaja > 0 && item.quantity >= item.cantidadPorCaja));
         const unitPrice = isBox ? item.precioCajaCerrada : unitAutoBox ? item.precioCajaCerrada : item.precioMayorista;
         const label = isBox
           ? `Caja x${item.cantidadPorCaja}`

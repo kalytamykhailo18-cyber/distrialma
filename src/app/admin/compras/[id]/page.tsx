@@ -50,6 +50,45 @@ function CostoSinIva({ costoConIva, ivaPct, onSync, disabled }: {
   );
 }
 
+function MarginInput({ costo, price, onPriceChange, disabled }: {
+  costo: number;
+  price: number;
+  onPriceChange: (newPrice: string) => void;
+  disabled: boolean;
+}) {
+  const [localPct, setLocalPct] = useState("");
+  const [focused, setFocused] = useState(false);
+
+  useEffect(() => {
+    if (!focused) {
+      setLocalPct(costo > 0 && price > 0 ? ((price / costo - 1) * 100).toFixed(2) : "");
+    }
+  }, [costo, price, focused]);
+
+  return (
+    <div className="relative">
+      <input
+        type="number"
+        min="0"
+        step="0.01"
+        value={localPct}
+        onFocus={() => setFocused(true)}
+        onChange={(e) => {
+          setLocalPct(e.target.value);
+          const pct = parseFloat(e.target.value);
+          if (!isNaN(pct) && costo > 0) {
+            onPriceChange(String(Math.round(costo * (1 + pct / 100))));
+          }
+        }}
+        onBlur={() => setFocused(false)}
+        disabled={disabled}
+        className="w-full text-right pr-7 pl-3 py-1.5 border-2 border-gray-300 rounded-lg text-base focus:outline-none focus:border-brand-600 disabled:opacity-50 disabled:bg-gray-100"
+      />
+      <span className="absolute right-2 top-1/2 -translate-y-1/2 text-base font-bold text-brand-500 pointer-events-none">%</span>
+    </div>
+  );
+}
+
 interface EntryItem {
   id: number;
   sku: string;
@@ -84,6 +123,8 @@ interface StockEntry {
   percepciones: number;
   total: number;
   notas: string | null;
+  nroFactura: string | null;
+  facturaImage: string | null;
   createdAt: string;
   items: EntryItem[];
 }
@@ -416,7 +457,13 @@ export default function EntryDetailPage() {
             <p><span className="font-semibold">Proveedor:</span> {entry.proveedorName}</p>
             <p><span className="font-semibold">Fecha:</span> {formatDate(entry.createdAt)}</p>
             <p><span className="font-semibold">Usuario:</span> {entry.usuario}</p>
+            {entry.nroFactura && <p><span className="font-semibold">Nro. Factura:</span> {entry.nroFactura}</p>}
             {entry.notas && <p><span className="font-semibold">Notas:</span> {entry.notas}</p>}
+            {entry.facturaImage && (
+              <a href={entry.facturaImage} target="_blank" rel="noopener noreferrer" className="inline-block mt-2">
+                <img src={entry.facturaImage} alt="Factura" className="h-24 rounded border hover:opacity-80 transition-opacity" />
+              </a>
+            )}
           </div>
         </div>
         <span
@@ -666,34 +713,22 @@ export default function EntryDetailPage() {
                     {priceFields.map(({ field, label }) => {
                       const costoVal = parseFloat(costeoRow?.costo || "0");
                       const priceVal = parseFloat(costeoRow?.[field] || "0");
-                      const currentMargin = costoVal > 0 && priceVal > 0 ? ((priceVal / costoVal - 1) * 100).toFixed(2) : "";
 
                       return (
                         <div key={field} className="bg-gray-50 rounded-lg p-3 border min-w-[150px] flex-1">
-                          <label className="block text-sm font-medium text-gray-700 mb-1.5">{label}</label>
+                          <label className="block text-sm font-bold text-brand-600 mb-1.5">{label}</label>
                           {!item.costeado ? (
                             <div className="space-y-2">
-                              <div className="relative">
-                                <input
-                                  type="number"
-                                  min="0"
-                                  step="0.01"
-                                  value={currentMargin}
-                                  onChange={(e) => {
-                                    const pct = parseFloat(e.target.value);
-                                    const c = parseFloat(costeoRow?.costo || "0");
-                                    if (!isNaN(pct) && c > 0) {
-                                      const newPrice = String(Math.round(c * (1 + pct / 100)));
-                                      setCosteoRows((prev) =>
-                                        prev.map((r) => r.id === item.id ? { ...r, [field]: newPrice } : r)
-                                      );
-                                    }
-                                  }}
-                                  disabled={saving}
-                                  className="w-full text-right pr-7 pl-3 py-1.5 border-2 border-gray-300 rounded-lg text-base focus:outline-none focus:border-brand-600 disabled:opacity-50 disabled:bg-gray-100"
-                                />
-                                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-sm text-gray-400 pointer-events-none">%</span>
-                              </div>
+                              <MarginInput
+                                costo={costoVal}
+                                price={priceVal}
+                                onPriceChange={(newPrice) => {
+                                  setCosteoRows((prev) =>
+                                    prev.map((r) => r.id === item.id ? { ...r, [field]: newPrice } : r)
+                                  );
+                                }}
+                                disabled={saving}
+                              />
                               <input
                                 type="number"
                                 min="0"
@@ -952,6 +987,7 @@ export default function EntryDetailPage() {
                   placeholder="0.00"
                   className="w-full text-right px-3 py-1.5 border-2 border-brand-400 rounded-lg text-base focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 disabled:opacity-50 disabled:bg-gray-100"
                 />
+                {sub > 0 && <p className="text-right text-sm text-gray-500 mt-0.5">$ {sub.toLocaleString("es-AR", { minimumFractionDigits: 2 })}</p>}
               </div>
 
               {/* Neto (sin IVA) — calculated, read-only */}
@@ -976,13 +1012,14 @@ export default function EntryDetailPage() {
                       disabled={saving}
                       className="w-full text-right pr-7 pl-2 py-2 border-2 border-gray-300 rounded-lg text-base focus:outline-none focus:border-brand-600 disabled:opacity-50 disabled:bg-gray-100"
                     />
-                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-sm text-gray-400 pointer-events-none">%</span>
+                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-base font-bold text-brand-500 pointer-events-none">%</span>
                   </div>
                   <input type="number" min="0" step="0.01" value={taxIva}
                     onChange={(e) => setTaxIva(e.target.value)}
                     disabled={saving} placeholder="0.00"
                     className="w-full text-right px-2 py-1.5 border-2 border-gray-300 rounded-lg text-base focus:outline-none focus:border-brand-600 disabled:opacity-50 disabled:bg-gray-100"
                   />
+                  {parseFloat(taxIva) > 0 && <p className="text-right text-xs text-gray-500 mt-0.5">$ {parseFloat(taxIva).toLocaleString("es-AR", { minimumFractionDigits: 2 })}</p>}
                 </div>
                 {/* IIBB — on neto */}
                 <div className="bg-gray-50 rounded-lg p-3 border min-w-[150px] flex-1">
@@ -996,13 +1033,14 @@ export default function EntryDetailPage() {
                       disabled={saving}
                       className="w-full text-right pr-7 pl-2 py-2 border-2 border-gray-300 rounded-lg text-base focus:outline-none focus:border-brand-600 disabled:opacity-50 disabled:bg-gray-100"
                     />
-                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-sm text-gray-400 pointer-events-none">%</span>
+                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-base font-bold text-brand-500 pointer-events-none">%</span>
                   </div>
                   <input type="number" min="0" step="0.01" value={taxIibb}
                     onChange={(e) => setTaxIibb(e.target.value)}
                     disabled={saving} placeholder="0.00"
                     className="w-full text-right px-2 py-1.5 border-2 border-gray-300 rounded-lg text-base focus:outline-none focus:border-brand-600 disabled:opacity-50 disabled:bg-gray-100"
                   />
+                  {parseFloat(taxIibb) > 0 && <p className="text-right text-xs text-gray-500 mt-0.5">$ {parseFloat(taxIibb).toLocaleString("es-AR", { minimumFractionDigits: 2 })}</p>}
                 </div>
                 {/* Perc IVA — on neto */}
                 <div className="bg-gray-50 rounded-lg p-3 border min-w-[150px] flex-1">
@@ -1016,13 +1054,14 @@ export default function EntryDetailPage() {
                       disabled={saving}
                       className="w-full text-right pr-7 pl-2 py-2 border-2 border-gray-300 rounded-lg text-base focus:outline-none focus:border-brand-600 disabled:opacity-50 disabled:bg-gray-100"
                     />
-                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-sm text-gray-400 pointer-events-none">%</span>
+                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-base font-bold text-brand-500 pointer-events-none">%</span>
                   </div>
                   <input type="number" min="0" step="0.01" value={taxPerc}
                     onChange={(e) => setTaxPerc(e.target.value)}
                     disabled={saving} placeholder="0.00"
                     className="w-full text-right px-2 py-1.5 border-2 border-gray-300 rounded-lg text-base focus:outline-none focus:border-brand-600 disabled:opacity-50 disabled:bg-gray-100"
                   />
+                  {parseFloat(taxPerc) > 0 && <p className="text-right text-xs text-gray-500 mt-0.5">$ {parseFloat(taxPerc).toLocaleString("es-AR", { minimumFractionDigits: 2 })}</p>}
                 </div>
               </div>
             </div>

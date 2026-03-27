@@ -41,8 +41,9 @@ export default function CarritoPage() {
           const unitLabel = isKg ? "KG" : "un.";
           const minQty = item.mode === "unit" && item.pesoMayorista > 0 ? item.pesoMayorista : 1;
           const step = 1;
-          // Auto-switch to caja cerrada price when unit qty >= cantidadPorCaja
-          const unitAutoBox = item.mode === "unit" && item.precioCajaCerrada > 0 && item.cantidadPorCaja > 0 && item.quantity >= item.cantidadPorCaja;
+          // Auto-switch to caja cerrada price when: qty >= cantidadPorCaja OR same SKU has a box in cart
+          const hasBoxInCart = items.some((other) => other.sku === item.sku && other.mode === "box" && other.precioCajaCerrada > 0);
+          const unitAutoBox = item.mode === "unit" && item.precioCajaCerrada > 0 && (hasBoxInCart || (item.cantidadPorCaja > 0 && item.quantity >= item.cantidadPorCaja));
           const unitPrice = item.mode === "box" && item.precioCajaCerrada > 0
             ? item.precioCajaCerrada
             : unitAutoBox

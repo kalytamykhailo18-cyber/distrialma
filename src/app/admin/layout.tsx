@@ -19,9 +19,11 @@ export default function AdminLayout({
   const permissions = user?.permissions;
   const isStaff = isStaffUser(role);
 
-  // Find the required permission for this page
+  // Find the required permission for this page (longer paths match first)
   const requiredPerm = PAGE_PERMISSION_MAP[pathname] ||
-    Object.entries(PAGE_PERMISSION_MAP).find(([path]) => pathname.startsWith(path + "/"))?.[1];
+    Object.entries(PAGE_PERMISSION_MAP)
+      .sort((a, b) => b[0].length - a[0].length)
+      .find(([path]) => pathname.startsWith(path + "/"))?.[1];
 
   const allowed = isStaff && (!requiredPerm || hasPermission(role, permissions, requiredPerm));
 
