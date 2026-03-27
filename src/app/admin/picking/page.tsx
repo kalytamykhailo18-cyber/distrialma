@@ -282,10 +282,11 @@ export default function PickingPage() {
                           key={idx}
                           onTouchStart={(e) => handleTouchStart(e, key)}
                           onTouchEnd={(e) => handleTouchEnd(e, order, idx)}
+                          className="flex items-center"
                         >
                           <button
                             onClick={() => toggleCheck(key)}
-                            className={`w-full text-left flex items-center gap-3 py-2 px-2 rounded-lg transition-colors ${
+                            className={`flex-1 text-left flex items-center gap-3 py-2 px-2 rounded-lg transition-colors ${
                               checked ? "bg-green-50" : "hover:bg-gray-50"
                             }`}
                           >
@@ -311,6 +312,16 @@ export default function PickingPage() {
                               </p>
                             </div>
                           </button>
+                          {/* X button to dismiss as faltante */}
+                          {!checked && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); dismissItem(order, idx); }}
+                              className="shrink-0 ml-1 w-8 h-8 flex items-center justify-center rounded-full text-red-400 hover:bg-red-50 hover:text-red-600 transition-colors"
+                              title="Marcar como faltante"
+                            >
+                              <span className="text-lg font-bold">×</span>
+                            </button>
+                          )}
                         </div>
                       );
                     })}
@@ -320,10 +331,18 @@ export default function PickingPage() {
                       const orderDismissed = order.items
                         .map((item, idx) => ({ item, key: `${order.boleta}-${idx}` }))
                         .filter(({ key }) => dismissed.has(key));
-                      if (orderDismissed.length === 0 || !order.telefono) return null;
+                      if (orderDismissed.length === 0) return null;
 
-                      const phone = order.telefono.replace(/[^0-9]/g, "");
-                      const phoneNum = phone.startsWith("54") ? phone : `54${phone}`;
+                      // Try phone from field, then extract from client name
+                      let phone = order.telefono?.replace(/[^0-9]/g, "") || "";
+                      if (!phone) {
+                        // Extract phone from name like "MARTIN PUENTE (+54 9 11 2400-6246)" or "(11 2184-4004)"
+                        const nameMatch = order.clienteNombre.match(/\(?\+?54?\s*9?\s*(11[\s-]?\d{4}[\s-]?\d{4})\)?/);
+                        if (nameMatch) phone = nameMatch[1].replace(/[\s-]/g, "");
+                      }
+                      if (!phone) return null;
+
+                      const phoneNum = phone.startsWith("54") ? phone : phone.startsWith("9") ? `54${phone}` : `549${phone}`;
                       const faltantes = orderDismissed
                         .map(({ item }) => `- ${item.productName} (${item.cant} ${item.unit || "UN"})`)
                         .join("\n");

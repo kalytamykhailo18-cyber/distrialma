@@ -207,6 +207,11 @@ export async function GET() {
         ptProd = puntouchBySku.get(peyaProd.sku) || null;
       }
 
+      // 3. Fallback: try matching PedidosYa SKU against PunTouch barcodes
+      if (!ptProd) {
+        ptProd = puntouchByBarcode.get(peyaProd.sku) || puntouchByBarcode.get(peyaProd.sku.replace(/^0+/, "")) || null;
+      }
+
       if (!ptProd) {
         unmatched++;
         unmatchedList.push({
