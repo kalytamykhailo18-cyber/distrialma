@@ -42,9 +42,11 @@ export async function GET() {
         p.Cant AS cant,
         p.Precio AS precio,
         p.Impo AS impo,
-        LTRIM(RTRIM(ISNULL(pr.Unidad, ''))) AS unit
+        LTRIM(RTRIM(ISNULL(pr.Unidad, ''))) AS unit,
+        ISNULL(s.Stk, 0) AS stock
       FROM [${dbPedidos}].dbo.Pedidos p
       LEFT JOIN [${dbProductos}].dbo.Productos pr ON pr.Cod = p.Producto
+      LEFT JOIN [${dbProductos}].dbo.Stock s ON s.CodProducto = p.Producto AND LTRIM(RTRIM(s.Deposito)) = '0'
       WHERE p.Tipo = 'I'
         AND (p.Anulado IS NULL OR LTRIM(RTRIM(p.Anulado)) = '' OR p.Anulado = ' ')
     `);
@@ -71,7 +73,7 @@ export async function GET() {
     }
 
     // Group items by boleta
-    const itemsByBoleta = new Map<string, Array<{ sku: string; productName: string; cant: number; precio: number; impo: number; unit: string }>>();
+    const itemsByBoleta = new Map<string, Array<{ sku: string; productName: string; cant: number; precio: number; impo: number; unit: string; stock: number }>>();
     for (const item of items.recordset) {
       if (!itemsByBoleta.has(item.boleta)) itemsByBoleta.set(item.boleta, []);
       itemsByBoleta.get(item.boleta)!.push(item);

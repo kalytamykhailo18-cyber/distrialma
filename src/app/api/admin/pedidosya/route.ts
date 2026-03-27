@@ -70,6 +70,7 @@ async function updatePeyaPrices(
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
+      "x-client-source": "one-web",
     },
     body: JSON.stringify({
       operationName: "ProductsUpdate",
@@ -91,6 +92,7 @@ async function updatePeyaPrices(
   });
 
   const data = await res.json();
+  console.log("PeYa update response:", JSON.stringify(data).substring(0, 500));
   if (data.errors) return { success: false, error: data.errors[0]?.message };
 
   const result = data.data?.productsUpdate;
@@ -124,7 +126,8 @@ export async function GET() {
         LTRIM(RTRIM(p.Cod)) AS sku,
         LTRIM(RTRIM(p.Nombre)) AS nombre,
         LTRIM(RTRIM(ISNULL(p.Codbar, ''))) AS codbar,
-        ISNULL(s.Precio5, 0) AS precio5
+        ISNULL(s.Precio5, 0) AS precio5,
+        LTRIM(RTRIM(ISNULL(p.Unidad, ''))) AS unidad
       FROM [${dbProd}].dbo.Productos p
       JOIN [${dbProd}].dbo.Stock s ON s.CodProducto = p.Cod
       WHERE (p.DeBaja = 0 OR p.DeBaja IS NULL)
@@ -133,11 +136,14 @@ export async function GET() {
     `);
 
     // Build lookup maps: barcode → product, SKU → product
-    type PtProd = { sku: string; nombre: string; precio5: number };
+    type PtProd = { sku: string; nombre: string; precio5: number; isKg: boolean };
     const puntouchByBarcode = new Map<string, PtProd>();
     const puntouchBySku = new Map<string, PtProd>();
     for (const row of result.recordset) {
-      const prod = { sku: row.sku, nombre: row.nombre, precio5: row.precio5 };
+      const isKg = row.unidad?.toUpperCase() === "KG";
+      // KG products: PunTouch stores price x10, PedidosYa needs real price (/10)
+      const precio5 = isKg ? Math.round(row.precio5 / 10) : row.precio5;
+      const prod = { sku: row.sku, nombre: row.nombre, precio5, isKg };
       // Map by SKU (PunTouch Cod)
       puntouchBySku.set(row.sku, prod);
       if (row.codbar) {
