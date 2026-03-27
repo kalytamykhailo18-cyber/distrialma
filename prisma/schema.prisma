@@ -30,7 +30,7 @@ model ProductDescription {
 model Setting {
   id    Int    @id @default(autoincrement())
   key   String @unique @db.VarChar(50)
-  value String @db.VarChar(255)
+  value String @db.Text
 
   @@map("settings")
 }

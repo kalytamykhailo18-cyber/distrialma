@@ -3,14 +3,21 @@
   "short_name": "Precios",
   "start_url": "/consulta-precios",
   "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#111827",
-  "theme_color": "#fb9a47",
+  "theme_color": "#111827",
   "icons": [
     {
-      "src": "/favicon.png",
-      "sizes": "100x71",
+      "src": "/icon-192.png",
+      "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any"
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
     }
   ]
 }

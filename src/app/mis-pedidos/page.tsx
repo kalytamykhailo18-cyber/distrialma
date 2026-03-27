@@ -5,7 +5,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { formatPrice } from "@/lib/utils";
-import { HiChevronDown } from "react-icons/hi";
+import { HiChevronDown, HiOutlineDocumentDownload } from "react-icons/hi";
 
 interface OrderItem {
   sku: string;
@@ -66,6 +66,100 @@ export default function MisPedidosPage() {
       else next.add(boleta);
       return next;
     });
+  }
+
+  async function downloadPDF(order: Order) {
+    const { default: jsPDF } = await import("jspdf");
+    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+    const w = doc.internal.pageSize.getWidth();
+    let y = 15;
+
+    // Header
+    doc.setFillColor(251, 154, 71); // brand orange
+    doc.rect(0, 0, w, 28, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(18);
+    doc.setFont("helvetica", "bold");
+    doc.text("Distrialma", 14, 13);
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text("Siempre con vos", 14, 19);
+    doc.setFontSize(14);
+    doc.text(`Boleta #${order.nroped}`, w - 14, 13, { align: "right" });
+    doc.setFontSize(9);
+    doc.text(formatDate(order.date), w - 14, 19, { align: "right" });
+
+    y = 36;
+
+    // Order info
+    doc.setTextColor(80, 80, 80);
+    doc.setFontSize(9);
+    if (order.notas) {
+      doc.text(`Observaciones: ${order.notas}`, 14, y);
+      y += 6;
+    }
+
+    // Table header
+    y += 2;
+    doc.setFillColor(55, 65, 81);
+    doc.rect(10, y, w - 20, 8, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "bold");
+    doc.text("Producto", 14, y + 5.5);
+    doc.text("Cant", w - 70, y + 5.5, { align: "right" });
+    doc.text("Precio", w - 40, y + 5.5, { align: "right" });
+    doc.text("Importe", w - 14, y + 5.5, { align: "right" });
+    y += 10;
+
+    // Table rows
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    for (let i = 0; i < order.items.length; i++) {
+      const item = order.items[i];
+      if (y > 270) {
+        doc.addPage();
+        y = 15;
+      }
+
+      // Zebra stripe
+      if (i % 2 === 0) {
+        doc.setFillColor(245, 245, 245);
+        doc.rect(10, y - 3.5, w - 20, 7, "F");
+      }
+
+      // Grid line
+      doc.setDrawColor(220, 220, 220);
+      doc.line(10, y + 3.5, w - 10, y + 3.5);
+
+      doc.setTextColor(50, 50, 50);
+      const name = item.name.length > 55 ? item.name.substring(0, 52) + "..." : item.name;
+      doc.text(name, 14, y + 1);
+      doc.text(String(item.cant), w - 70, y + 1, { align: "right" });
+      doc.text(formatPrice(item.precio), w - 40, y + 1, { align: "right" });
+      doc.setFont("helvetica", "bold");
+      doc.text(formatPrice(item.impo), w - 14, y + 1, { align: "right" });
+      doc.setFont("helvetica", "normal");
+      y += 7;
+    }
+
+    // Total bar
+    y += 3;
+    doc.setFillColor(251, 154, 71);
+    doc.rect(10, y, w - 20, 10, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.text("TOTAL", 14, y + 7);
+    doc.text(formatPrice(order.total), w - 14, y + 7, { align: "right" });
+
+    // Footer
+    doc.setTextColor(160, 160, 160);
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "normal");
+    doc.text("distrialma.com.ar", w / 2, 290, { align: "center" });
+
+    doc.save(`Boleta-${order.nroped}.pdf`);
   }
 
   if (status === "loading" || (status === "authenticated" && loading)) {
@@ -134,6 +228,15 @@ export default function MisPedidosPage() {
 
               {expanded.has(order.boleta) && (
                 <div className="border-t px-4 py-3">
+                  <div className="flex justify-end mb-2">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); downloadPDF(order); }}
+                      className="flex items-center gap-1 text-xs text-brand-600 hover:text-brand-700 font-medium"
+                    >
+                      <HiOutlineDocumentDownload className="w-4 h-4" />
+                      Descargar PDF
+                    </button>
+                  </div>
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="text-gray-500 text-xs">

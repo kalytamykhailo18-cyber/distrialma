@@ -30,6 +30,7 @@ const ICON_MAP: Record<string, IconType> = {
   compras: HiOutlineShoppingCart,
   precios: HiOutlineCurrencyDollar,
   proveedores: HiOutlineOfficeBuilding,
+  pedidosya: HiOutlineTruck,
   usuarios: HiOutlineUserGroup,
   etiquetas: HiOutlinePrinter,
   "mis-pedidos": HiOutlineClipboardList,
@@ -117,6 +118,7 @@ export default function Navbar() {
     { href: "/admin/compras", label: "Compras", perm: "compras", iconKey: "compras" },
     { href: "/admin/precios", label: "Precios", perm: "costeo", iconKey: "precios" },
     { href: "/admin/proveedores", label: "Proveedores", perm: "compras", iconKey: "proveedores" },
+    { href: "/admin/pedidosya", label: "PedidosYa", perm: "costeo", iconKey: "pedidosya" },
     { href: "/admin/usuarios", label: "Usuarios", perm: "usuarios", iconKey: "usuarios" },
     { href: "/admin/etiquetas", label: "Etiquetas", perm: "etiquetas", iconKey: "etiquetas" },
   ];

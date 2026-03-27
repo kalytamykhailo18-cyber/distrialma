@@ -42,6 +42,7 @@ export const PAGE_PERMISSION_MAP: Record<string, Permission> = {
   "/admin/precios": "costeo",
   "/admin/proveedores": "compras",
   "/admin/picking": "picking",
+  "/admin/pedidosya": "costeo",
   "/admin/usuarios": "usuarios",
   "/reparto": "reparto",
 };
