@@ -101,7 +101,9 @@ export default function CombosPage() {
     setEditId(combo.id);
     setName(combo.name);
     setDescription(combo.description || "");
-    setPrice(combo.price ? String(combo.price) : "");
+    // Only pre-fill price if it was a custom price (different from auto-calculated)
+    // Leave empty so auto-calculation kicks in — prevents stale fixed prices
+    setPrice("");
     // Fetch product names for items
     const itemsWithNames = await Promise.all(
       combo.items.map(async (i) => {
