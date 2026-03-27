@@ -14,7 +14,8 @@ export async function GET(req: NextRequest) {
     const pool = await getPool();
     const dbProd = getDbName("productos");
 
-    // Try exact barcode or SKU first, then name search
+    // Try exact barcode (main + alternatives) or SKU first, then name search
+    // No stock filter — kiosk should always show products
     const result = await pool.request().input("q", q).input("pattern", `%${q}%`).query(`
       SELECT TOP 1
         LTRIM(RTRIM(p.Cod)) AS sku,
@@ -37,12 +38,16 @@ export async function GET(req: NextRequest) {
         AND LTRIM(RTRIM(s.Deposito)) = '0'
         AND (
           LTRIM(RTRIM(ISNULL(p.Codbar, ''))) = @q
+          OR LTRIM(RTRIM(ISNULL(p.CodAlt, ''))) = @q
+          OR LTRIM(RTRIM(ISNULL(p.CodAlt2, ''))) = @q
           OR LTRIM(RTRIM(p.Cod)) = @q
           OR p.Nombre LIKE @pattern
         )
       ORDER BY
         CASE
           WHEN LTRIM(RTRIM(ISNULL(p.Codbar, ''))) = @q THEN 0
+          WHEN LTRIM(RTRIM(ISNULL(p.CodAlt, ''))) = @q THEN 0
+          WHEN LTRIM(RTRIM(ISNULL(p.CodAlt2, ''))) = @q THEN 0
           WHEN LTRIM(RTRIM(p.Cod)) = @q THEN 1
           ELSE 2
         END,

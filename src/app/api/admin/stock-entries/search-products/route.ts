@@ -29,8 +29,10 @@ export async function GET(req: NextRequest) {
       WHERE p.Nombre LIKE @q
          OR p.Cod LIKE @q
          OR ISNULL(p.Codbar,'') LIKE @q
+         OR ISNULL(p.CodAlt,'') LIKE @q
+         OR ISNULL(p.CodAlt2,'') LIKE @q
          OR LTRIM(RTRIM(p.Cod)) = @exact
-      ORDER BY CASE WHEN LTRIM(RTRIM(p.Cod)) = @exact THEN 0 WHEN LTRIM(RTRIM(ISNULL(p.Codbar,''))) = @exact THEN 1 ELSE 2 END, p.Nombre
+      ORDER BY CASE WHEN LTRIM(RTRIM(p.Cod)) = @exact THEN 0 WHEN LTRIM(RTRIM(ISNULL(p.Codbar,''))) = @exact THEN 1 WHEN LTRIM(RTRIM(ISNULL(p.CodAlt,''))) = @exact THEN 1 WHEN LTRIM(RTRIM(ISNULL(p.CodAlt2,''))) = @exact THEN 1 ELSE 2 END, p.Nombre
     `);
 
     return NextResponse.json({ products: result.recordset });

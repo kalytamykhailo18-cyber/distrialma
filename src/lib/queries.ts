@@ -91,7 +91,7 @@ export async function getProducts(opts: {
     params.brandId = brandId;
   }
   if (search) {
-    where += " AND (p.Nombre LIKE @search OR p.Cod LIKE @search)";
+    where += " AND (p.Nombre LIKE @search OR p.Cod LIKE @search OR ISNULL(p.Codbar,'') LIKE @search OR ISNULL(p.CodAlt,'') LIKE @search OR ISNULL(p.CodAlt2,'') LIKE @search)";
     params.search = `%${search}%`;
   }
 
