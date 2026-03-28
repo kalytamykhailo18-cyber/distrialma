@@ -115,7 +115,16 @@ export default function CierreCajaPage() {
     doc.setFont("helvetica", "bold");
     doc.text("TOTAL VENTAS", 14, y + 7);
     doc.text(fmt(data.ventas.total), w - 14, y + 7, { align: "right" });
-    y += 16;
+    y += 18;
+
+    // Page overflow handler
+    const pageH = doc.internal.pageSize.getHeight();
+    const checkPage = (needed = 10) => {
+      if (y + needed > pageH - 15) {
+        doc.addPage();
+        y = 15;
+      }
+    };
 
     // Caja detail
     doc.setTextColor(50, 50, 50);
@@ -123,6 +132,7 @@ export default function CierreCajaPage() {
     doc.setFont("helvetica", "normal");
 
     const drawRow = (label: string, value: string, bold = false) => {
+      checkPage(10);
       if (bold) doc.setFont("helvetica", "bold");
       doc.text(label, 14, y);
       doc.text(value, w - 14, y, { align: "right" });
@@ -152,22 +162,39 @@ export default function CierreCajaPage() {
 
     // Movimientos table
     if (data.movimientos.length > 0) {
+      const drawMovHeader = () => {
+        doc.setFillColor(55, 65, 81);
+        doc.rect(10, y, w - 20, 8, "F");
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(8);
+        doc.setFont("helvetica", "bold");
+        doc.text("Tipo", 14, y + 5.5);
+        doc.text("Concepto", 50, y + 5.5);
+        doc.text("Hora", 140, y + 5.5);
+        doc.text("Monto", w - 14, y + 5.5, { align: "right" });
+        y += 12;
+        doc.setTextColor(50, 50, 50);
+      };
+
+      checkPage(20);
       doc.setFontSize(10);
       doc.setFont("helvetica", "bold");
+      doc.setTextColor(50, 50, 50);
       doc.text("Movimientos de Caja", 14, y);
       y += 6;
-
-      doc.setFillColor(240, 240, 240);
-      doc.rect(10, y, w - 20, 7, "F");
-      doc.setFontSize(8);
-      doc.text("Tipo", 14, y + 5);
-      doc.text("Concepto", 50, y + 5);
-      doc.text("Hora", 140, y + 5);
-      doc.text("Monto", w - 14, y + 5, { align: "right" });
-      y += 9;
+      drawMovHeader();
 
       doc.setFont("helvetica", "normal");
+      doc.setFontSize(8);
       for (const m of data.movimientos) {
+        if (y + 8 > pageH - 15) {
+          doc.addPage();
+          y = 15;
+          drawMovHeader();
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(8);
+        }
+        doc.setTextColor(50, 50, 50);
         doc.text(m.tipo, 14, y);
         doc.text(m.concepto.substring(0, 40), 50, y);
         doc.text(formatFechora(m.fechora), 140, y);
@@ -180,10 +207,14 @@ export default function CierreCajaPage() {
       }
     }
 
-    // Footer
-    doc.setTextColor(160, 160, 160);
-    doc.setFontSize(7);
-    doc.text("distrialma.com.ar — Generado automáticamente", w / 2, 285, { align: "center" });
+    // Footer on all pages
+    const pageCount = doc.getNumberOfPages();
+    for (let p = 1; p <= pageCount; p++) {
+      doc.setPage(p);
+      doc.setTextColor(160, 160, 160);
+      doc.setFontSize(7);
+      doc.text(`Página ${p}/${pageCount} — distrialma.com.ar`, w / 2, pageH - 8, { align: "center" });
+    }
 
     doc.save(`CierreCaja-Suc${data.sucursal}-${new Date().toISOString().slice(0, 10)}.pdf`);
   }
@@ -193,13 +224,26 @@ export default function CierreCajaPage() {
       <h1 className="text-2xl font-bold text-gray-900 mb-2">Cierre de Caja</h1>
       <p className="text-sm text-gray-500 mb-6">Genera el cierre de caja y descarga el PDF.</p>
 
-      <button
-        onClick={loadCierre}
-        disabled={loading}
-        className="bg-brand-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-brand-700 disabled:opacity-50 transition-colors"
-      >
-        {loading ? "Cargando..." : data ? "Actualizar" : "Cargar Cierre"}
-      </button>
+      <div className="flex gap-3">
+        <button
+          onClick={loadCierre}
+          disabled={loading}
+          className={`px-5 py-2.5 rounded-xl font-semibold disabled:opacity-50 transition-colors ${
+            data ? "bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200" : "bg-brand-600 text-white hover:bg-brand-700"
+          }`}
+        >
+          {loading ? "Cargando..." : data ? "Actualizar" : "Cargar Cierre"}
+        </button>
+        {data && (
+          <button
+            onClick={downloadPDF}
+            className="flex items-center gap-2 px-5 py-2.5 bg-red-500 text-white rounded-xl font-semibold hover:bg-red-600 transition-colors"
+          >
+            <HiOutlineDocumentDownload className="w-5 h-5" />
+            Descargar PDF
+          </button>
+        )}
+      </div>
 
       {error && (
         <div className="mt-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl">{error}</div>
@@ -281,10 +325,10 @@ export default function CierreCajaPage() {
               {/* Movimientos */}
               {data.movimientos.length > 0 && (
                 <div className="bg-white border rounded-xl mb-4 overflow-hidden">
-                  <div className="px-4 py-2 bg-gray-50 border-b">
-                    <p className="text-sm font-bold text-gray-700">Movimientos de Caja</p>
+                  <div className="px-4 py-2 bg-gray-50 border-b sticky top-0 z-10">
+                    <p className="text-sm font-bold text-gray-700">Movimientos de Caja ({data.movimientos.length})</p>
                   </div>
-                  <div className="divide-y">
+                  <div className="divide-y max-h-80 overflow-y-auto">
                     {data.movimientos.map((m, i) => (
                       <div key={i} className="px-4 py-2 flex items-center justify-between">
                         <div>
@@ -314,14 +358,6 @@ export default function CierreCajaPage() {
             </div>
           )}
 
-          {/* Download PDF */}
-          <button
-            onClick={downloadPDF}
-            className="flex items-center gap-2 px-5 py-3 bg-red-500 text-white rounded-xl font-semibold hover:bg-red-600 transition-colors"
-          >
-            <HiOutlineDocumentDownload className="w-5 h-5" />
-            Descargar PDF del Cierre
-          </button>
         </div>
       )}
     </div>
