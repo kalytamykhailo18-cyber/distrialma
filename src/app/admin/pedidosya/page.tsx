@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { HiOutlineDocumentDownload } from "react-icons/hi";
 
 interface PriceChange {
@@ -35,6 +35,93 @@ interface CompareResult {
   changes: PriceChange[];
   stockChanges: StockChange[];
   unmatchedList: UnmatchedItem[];
+}
+
+function ImageLookup() {
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<Array<{ sku: string; name: string; image: string | null }>>([]);
+  const [searching, setSearching] = useState(false);
+  const [copied, setCopied] = useState("");
+  const searchTimeout = useRef<NodeJS.Timeout | null>(null);
+
+  function handleSearch(q: string) {
+    setQuery(q);
+    if (searchTimeout.current) clearTimeout(searchTimeout.current);
+    if (q.trim().length < 2) { setResults([]); return; }
+    searchTimeout.current = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const res = await fetch(`/api/products?search=${encodeURIComponent(q)}&limit=10`);
+        const data = await res.json();
+        setResults((data.products || []).map((p: { sku: string; name: string; images: Array<{ url: string }> }) => ({
+          sku: p.sku,
+          name: p.name,
+          image: p.images?.[0]?.url || null,
+        })));
+      } catch { setResults([]); }
+      finally { setSearching(false); }
+    }, 400);
+  }
+
+  function copyUrl(url: string) {
+    navigator.clipboard.writeText(url);
+    setCopied(url);
+    setTimeout(() => setCopied(""), 2000);
+  }
+
+  if (!query && results.length === 0) {
+    return (
+      <div className="mb-6">
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => handleSearch(e.target.value)}
+          placeholder="Buscar imagen de producto (nombre, SKU o código de barras)..."
+          className="w-full px-4 py-2 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="mb-6">
+      <input
+        type="text"
+        value={query}
+        onChange={(e) => handleSearch(e.target.value)}
+        placeholder="Buscar imagen de producto..."
+        className="w-full px-4 py-2 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 mb-2"
+      />
+      {searching && <p className="text-xs text-gray-400">Buscando...</p>}
+      {results.length > 0 && (
+        <div className="bg-white border rounded-lg divide-y">
+          {results.map((p) => (
+            <div key={p.sku} className="px-3 py-2 flex items-center gap-3">
+              {p.image && (
+                <img src={p.image} alt="" className="w-10 h-10 object-contain rounded" />
+              )}
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium truncate">{p.name}</p>
+                <p className="text-xs text-gray-400">SKU: {p.sku}</p>
+              </div>
+              {p.image ? (
+                <button
+                  onClick={() => copyUrl(p.image!)}
+                  className={`text-xs px-2 py-1 rounded font-medium shrink-0 ${
+                    copied === p.image ? "bg-green-100 text-green-700" : "bg-brand-50 text-brand-600 hover:bg-brand-100"
+                  }`}
+                >
+                  {copied === p.image ? "Copiado!" : "Copiar URL"}
+                </button>
+              ) : (
+                <span className="text-xs text-gray-300 shrink-0">Sin imagen</span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function MappingRow({ mapping, onUpdate, onDelete }: {
@@ -514,10 +601,31 @@ export default function PedidosYaPage() {
 
   return (
     <div className="max-w-5xl mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-1">PedidosYa — Sync</h1>
-      <p className="text-gray-500 text-sm mb-6">
+      <div className="flex items-center justify-between mb-1">
+        <h1 className="text-2xl font-bold">PedidosYa — Sync</h1>
+        <div className="flex gap-2">
+          <a
+            href="/api/admin/pedidosya/export-new?weight=100&section=Fiambres%20y%20Quesos"
+            className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-purple-600 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100"
+          >
+            <HiOutlineDocumentDownload className="w-4 h-4" />
+            Nuevos 100g
+          </a>
+          <a
+            href="/api/admin/pedidosya/export-new?weight=250&section=Fiambres%20y%20Quesos"
+            className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-purple-600 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100"
+          >
+            <HiOutlineDocumentDownload className="w-4 h-4" />
+            Nuevos 250g
+          </a>
+        </div>
+      </div>
+      <p className="text-gray-500 text-sm mb-4">
         Compara precios y stock de PunTouch con PedidosYa.
       </p>
+
+      {/* Image URL lookup */}
+      <ImageLookup />
 
       {/* Login / Token renewal UI */}
       {(tokenExpired || loginStep !== "idle") && (
