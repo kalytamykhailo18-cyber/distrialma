@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getPool, getDbName } from "@/lib/mssql";
 import { requireStaff } from "@/lib/api-auth";
 import { prisma } from "@/lib/prisma";
+import ExcelJS from "exceljs";
 
 export async function GET(req: NextRequest) {
   if (!(await requireStaff())) {
@@ -15,7 +16,6 @@ export async function GET(req: NextRequest) {
     const pool = await getPool();
     const dbProd = getDbName("productos");
 
-    // Get KG products with stock > 0 and Precio5 > 0
     const result = await pool.request().query(`
       SELECT
         LTRIM(RTRIM(p.Cod)) AS sku,
@@ -37,7 +37,6 @@ export async function GET(req: NextRequest) {
       ORDER BY r.[Desc], p.Nombre
     `);
 
-    // Get Cloudinary images
     const skus = result.recordset.map((r: { sku: string }) => r.sku);
     const images = await prisma.productImage.findMany({
       where: { sku: { in: skus } },
@@ -48,81 +47,112 @@ export async function GET(req: NextRequest) {
       if (!imageMap.has(img.sku)) imageMap.set(img.sku, img.filename);
     }
 
-    // Build CSV rows matching PedidosYa template
-    // Columns: Activo, Codigo de Barras, SKU, Precio, Seccion, Que producto es, Marca, Variante, Contenido, Unidad, Nombre formado, Link/URL Imagen, Descripcion
     const weightKg = weight / 1000;
     const weightLabel = weight >= 1000 ? `${weight / 1000} kg` : `${weight} g`;
 
-    const header = [
-      "Activo (SI/NO)",
-      "Codigo de Barras",
-      "SKU",
-      "Precio",
-      "Seccion",
-      "Que producto es",
-      "Marca (brand)",
-      "Variante",
-      "Contenido",
-      "Unidad",
-      "Nombre formado",
-      "Link/URL de la Imagen",
-      "Descripcion",
+    // Build Excel with ExcelJS (proper styling support)
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet("Template");
+
+    // Column widths
+    ws.columns = [
+      { width: 14 },  // A - Activo
+      { width: 20 },  // B - Codigo de Barras
+      { width: 12 },  // C - SKU
+      { width: 12 },  // D - Precio
+      { width: 24 },  // E - Seccion
+      { width: 24 },  // F - Que producto es
+      { width: 20 },  // G - Marca
+      { width: 38 },  // H - Variante
+      { width: 14 },  // I - Contenido
+      { width: 12 },  // J - Unidad
+      { width: 48 },  // K - Nombre formado
+      { width: 65 },  // L - Imagen URL
+      { width: 22 },  // M - Descripcion
+      { width: 14 },  // N - Impuestos
+      { width: 22 },  // O - Validation
     ];
 
-    const rows = result.recordset.map((p: {
-      sku: string; nombre: string; codbar: string;
-      rubro: string; marca: string; precio5: number;
-    }) => {
-      // Price per weight: Precio5 is per KG (stored as KG price in PunTouch for these)
-      const pricePerKg = p.precio5;
-      const price = Math.round(pricePerKg * weightKg);
+    const thinBorder: Partial<ExcelJS.Borders> = {
+      top: { style: "thin" },
+      bottom: { style: "thin" },
+      left: { style: "thin" },
+      right: { style: "thin" },
+    };
 
-      // Product name parts
-      const productType = p.rubro || "Fiambre";
-      const brand = p.marca || "";
-      const cleanName = p.nombre
-        .replace(/\s*KG\s*/gi, "")
-        .replace(/\s*K\s*$/i, "")
-        .trim();
-      const variant = cleanName;
-      const content = String(weight);
-      const unit = weight >= 1000 ? "kg" : "g";
-      const formedName = `${brand ? brand + " " : ""}${cleanName} ${weightLabel}`.trim();
+    // Row 1 — Headers
+    const headerData = [
+      "Activo (SI/NO)", "Codigo de Barras", "SKU", "Precio", "Seccion",
+      "Que producto es", "Marca (brand)", "Variante", "Contenido",
+      "Unidad", "Nombre formado", "Link/URL de la Imagen", "Descripcion",
+      "Impuestos", "Validation INFO",
+    ];
+    const headerRow = ws.addRow(headerData);
+    headerRow.height = 28;
 
-      const imageUrl = imageMap.get(p.sku) || "";
+    // Color-code headers like original template
+    const headerColors: Record<number, string> = {
+      // A-E: Red (mandatory always)
+      1: "FFFA0050", 2: "FFFA0050", 3: "FFFA0050", 4: "FFFA0050", 5: "FFFA0050",
+      // F-J: Orange (mandatory for new products)
+      6: "FFFF9900", 7: "FFFF9900", 8: "FFFF9900", 9: "FFFF9900", 10: "FFFF9900",
+      // K: Gray (auto-calculated)
+      11: "FFB7B7B7",
+      // L: Orange (image, mandatory for new)
+      12: "FFFF9900",
+      // M: Yellow (optional)
+      13: "FFFFFF00",
+      // N: Blue (taxes)
+      14: "FFC9DAF8",
+      // O: Gray (validation)
+      15: "FFB7B7B7",
+    };
 
-      return [
-        "SI",
-        p.codbar || "",
-        p.sku,
-        String(price),
-        section,
-        productType,
-        brand,
-        variant,
-        content,
-        unit,
-        formedName,
-        imageUrl,
-        "",
-      ];
+    headerRow.eachCell((cell, colNumber) => {
+      cell.fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: headerColors[colNumber] || "FFFA0050" },
+      };
+      cell.font = { bold: true, size: 11, color: { argb: "FF000000" } };
+      cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
+      cell.border = thinBorder;
     });
 
-    // Generate CSV with BOM for Excel
-    const BOM = "\uFEFF";
-    const csv = BOM + [header, ...rows].map((r) =>
-      r.map((c) => {
-        const s = String(c);
-        return s.includes(",") || s.includes('"') || s.includes("\n")
-          ? `"${s.replace(/"/g, '""')}"`
-          : s;
-      }).join(",")
-    ).join("\n");
+    // Data rows
+    for (const p of result.recordset as Array<{
+      sku: string; nombre: string; codbar: string;
+      rubro: string; marca: string; precio5: number;
+    }>) {
+      const price = Math.round(p.precio5 * weightKg);
+      const brand = p.marca || "";
+      const cleanName = p.nombre.replace(/\s*KG\s*/gi, "").replace(/\s*K\s*$/i, "").trim();
+      const formedName = `${brand ? brand + " " : ""}${cleanName} ${weightLabel}`.trim();
+      const imageUrl = imageMap.get(p.sku) || "";
 
-    return new NextResponse(csv, {
+      const row = ws.addRow([
+        "SI", p.codbar || "", p.sku, price, section,
+        p.rubro || "Fiambre", brand, cleanName, weight,
+        weight >= 1000 ? "kg" : "g", formedName, imageUrl, "",
+        "", "",
+      ]);
+
+      row.eachCell((cell) => {
+        cell.alignment = { horizontal: "left", vertical: "middle" };
+        cell.border = thinBorder;
+        cell.font = { size: 11 };
+      });
+    }
+
+    // Freeze panes (freeze row 1 and 2)
+    ws.views = [{ state: "frozen", ySplit: 1 }];
+
+    const buffer = await wb.xlsx.writeBuffer();
+
+    return new NextResponse(buffer, {
       headers: {
-        "Content-Type": "text/csv; charset=utf-8",
-        "Content-Disposition": `attachment; filename="PedidosYa-Nuevos-${weight}g-${new Date().toISOString().slice(0, 10)}.csv"`,
+        "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "Content-Disposition": `attachment; filename="PedidosYa-Nuevos-${weight}g-${new Date().toISOString().slice(0, 10)}.xlsx"`,
       },
     });
   } catch (error) {

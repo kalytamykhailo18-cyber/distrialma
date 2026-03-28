@@ -69,52 +69,59 @@ async function updatePeyaProducts(
   token: string,
   updates: Array<{ sku: string; price?: number; active?: boolean }>
 ): Promise<{ success: boolean; error?: string }> {
-  const products = updates.map((u) => {
-    const prod: { sku: string; price?: number; active?: boolean } = { sku: u.sku };
-    if (u.price !== undefined) prod.price = u.price;
-    if (u.active !== undefined) prod.active = u.active;
-    return prod;
-  });
+  // Use individual synchronous mutation (more reliable than batch async)
+  const errors: string[] = [];
+  let successCount = 0;
 
-  const res = await fetch(PEYA_GRAPHQL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-      "x-client-source": "one-web",
-    },
-    body: JSON.stringify({
-      operationName: "ProductsUpdate",
-      query: `mutation ProductsUpdate($productsUpdate: ProductsUpdate!) {
-        productsUpdate(productsUpdate: $productsUpdate) {
-          ... on ProductsUpdatedSuccessResult { __typename status }
-          ... on ProductsUpdateAccepted { __typename bulkRequestId }
-          ... on ProductsUpdateAsyncAccepted { __typename }
-          ... on ProductsUpdateValidationErrors { __typename productsErrors { sku error } }
-        }
-      }`,
-      variables: {
-        productsUpdate: {
-          vendorIdentifiers: [VENDOR],
-          products,
+  for (const u of updates) {
+    const productUpdate: Record<string, unknown> = {
+      vendorIdentifier: VENDOR,
+      sku: u.sku,
+    };
+    if (u.price !== undefined) productUpdate.price = u.price;
+    if (u.active !== undefined) productUpdate.active = u.active;
+
+    try {
+      const res = await fetch(PEYA_GRAPHQL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+          "x-client-source": "one-web",
         },
-      },
-    }),
-  });
+        body: JSON.stringify({
+          operationName: "ProductUpdate",
+          query: `mutation ProductUpdate($productUpdate: ProductUpdate!) {
+            product(productUpdate: $productUpdate) {
+              ... on ProductUpdateResult { sku price active }
+              ... on ProductsUpdateValidationErrors { __typename productsErrors { sku error } }
+            }
+          }`,
+          variables: { productUpdate },
+        }),
+      });
 
-  if (!res.ok || !res.headers.get("content-type")?.includes("json")) {
-    return { success: false, error: "Token expirado. Renová la sesión." };
+      if (!res.ok || !res.headers.get("content-type")?.includes("json")) {
+        errors.push(`${u.sku}: Token expirado`);
+        break;
+      }
+      const data = await res.json();
+      if (data.errors) {
+        errors.push(`${u.sku}: ${data.errors[0]?.message}`);
+      } else if (data.data?.product?.productsErrors) {
+        errors.push(`${u.sku}: ${data.data.product.productsErrors[0]?.error}`);
+      } else {
+        successCount++;
+      }
+    } catch (e) {
+      errors.push(`${u.sku}: ${e instanceof Error ? e.message : "Error"}`);
+    }
   }
-  const data = await res.json();
-  console.log("PeYa update response:", JSON.stringify(data).substring(0, 500));
-  if (data.errors) return { success: false, error: data.errors[0]?.message };
 
-  const result = data.data?.productsUpdate;
-  if (result?.__typename === "ProductsUpdateValidationErrors") {
-    const errList = result.productsErrors?.slice(0, 5).map((e: { sku: string; error: string }) => `${e.sku}: ${e.error}`).join("; ");
-    return { success: false, error: errList || "Validation error" };
+  if (errors.length > 0) {
+    console.log("PeYa update errors:", errors.join("; "));
+    return { success: successCount > 0, error: errors.join("; ") };
   }
-
   return { success: true };
 }
 
