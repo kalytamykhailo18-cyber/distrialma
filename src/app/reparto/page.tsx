@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { formatPrice } from "@/lib/utils";
 import { hasPermission } from "@/lib/permissions";
 import { FaWhatsapp } from "react-icons/fa";
+import { HiOutlineDocumentDownload } from "react-icons/hi";
 
 interface Client {
   cod: string;
@@ -78,6 +79,119 @@ export default function RepartoPage() {
 
   if (!allowed) return null;
 
+  async function exportPDF() {
+    if (!data || !filtered.length) return;
+    const { default: jsPDF } = await import("jspdf");
+    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+    const w = doc.internal.pageSize.getWidth();
+    let y = 15;
+
+    // Header
+    doc.setFillColor(251, 154, 71);
+    doc.rect(0, 0, w, 22, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "bold");
+    doc.text("Distrialma — Hoja de Reparto", 14, 14);
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    doc.text(`${selectedDay} — ${filtered.length} clientes — ${new Date().toLocaleDateString("es-AR")}`, w - 14, 14, { align: "right" });
+    y = 28;
+
+    // Stats bar
+    if (data.stats) {
+      doc.setFillColor(240, 240, 240);
+      doc.rect(10, y, w - 20, 8, "F");
+      doc.setTextColor(80, 80, 80);
+      doc.setFontSize(8);
+      doc.text(`Total: ${data.stats.total}  |  Facturado: ${data.stats.facturado}  |  Pedido web: ${data.stats.pendiente}  |  Sin pedido: ${data.stats.sinPedido}`, 14, y + 5.5);
+      y += 12;
+    }
+
+    // Table header
+    doc.setFillColor(55, 65, 81);
+    doc.rect(10, y, w - 20, 8, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "bold");
+    doc.text("#", 14, y + 5.5);
+    doc.text("Cliente", 22, y + 5.5);
+    doc.text("Dirección", 90, y + 5.5);
+    doc.text("Teléfono", 148, y + 5.5);
+    doc.text("Estado", 178, y + 5.5);
+    doc.text("Total", w - 14, y + 5.5, { align: "right" });
+    y += 10;
+
+    // Rows
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7);
+    for (let i = 0; i < filtered.length; i++) {
+      const c = filtered[i];
+      if (y > 275) {
+        doc.addPage();
+        y = 15;
+      }
+
+      // Zebra stripe
+      if (i % 2 === 0) {
+        doc.setFillColor(248, 248, 248);
+        doc.rect(10, y - 3, w - 20, 7, "F");
+      }
+
+      // Status color dot
+      if (c.status === "facturado") doc.setFillColor(34, 197, 94);
+      else if (c.status === "pendiente") doc.setFillColor(234, 179, 8);
+      else doc.setFillColor(239, 68, 68);
+      doc.circle(16, y + 0.5, 1.5, "F");
+
+      // Grid line
+      doc.setDrawColor(220, 220, 220);
+      doc.line(10, y + 4, w - 10, y + 4);
+
+      doc.setTextColor(50, 50, 50);
+      doc.text(String(i + 1), 14, y + 1);
+      const nombre = c.nombre.length > 35 ? c.nombre.substring(0, 33) + "..." : c.nombre;
+      doc.setFont("helvetica", "bold");
+      doc.text(nombre, 22, y + 1);
+      doc.setFont("helvetica", "normal");
+      const addr = (c.address || "—").length > 30 ? (c.address || "").substring(0, 28) + "..." : (c.address || "—");
+      doc.text(addr, 90, y + 1);
+      doc.text(c.telefono || "—", 148, y + 1);
+
+      // Status badge
+      if (c.status === "facturado") {
+        doc.setTextColor(21, 128, 61);
+        doc.text("Facturado", 178, y + 1);
+      } else if (c.status === "pendiente") {
+        doc.setTextColor(161, 98, 7);
+        doc.text("Pedido web", 178, y + 1);
+      } else {
+        doc.setTextColor(220, 38, 38);
+        doc.text("Sin pedido", 178, y + 1);
+      }
+
+      doc.setTextColor(50, 50, 50);
+      if (c.lastOrderTotal > 0) {
+        doc.setFont("helvetica", "bold");
+        doc.text(formatPrice(c.lastOrderTotal), w - 14, y + 1, { align: "right" });
+        doc.setFont("helvetica", "normal");
+      }
+
+      y += 7;
+    }
+
+    // Footer
+    doc.setTextColor(160, 160, 160);
+    doc.setFontSize(7);
+    const pageCount = doc.getNumberOfPages();
+    for (let p = 1; p <= pageCount; p++) {
+      doc.setPage(p);
+      doc.text(`Página ${p}/${pageCount} — distrialma.com.ar`, w / 2, 290, { align: "center" });
+    }
+
+    doc.save(`Reparto-${selectedDay}-${new Date().toISOString().slice(0, 10)}.pdf`);
+  }
+
   const filtered = data?.clients.filter((c) => {
     if (!filter.trim()) return true;
     const term = filter.toLowerCase();
@@ -131,14 +245,25 @@ export default function RepartoPage() {
         </div>
       )}
 
-      {/* Search */}
-      <input
-        type="text"
-        value={filter}
-        onChange={(e) => setFilter(e.target.value)}
-        placeholder="Buscar cliente..."
-        className="w-full px-4 py-2 border border-brand-400 rounded-lg text-sm mb-4 focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
-      />
+      {/* Search + Export */}
+      <div className="flex gap-2 mb-4">
+        <input
+          type="text"
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          placeholder="Buscar cliente..."
+          className="flex-1 px-4 py-2 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
+        />
+        {filtered.length > 0 && (
+          <button
+            onClick={exportPDF}
+            className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 shrink-0"
+          >
+            <HiOutlineDocumentDownload className="w-4 h-4" />
+            PDF
+          </button>
+        )}
+      </div>
 
       {/* Client list */}
       {loading ? (

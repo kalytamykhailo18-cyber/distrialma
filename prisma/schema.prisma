@@ -213,3 +213,14 @@ model PriceMargin {
 
   @@map("price_margins")
 }
+
+model PeyaMapping {
+  id           Int      @id @default(autoincrement())
+  peyaSku      String   @unique @db.VarChar(50)
+  puntouchSku  String   @db.VarChar(20)
+  multiplier   Decimal  @default(1.0) @db.Decimal(6, 3)
+  createdAt    DateTime @default(now())
+
+  @@index([puntouchSku])
+  @@map("peya_mappings")
+}

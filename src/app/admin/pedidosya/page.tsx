@@ -38,31 +38,32 @@ interface CompareResult {
 }
 
 function UnmatchedRow({ item }: { item: UnmatchedItem }) {
-  const [editing, setEditing] = useState(false);
-  const [newSku, setNewSku] = useState(item.peyaSku.replace(/^0+/, ""));
+  const [linking, setLinking] = useState(false);
+  const [ptSku, setPtSku] = useState("");
+  const [mult, setMult] = useState("1");
   const [saving, setSaving] = useState(false);
   const [toggling, setToggling] = useState(false);
   const [currentActive, setCurrentActive] = useState(item.active);
   const [saved, setSaved] = useState(false);
 
-  async function saveSku() {
-    if (!newSku.trim() || newSku.trim() === item.peyaSku) {
-      setEditing(false);
-      return;
-    }
+  async function saveMapping() {
+    if (!ptSku.trim()) return;
     setSaving(true);
     try {
       const res = await fetch("/api/admin/pedidosya", {
-        method: "POST",
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          skuUpdates: [{ oldSku: item.peyaSku, newSku: newSku.trim() }],
+          action: "create",
+          peyaSku: item.peyaSku,
+          puntouchSku: ptSku.trim(),
+          multiplier: parseFloat(mult) || 1,
         }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      setSaved(true);
-      setEditing(false);
+      if (res.ok) {
+        setSaved(true);
+        setLinking(false);
+      }
     } catch {
       // silent
     } finally {
@@ -93,31 +94,14 @@ function UnmatchedRow({ item }: { item: UnmatchedItem }) {
   return (
     <tr className={`border-b hover:bg-gray-50 ${saved ? "bg-green-50" : ""}`}>
       <td className="p-3">
-        {editing ? (
-          <div className="flex items-center gap-1">
-            <input
-              type="text"
-              value={newSku}
-              onChange={(e) => setNewSku(e.target.value)}
-              className="w-24 px-2 py-1 border border-brand-400 rounded text-sm font-mono focus:outline-none focus:ring-1 focus:ring-brand-500"
-              autoFocus
-              onKeyDown={(e) => e.key === "Enter" && saveSku()}
-            />
-            <button onClick={saveSku} disabled={saving} className="text-xs text-green-600 font-medium px-1.5 py-1 hover:bg-green-50 rounded">
-              {saving ? "..." : "OK"}
-            </button>
-            <button onClick={() => setEditing(false)} className="text-xs text-gray-400 px-1">X</button>
-          </div>
-        ) : (
-          <button
-            onClick={() => { navigator.clipboard.writeText(displaySku); }}
-            className="font-mono text-sm font-bold text-brand-600 hover:text-brand-700 cursor-pointer"
-            title="Click para copiar (sin ceros)"
-          >
-            {displaySku}
-            {saved && <span className="ml-1 text-green-500 text-xs">✓</span>}
-          </button>
-        )}
+        <button
+          onClick={() => { navigator.clipboard.writeText(displaySku); }}
+          className="font-mono text-sm font-bold text-brand-600 hover:text-brand-700 cursor-pointer"
+          title="Click para copiar"
+        >
+          {displaySku}
+          {saved && <span className="ml-1 text-green-500 text-xs">✓ Asociado</span>}
+        </button>
       </td>
       <td className="p-3 font-medium">{item.peyaName}</td>
       <td className="p-3 font-mono text-xs text-gray-400">{item.barcode?.replace(/^0+/, "") || "—"}</td>
@@ -132,13 +116,44 @@ function UnmatchedRow({ item }: { item: UnmatchedItem }) {
           {toggling ? "..." : currentActive ? "Activo" : "Inactivo"}
         </button>
       </td>
-      <td className="p-3 text-center">
-        <button
-          onClick={() => setEditing(true)}
-          className="text-xs text-brand-600 font-medium hover:bg-brand-50 px-2 py-1 rounded"
-        >
-          Editar SKU
-        </button>
+      <td className="p-3">
+        {linking ? (
+          <div className="flex items-center gap-1 flex-wrap">
+            <input
+              type="text"
+              value={ptSku}
+              onChange={(e) => setPtSku(e.target.value)}
+              placeholder="SKU PunTouch"
+              className="w-20 px-2 py-1 border border-brand-400 rounded text-xs font-mono focus:outline-none focus:ring-1 focus:ring-brand-500"
+              autoFocus
+            />
+            <div className="flex items-center gap-0.5">
+              <span className="text-xs text-gray-500">×</span>
+              <input
+                type="number"
+                value={mult}
+                onChange={(e) => setMult(e.target.value)}
+                step="0.1"
+                min="0.01"
+                className="w-14 px-1 py-1 border border-gray-300 rounded text-xs font-mono text-center focus:outline-none focus:ring-1 focus:ring-brand-500"
+                placeholder="1"
+              />
+            </div>
+            <button onClick={saveMapping} disabled={saving || !ptSku.trim()} className="text-xs text-green-600 font-medium px-1.5 py-1 hover:bg-green-50 rounded disabled:opacity-50">
+              {saving ? "..." : "OK"}
+            </button>
+            <button onClick={() => setLinking(false)} className="text-xs text-gray-400 px-1">×</button>
+          </div>
+        ) : saved ? (
+          <span className="text-xs text-green-600 font-medium">Asociado</span>
+        ) : (
+          <button
+            onClick={() => setLinking(true)}
+            className="text-xs text-brand-600 font-medium hover:bg-brand-50 px-2 py-1 rounded"
+          >
+            Asociar
+          </button>
+        )}
       </td>
     </tr>
   );
@@ -601,7 +616,7 @@ export default function PedidosYaPage() {
                           <td className="p-3"><span className="text-gray-400 text-xs font-mono mr-1.5">{c.peyaSku}</span><span className="font-medium">{c.peyaName}</span></td>
                           <td className="p-3 text-center">
                             <span className={`font-mono font-bold ${c.stock <= 0 ? "text-red-500" : "text-green-600"}`}>
-                              {c.stock}
+                              {c.stock === -999 ? "Sin L5" : c.stock}
                             </span>
                           </td>
                           <td className="p-3 text-center">
@@ -628,7 +643,7 @@ export default function PedidosYaPage() {
             <div className="bg-white border rounded-xl overflow-hidden">
               <div className="px-4 py-3 bg-gray-50 border-b">
                 <p className="text-sm text-gray-600">
-                  Productos sin asociar. Podés editar el SKU para vincularlo con PunTouch, o cambiar el estado activo/inactivo.
+                  Productos sin asociar. Usá el botón Asociar para vincularlos con un SKU de PunTouch (con multiplicador para pesables, ej: x0.5 para 500g).
                 </p>
               </div>
               <div className="overflow-x-auto">
@@ -639,7 +654,7 @@ export default function PedidosYaPage() {
                       <th className="p-3">Producto</th>
                       <th className="p-3">EAN</th>
                       <th className="p-3 text-center">Estado</th>
-                      <th className="p-3 text-center">Acciones</th>
+                      <th className="p-3">Asociar con PunTouch</th>
                     </tr>
                   </thead>
                   <tbody>

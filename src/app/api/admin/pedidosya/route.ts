@@ -133,25 +133,30 @@ export async function GET() {
     // Fetch PedidosYa products
     const peyaProducts = await fetchPeyaProducts(token);
 
-    // Fetch PunTouch products with Precio5 and barcodes
+    // Fetch ALL PunTouch products (including Precio5=0 for deactivation detection)
     const pool = await getPool();
     const dbProd = getDbName("productos");
-    const result = await pool.request().query(`
-      SELECT
-        LTRIM(RTRIM(p.Cod)) AS sku,
-        LTRIM(RTRIM(p.Nombre)) AS nombre,
-        LTRIM(RTRIM(ISNULL(p.Codbar, ''))) AS codbar,
-        LTRIM(RTRIM(ISNULL(p.CodAlt, ''))) AS codalt,
-        LTRIM(RTRIM(ISNULL(p.CodAlt2, ''))) AS codalt2,
-        ISNULL(s.Precio5, 0) AS precio5,
-        ISNULL(s.Stk, 0) AS stock,
-        LTRIM(RTRIM(ISNULL(p.Unidad, ''))) AS unidad
-      FROM [${dbProd}].dbo.Productos p
-      JOIN [${dbProd}].dbo.Stock s ON s.CodProducto = p.Cod
-      WHERE (p.DeBaja = 0 OR p.DeBaja IS NULL)
-        AND LTRIM(RTRIM(s.Deposito)) = '0'
-        AND s.Precio5 > 0
-    `);
+    const [result, mappings] = await Promise.all([
+      pool.request().query(`
+        SELECT
+          LTRIM(RTRIM(p.Cod)) AS sku,
+          LTRIM(RTRIM(p.Nombre)) AS nombre,
+          LTRIM(RTRIM(ISNULL(p.Codbar, ''))) AS codbar,
+          LTRIM(RTRIM(ISNULL(p.CodAlt, ''))) AS codalt,
+          LTRIM(RTRIM(ISNULL(p.CodAlt2, ''))) AS codalt2,
+          ISNULL(s.Precio5, 0) AS precio5,
+          ISNULL(s.Stk, 0) AS stock,
+          LTRIM(RTRIM(ISNULL(p.Unidad, ''))) AS unidad
+        FROM [${dbProd}].dbo.Productos p
+        JOIN [${dbProd}].dbo.Stock s ON s.CodProducto = p.Cod
+        WHERE (p.DeBaja = 0 OR p.DeBaja IS NULL)
+          AND LTRIM(RTRIM(s.Deposito)) = '0'
+      `),
+      prisma.peyaMapping.findMany(),
+    ]);
+
+    // Build manual mapping: peyaSku → { puntouchSku, multiplier }
+    const manualMap = new Map(mappings.map((m) => [m.peyaSku, { puntouchSku: m.puntouchSku, multiplier: Number(m.multiplier) }]));
 
     // Build lookup maps: barcode → product, SKU → product
     type PtProd = { sku: string; nombre: string; precio5: number; stock: number; isKg: boolean };
@@ -159,11 +164,10 @@ export async function GET() {
     const puntouchBySku = new Map<string, PtProd>();
     for (const row of result.recordset) {
       const isKg = row.unidad?.toUpperCase() === "KG";
+      // For auto-matched products, KG price ÷ 10
       const precio5 = isKg ? Math.round(row.precio5 / 10) : row.precio5;
       const prod = { sku: row.sku, nombre: row.nombre, precio5, stock: row.stock, isKg };
-      // Map by SKU (PunTouch Cod)
       puntouchBySku.set(row.sku, prod);
-      // Map by all barcodes (main + alternatives)
       for (const bc of [row.codbar, row.codalt, row.codalt2]) {
         if (bc) {
           puntouchByBarcode.set(bc, prod);
@@ -172,7 +176,17 @@ export async function GET() {
       }
     }
 
-    // Compare prices and stock/active status
+    // Also build a raw map (without KG÷10) for manual mappings with custom multiplier
+    const puntouchRawBySku = new Map<string, { precio5: number; stock: number; isKg: boolean }>();
+    for (const row of result.recordset) {
+      puntouchRawBySku.set(row.sku, {
+        precio5: row.precio5,
+        stock: row.stock,
+        isKg: row.unidad?.toUpperCase() === "KG",
+      });
+    }
+
+    // Compare
     const priceChanges: Array<{
       peyaSku: string;
       peyaName: string;
@@ -192,22 +206,44 @@ export async function GET() {
     let matched = 0;
     let unmatched = 0;
     const unmatchedList: Array<{ peyaSku: string; peyaName: string; barcode: string; active: boolean }> = [];
+    const puntouchWithPrecio5 = result.recordset.filter((r: { precio5: number }) => r.precio5 > 0).length;
 
     for (const peyaProd of peyaProducts) {
       let ptProd: PtProd | null = null;
 
-      // 1. Try matching by barcode (EAN)
-      for (const bc of peyaProd.barcodes) {
-        ptProd = puntouchByBarcode.get(bc) || puntouchByBarcode.get(bc.replace(/^0+/, "")) || null;
-        if (ptProd) break;
+      // 0. Check manual mapping first (highest priority)
+      const manual = manualMap.get(peyaProd.sku);
+      if (manual) {
+        const raw = puntouchRawBySku.get(manual.puntouchSku);
+        if (raw) {
+          // For manual mappings: use raw precio5 × multiplier directly
+          // (user controls the multiplier, no auto KG÷10)
+          const price = raw.precio5 * manual.multiplier;
+          ptProd = {
+            sku: manual.puntouchSku,
+            nombre: "",
+            precio5: price,
+            stock: raw.stock,
+            isKg: raw.isKg,
+          };
+          // multiplier applied above
+        }
       }
 
-      // 2. Fallback: try matching by PedidosYa SKU = PunTouch Cod
+      // 1. Try matching by barcode (EAN)
+      if (!ptProd) {
+        for (const bc of peyaProd.barcodes) {
+          ptProd = puntouchByBarcode.get(bc) || puntouchByBarcode.get(bc.replace(/^0+/, "")) || null;
+          if (ptProd) break;
+        }
+      }
+
+      // 2. Fallback: PedidosYa SKU = PunTouch Cod
       if (!ptProd) {
         ptProd = puntouchBySku.get(peyaProd.sku) || null;
       }
 
-      // 3. Fallback: try matching PedidosYa SKU against PunTouch barcodes
+      // 3. Fallback: PedidosYa SKU against PunTouch barcodes
       if (!ptProd) {
         ptProd = puntouchByBarcode.get(peyaProd.sku) || puntouchByBarcode.get(peyaProd.sku.replace(/^0+/, "")) || null;
       }
@@ -225,9 +261,10 @@ export async function GET() {
 
       matched++;
 
-      // Price difference — PedidosYa only accepts integers, so round PunTouch price
+      // Price: Precio5=0 means should deactivate, otherwise compare prices
       const roundedPt = Math.round(ptProd.precio5);
-      if (roundedPt !== Math.round(peyaProd.price)) {
+
+      if (ptProd.precio5 > 0 && roundedPt !== Math.round(peyaProd.price)) {
         priceChanges.push({
           peyaSku: peyaProd.sku,
           peyaName: peyaProd.name,
@@ -239,22 +276,22 @@ export async function GET() {
         });
       }
 
-      // Stock/active difference: deactivate if stock <= 0, activate if stock > 0
-      const shouldBeActive = ptProd.stock > 0;
+      // Stock/active: deactivate if stock<=0 OR precio5=0
+      const shouldBeActive = ptProd.stock > 0 && ptProd.precio5 > 0;
       if (peyaProd.active !== shouldBeActive) {
         stockChanges.push({
           peyaSku: peyaProd.sku,
           peyaName: peyaProd.name,
           currentActive: peyaProd.active,
           shouldBeActive,
-          stock: ptProd.stock,
+          stock: ptProd.precio5 <= 0 ? -999 : ptProd.stock, // -999 = sin precio en lista 5
         });
       }
     }
 
     return NextResponse.json({
       peyaTotal: peyaProducts.length,
-      puntouchTotal: result.recordset.length,
+      puntouchTotal: puntouchWithPrecio5,
       matched,
       unmatched,
       changes: priceChanges,
@@ -283,11 +320,16 @@ export async function POST(req: NextRequest) {
     const puntouchPriceUpdates: Array<{ peyaSku: string; puntouchSku: string; price: number }> = [];
     const skuChangeResults: string[] = [];
 
+    // Load manual mappings to exclude them from Precio5 sync-back
+    const manualMappedSkus = new Set(
+      (await prisma.peyaMapping.findMany({ select: { peyaSku: true } })).map((m) => m.peyaSku)
+    );
+
     if (updates && Array.isArray(updates)) {
       for (const u of updates) {
         allUpdates.push({ sku: u.sku, price: u.price });
-        // Track PunTouch SKU for syncing Precio5 back
-        if (u.puntouchSku && u.price) {
+        // Sync Precio5 back ONLY for auto-matched products (not manual mappings)
+        if (u.puntouchSku && u.price && !manualMappedSkus.has(u.sku)) {
           puntouchPriceUpdates.push({ peyaSku: u.sku, puntouchSku: u.puntouchSku, price: u.price });
         }
       }
@@ -365,15 +407,28 @@ export async function POST(req: NextRequest) {
     }
 
     // Sync rounded prices back to PunTouch Precio5
+    // KG products: PedidosYa price was ÷10, so multiply back ×10 for PunTouch
     if (puntouchPriceUpdates.length > 0 && totalUpdated > 0) {
       try {
         const pool = await getPool();
         const dbProd = getDbName("productos");
+
+        // Check which products are KG
+        const skuList = puntouchPriceUpdates.map((u) => `'${String(u.puntouchSku).padStart(7, " ")}'`).join(",");
+        const unitResult = await pool.request().query(`
+          SELECT LTRIM(RTRIM(Cod)) AS sku, LTRIM(RTRIM(ISNULL(Unidad, ''))) AS unidad
+          FROM [${dbProd}].dbo.Productos WHERE Cod IN (${skuList})
+        `);
+        const unitMap = new Map(unitResult.recordset.map((r: { sku: string; unidad: string }) => [r.sku, r.unidad]));
+
         for (const u of puntouchPriceUpdates) {
           const codPadded = String(u.puntouchSku).padStart(7, " ");
+          const isKg = unitMap.get(u.puntouchSku)?.toUpperCase() === "KG";
+          // KG products: PedidosYa price is ÷10, PunTouch stores ×10
+          const precio5 = isKg ? u.price * 10 : u.price;
           await pool.request()
             .input("cod", codPadded)
-            .input("precio5", u.price)
+            .input("precio5", precio5)
             .query(`
               UPDATE [${dbProd}].dbo.Stock
               SET Precio5 = @precio5
@@ -425,5 +480,47 @@ export async function PUT(req: NextRequest) {
   } catch (error) {
     console.error("Error saving PeYa token:", error);
     return NextResponse.json({ error: "Error al guardar token" }, { status: 500 });
+  }
+}
+
+// PATCH: Manage manual PeYa ↔ PunTouch mappings
+export async function PATCH(req: NextRequest) {
+  if (!(await requireStaff())) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  }
+
+  try {
+    const { action, peyaSku, puntouchSku, multiplier } = await req.json();
+
+    if (action === "create" || action === "update") {
+      if (!peyaSku || !puntouchSku) {
+        return NextResponse.json({ error: "SKU de PeYa y PunTouch requeridos" }, { status: 400 });
+      }
+      const mult = parseFloat(multiplier) || 1;
+      await prisma.peyaMapping.upsert({
+        where: { peyaSku },
+        update: { puntouchSku, multiplier: mult },
+        create: { peyaSku, puntouchSku, multiplier: mult },
+      });
+      return NextResponse.json({ ok: true });
+    }
+
+    if (action === "delete") {
+      if (!peyaSku) {
+        return NextResponse.json({ error: "SKU requerido" }, { status: 400 });
+      }
+      await prisma.peyaMapping.deleteMany({ where: { peyaSku } });
+      return NextResponse.json({ ok: true });
+    }
+
+    if (action === "list") {
+      const mappings = await prisma.peyaMapping.findMany({ orderBy: { createdAt: "desc" } });
+      return NextResponse.json({ mappings });
+    }
+
+    return NextResponse.json({ error: "Acción no válida" }, { status: 400 });
+  } catch (error) {
+    console.error("Error managing PeYa mappings:", error);
+    return NextResponse.json({ error: "Error al gestionar asociaciones" }, { status: 500 });
   }
 }
