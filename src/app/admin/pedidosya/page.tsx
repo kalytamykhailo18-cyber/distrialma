@@ -37,6 +37,84 @@ interface CompareResult {
   unmatchedList: UnmatchedItem[];
 }
 
+function MappingRow({ mapping, onUpdate, onDelete }: {
+  mapping: { id: number; peyaSku: string; puntouchSku: string; multiplier: number };
+  onUpdate: (peyaSku: string, puntouchSku: string, multiplier: number) => Promise<void>;
+  onDelete: (peyaSku: string) => Promise<void>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [ptSku, setPtSku] = useState(mapping.puntouchSku);
+  const [mult, setMult] = useState(String(mapping.multiplier));
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  async function save() {
+    setSaving(true);
+    await onUpdate(mapping.peyaSku, ptSku.trim(), parseFloat(mult) || 1);
+    setSaving(false);
+    setEditing(false);
+  }
+
+  async function remove() {
+    setDeleting(true);
+    await onDelete(mapping.peyaSku);
+  }
+
+  return (
+    <tr className="border-b hover:bg-gray-50">
+      <td className="p-3 font-mono text-sm text-brand-600 font-bold">{mapping.peyaSku}</td>
+      <td className="p-3">
+        {editing ? (
+          <input
+            type="text"
+            value={ptSku}
+            onChange={(e) => setPtSku(e.target.value)}
+            className="w-20 px-2 py-1 border border-brand-400 rounded text-xs font-mono focus:outline-none focus:ring-1 focus:ring-brand-500"
+          />
+        ) : (
+          <span className="font-mono text-sm">{mapping.puntouchSku}</span>
+        )}
+      </td>
+      <td className="p-3 text-center">
+        {editing ? (
+          <div className="flex items-center justify-center gap-0.5">
+            <span className="text-xs text-gray-500">×</span>
+            <input
+              type="number"
+              value={mult}
+              onChange={(e) => setMult(e.target.value)}
+              step="0.1"
+              min="0.01"
+              className="w-14 px-1 py-1 border border-gray-300 rounded text-xs font-mono text-center focus:outline-none focus:ring-1 focus:ring-brand-500"
+            />
+          </div>
+        ) : (
+          <span className="font-mono text-sm font-medium">×{mapping.multiplier}</span>
+        )}
+      </td>
+      <td className="p-3 text-center">
+        {editing ? (
+          <div className="flex items-center justify-center gap-1">
+            <button onClick={save} disabled={saving} className="text-xs text-green-600 font-medium px-2 py-1 hover:bg-green-50 rounded">
+              {saving ? "..." : "Guardar"}
+            </button>
+            <button onClick={() => setEditing(false)} className="text-xs text-gray-400 px-1">Cancelar</button>
+          </div>
+        ) : (
+          <div className="flex items-center justify-center gap-2">
+            <button onClick={() => setEditing(true)} className="text-xs text-brand-600 font-medium hover:bg-brand-50 px-2 py-1 rounded">
+              Editar
+            </button>
+            <button onClick={remove} disabled={deleting} className="text-xs text-red-500 font-medium hover:bg-red-50 px-2 py-1 rounded">
+              {deleting ? "..." : "Eliminar"}
+            </button>
+          </div>
+        )}
+      </td>
+    </tr>
+  );
+}
+
 function UnmatchedRow({ item }: { item: UnmatchedItem }) {
   const [linking, setLinking] = useState(false);
   const [ptSku, setPtSku] = useState("");
@@ -167,7 +245,12 @@ export default function PedidosYaPage() {
   const [successMsg, setSuccessMsg] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [selectedStock, setSelectedStock] = useState<Set<string>>(new Set());
-  const [tab, setTab] = useState<"prices" | "stock" | "unmatched">("prices");
+  const [tab, setTab] = useState<"prices" | "stock" | "unmatched" | "mappings">("prices");
+
+  // Mappings state
+  interface Mapping { id: number; peyaSku: string; puntouchSku: string; multiplier: number; createdAt: string }
+  const [mappings, setMappings] = useState<Mapping[]>([]);
+  const [mappingsLoading, setMappingsLoading] = useState(false);
 
   // Login state
   const [loginStep, setLoginStep] = useState<"idle" | "logging_in" | "need_2fa" | "verifying">("idle");
@@ -221,6 +304,42 @@ export default function PedidosYaPage() {
       setLoginStep("need_2fa");
       setTwoFaCode("");
     }
+  }
+
+  async function loadMappings() {
+    setMappingsLoading(true);
+    try {
+      const res = await fetch("/api/admin/pedidosya", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "list" }),
+      });
+      const data = await res.json();
+      if (res.ok) setMappings(data.mappings || []);
+    } catch { /* silent */ }
+    finally { setMappingsLoading(false); }
+  }
+
+  async function deleteMapping(peyaSku: string) {
+    try {
+      await fetch("/api/admin/pedidosya", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "delete", peyaSku }),
+      });
+      setMappings((prev) => prev.filter((m) => m.peyaSku !== peyaSku));
+    } catch { /* silent */ }
+  }
+
+  async function updateMapping(peyaSku: string, puntouchSku: string, multiplier: number) {
+    try {
+      const res = await fetch("/api/admin/pedidosya", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "update", peyaSku, puntouchSku, multiplier }),
+      });
+      if (res.ok) await loadMappings();
+    } catch { /* silent */ }
   }
 
   async function comparePrices() {
@@ -526,6 +645,12 @@ export default function PedidosYaPage() {
                   Sin asociar ({result.unmatchedList.length})
                 </button>
               )}
+              <button
+                onClick={() => { setTab("mappings"); loadMappings(); }}
+                className={`px-4 py-1.5 text-sm rounded-md transition-colors ${tab === "mappings" ? "bg-white text-gray-900 shadow-sm font-medium" : "text-gray-500"}`}
+              >
+                Asociaciones
+              </button>
             </div>
             <button
               onClick={tab === "prices" ? exportPricesCSV : tab === "stock" ? exportStockCSV : exportUnmatchedCSV}
@@ -667,8 +792,42 @@ export default function PedidosYaPage() {
             </div>
           )}
 
+          {/* Mappings tab */}
+          {tab === "mappings" && (
+            <div className="bg-white border rounded-xl overflow-hidden">
+              <div className="px-4 py-3 bg-gray-50 border-b">
+                <p className="text-sm text-gray-600">
+                  Asociaciones manuales entre PedidosYa y PunTouch. Editá el multiplicador o eliminá asociaciones incorrectas.
+                </p>
+              </div>
+              {mappingsLoading ? (
+                <p className="p-4 text-gray-400">Cargando...</p>
+              ) : mappings.length === 0 ? (
+                <p className="p-4 text-gray-400">No hay asociaciones manuales.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-gray-50 border-b text-left">
+                        <th className="p-3">SKU PeYa</th>
+                        <th className="p-3">SKU PunTouch</th>
+                        <th className="p-3 text-center">Multiplicador</th>
+                        <th className="p-3 text-center">Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {mappings.map((m) => (
+                        <MappingRow key={m.id} mapping={m} onUpdate={updateMapping} onDelete={deleteMapping} />
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Apply button — only for current tab */}
-          {currentTabCount > 0 && tab !== "unmatched" && (
+          {currentTabCount > 0 && tab !== "unmatched" && tab !== "mappings" && (
             <div className="mt-4 flex items-center justify-between">
               <span className="text-sm text-gray-500">
                 {currentTabCount} de {tab === "prices" ? result.changes.length : result.stockChanges.length} seleccionados
