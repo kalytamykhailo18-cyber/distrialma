@@ -32,6 +32,7 @@ interface CierreData {
   totalEfectivoCaja: number;
   totalTarjeta: number;
   totalDeuda: number;
+  tarjetasDetalle: Array<{ cod: string; nombre: string; total: number; cantidad: number }>;
 }
 
 interface CierreRecord {
@@ -64,21 +65,26 @@ export default function CierreCajaPage() {
   const [success, setSuccess] = useState("");
   const [history, setHistory] = useState<CierreRecord[]>([]);
   const [nuevoInicio, setNuevoInicio] = useState("");
-  const [fotoTicket, setFotoTicket] = useState<string | null>(null);
+  const [fotos, setFotos] = useState<string[]>([]);
   const [empleados, setEmpleados] = useState<Array<{ cod: string; nombre: string }>>([]);
   const [selectedEmpleado, setSelectedEmpleado] = useState("");
+  const [sucursal, setSucursal] = useState("1");
 
   const user = session?.user as { role?: string; name?: string } | undefined;
   const isAdmin = user?.role === "admin";
 
   useEffect(() => {
     if (isAdmin) loadHistory();
-    // Load employees
-    fetch("/api/admin/cierre-caja/empleados")
+  }, [isAdmin]);
+
+  // Reload employees when sucursal changes
+  useEffect(() => {
+    setSelectedEmpleado("");
+    fetch(`/api/admin/cierre-caja/empleados?sucursal=${sucursal}`)
       .then((r) => r.json())
       .then((d) => setEmpleados(d.empleados || []))
       .catch(() => {});
-  }, [isAdmin]);
+  }, [sucursal]);
 
   async function loadHistory() {
     try {
@@ -93,7 +99,7 @@ export default function CierreCajaPage() {
     setError("");
     setSuccess("");
     try {
-      const res = await fetch("/api/admin/cierre-caja?sucursal=1");
+      const res = await fetch(`/api/admin/cierre-caja?sucursal=${sucursal}`);
       const d = await res.json();
       if (!res.ok) throw new Error(d.error);
       setData(d);
@@ -180,7 +186,31 @@ export default function CierreCajaPage() {
     drawRow("TOTAL EFECTIVO EN CAJA:", fmt(data.totalEfectivoCaja), true);
     y += 3;
     drawRow("Total tarjeta/otros:", fmt(data.totalTarjeta));
+    if (data.tarjetasDetalle && data.tarjetasDetalle.length > 0) {
+      doc.setFontSize(8);
+      for (const t of data.tarjetasDetalle) {
+        checkPage(7);
+        doc.setTextColor(120, 120, 120);
+        doc.text(`   ${t.nombre} (${t.cantidad})`, 18, y);
+        doc.text(fmt(t.total), w - 14, y, { align: "right" });
+        y += 5;
+      }
+      doc.setFontSize(9);
+      doc.setTextColor(50, 50, 50);
+    }
     drawRow("Total deuda:", fmt(data.totalDeuda));
+    y += 2;
+    checkPage(15);
+    doc.setFillColor(251, 154, 71);
+    doc.rect(10, y, w - 20, 10, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.text("TOTAL GENERAL", 14, y + 7);
+    doc.text(fmt(data.totalEfectivoCaja + data.totalTarjeta + data.totalDeuda), w - 14, y + 7, { align: "right" });
+    y += 14;
+    doc.setTextColor(50, 50, 50);
+    doc.setFontSize(9);
     if (data.anuladas.cantidad > 0) {
       y += 3;
       drawRow(`Anuladas (${data.anuladas.cantidad}):`, fmt(data.anuladas.total));
@@ -279,7 +309,7 @@ export default function CierreCajaPage() {
           sucursal: data.sucursal,
           pdfBase64,
           nuevoInicio: nuevoInicio ? parseFloat(nuevoInicio) : 0,
-          fotoTicket: fotoTicket || undefined,
+          fotos: fotos.length > 0 ? fotos : undefined,
           empleado: selectedEmpleado || undefined,
         }),
       });
@@ -304,6 +334,21 @@ export default function CierreCajaPage() {
       <h1 className="text-2xl font-bold text-gray-900 mb-2">Cierre de Caja</h1>
       <p className="text-sm text-gray-500 mb-6">Genera el cierre, registra el responsable y envía el PDF por email.</p>
 
+      {/* Sucursal selector */}
+      <div className="flex items-center gap-3 mb-4">
+        <span className="text-sm text-gray-600">Sucursal:</span>
+        <select
+          value={sucursal}
+          onChange={(e) => { setSucursal(e.target.value); setData(null); }}
+          className="px-3 py-2 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600"
+        >
+          <option value="1">Sucursal 1</option>
+          <option value="2">Sucursal 2</option>
+          <option value="6">Sucursal 6</option>
+          <option value="7">Sucursal 7</option>
+        </select>
+      </div>
+
       <div className="flex flex-wrap gap-3 mb-4">
         <button
           onClick={loadCierre}
@@ -325,7 +370,7 @@ export default function CierreCajaPage() {
             </button>
             <button
               onClick={cerrarCaja}
-              disabled={closing || !selectedEmpleado || !nuevoInicio}
+              disabled={closing || !nuevoInicio}
               className="flex items-center gap-2 px-5 py-2.5 bg-green-600 text-white rounded-xl font-semibold hover:bg-green-700 disabled:opacity-50 transition-colors"
             >
               {closing ? (
@@ -383,7 +428,17 @@ export default function CierreCajaPage() {
                 <div className="px-4 py-3 flex justify-between"><span className="text-sm text-gray-600">Pagos proveedores</span><span className="text-sm font-medium text-red-500">-{fmt(data.pagos)}</span></div>
                 <div className="px-4 py-3 flex justify-between bg-gray-50"><span className="text-sm font-bold">TOTAL EFECTIVO EN CAJA</span><span className="text-sm font-bold">{fmt(data.totalEfectivoCaja)}</span></div>
                 <div className="px-4 py-3 flex justify-between"><span className="text-sm text-gray-600">Total tarjeta</span><span className="text-sm font-medium">{fmt(data.totalTarjeta)}</span></div>
+                {data.tarjetasDetalle && data.tarjetasDetalle.length > 0 && data.tarjetasDetalle.map((t) => (
+                  <div key={t.cod} className="px-4 py-2 flex justify-between bg-blue-50/50">
+                    <span className="text-xs text-gray-500 pl-4">{t.nombre} ({t.cantidad})</span>
+                    <span className="text-xs font-medium text-gray-600">{fmt(t.total)}</span>
+                  </div>
+                ))}
                 <div className="px-4 py-3 flex justify-between"><span className="text-sm text-gray-600">Total deuda</span><span className="text-sm font-medium">{fmt(data.totalDeuda)}</span></div>
+                <div className="px-4 py-3 flex justify-between bg-brand-50 border-t-2 border-brand-400">
+                  <span className="text-sm font-bold text-brand-700">TOTAL GENERAL</span>
+                  <span className="text-sm font-bold text-brand-700">{fmt(data.totalEfectivoCaja + data.totalTarjeta + data.totalDeuda)}</span>
+                </div>
                 {data.anuladas.cantidad > 0 && (
                   <div className="px-4 py-3 flex justify-between"><span className="text-sm text-gray-600">Anuladas ({data.anuladas.cantidad})</span><span className="text-sm font-medium text-red-500">{fmt(data.anuladas.total)}</span></div>
                 )}
@@ -441,7 +496,7 @@ export default function CierreCajaPage() {
               </div>
               <div className="bg-white border rounded-xl p-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Inicio de caja para mañana
+                  Próximo inicio de caja
                 </label>
                 <p className="text-xs text-gray-400 mb-3">Ingresá el monto en efectivo que queda en la caja para el próximo turno.</p>
                 <div className="flex items-center gap-2">
@@ -464,7 +519,7 @@ export default function CierreCajaPage() {
           {isAdmin && (
             <div className="bg-white border rounded-xl p-4 mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Inicio de caja para mañana
+                Próximo inicio de caja
               </label>
               <div className="flex items-center gap-2">
                 <span className="text-gray-500 font-medium">$</span>
@@ -481,43 +536,46 @@ export default function CierreCajaPage() {
             </div>
           )}
 
-          {/* Photo capture: ticket posnet */}
+          {/* Photo capture: ticket posnet (multiple) */}
           <div className="bg-white border rounded-xl p-4 mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Foto del ticket de cierre posnet
+              Fotos de tickets de cierre posnet
             </label>
-            <p className="text-xs text-gray-400 mb-3">Sacá una foto del ticket de cierre del posnet para adjuntar al email.</p>
-            {fotoTicket ? (
-              <div className="flex items-center gap-3">
-                <img src={`data:image/jpeg;base64,${fotoTicket}`} alt="Ticket" className="w-20 h-28 object-cover rounded border" />
-                <div>
-                  <p className="text-sm text-green-600 font-medium">Foto cargada</p>
-                  <button onClick={() => setFotoTicket(null)} className="text-xs text-red-500 hover:underline mt-1">Eliminar</button>
-                </div>
+            {fotos.length > 0 && (
+              <div className="flex flex-wrap gap-3 mb-3">
+                {fotos.map((foto, i) => (
+                  <div key={i} className="relative">
+                    <img src={`data:image/jpeg;base64,${foto}`} alt={`Ticket ${i + 1}`} className="w-20 h-28 object-cover rounded border" />
+                    <button
+                      onClick={() => setFotos((prev) => prev.filter((_, j) => j !== i))}
+                      className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center"
+                    >×</button>
+                  </div>
+                ))}
               </div>
-            ) : (
-              <label className="flex items-center justify-center gap-2 px-4 py-3 bg-gray-50 border-2 border-dashed border-gray-300 rounded-xl cursor-pointer hover:bg-gray-100 transition-colors">
-                <HiOutlineCamera className="w-6 h-6 text-gray-400" />
-                <span className="text-sm text-gray-500">Tomar foto o seleccionar imagen</span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      const reader = new FileReader();
-                      reader.onload = () => {
-                        const base64 = (reader.result as string).split(",")[1];
-                        setFotoTicket(base64);
-                      };
-                      reader.readAsDataURL(file);
-                    }
-                  }}
-                />
-              </label>
             )}
+            <label className="flex items-center justify-center gap-2 px-4 py-3 bg-gray-50 border-2 border-dashed border-gray-300 rounded-xl cursor-pointer hover:bg-gray-100 transition-colors">
+              <HiOutlineCamera className="w-6 h-6 text-gray-400" />
+              <span className="text-sm text-gray-500">{fotos.length > 0 ? "Agregar otra foto" : "Tomar foto o seleccionar imagen"}</span>
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                      const base64 = (reader.result as string).split(",")[1];
+                      setFotos((prev) => [...prev, base64]);
+                    };
+                    reader.readAsDataURL(file);
+                  }
+                  e.target.value = "";
+                }}
+              />
+            </label>
           </div>
         </div>
       )}
