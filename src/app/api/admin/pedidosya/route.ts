@@ -137,6 +137,10 @@ export async function GET() {
       return NextResponse.json({ error: "Token de PedidosYa no configurado. Iniciá sesión primero." }, { status: 400 });
     }
 
+    // Get stock minimum threshold
+    const minStockSetting = await prisma.setting.findUnique({ where: { key: "peya_stock_min" } });
+    const stockMin = parseInt(minStockSetting?.value || "0") || 0;
+
     // Fetch PedidosYa products
     const peyaProducts = await fetchPeyaProducts(token);
 
@@ -284,7 +288,7 @@ export async function GET() {
       }
 
       // Stock/active: deactivate if stock<=0 OR precio5=0
-      const shouldBeActive = ptProd.stock > 0 && ptProd.precio5 > 0;
+      const shouldBeActive = ptProd.stock > stockMin && ptProd.precio5 > 0;
       if (peyaProd.active !== shouldBeActive) {
         stockChanges.push({
           peyaSku: peyaProd.sku,
@@ -497,7 +501,7 @@ export async function PATCH(req: NextRequest) {
   }
 
   try {
-    const { action, peyaSku, puntouchSku, multiplier } = await req.json();
+    const { action, peyaSku, puntouchSku, multiplier, key, value } = await req.json();
 
     if (action === "create" || action === "update") {
       if (!peyaSku || !puntouchSku) {
@@ -523,6 +527,20 @@ export async function PATCH(req: NextRequest) {
     if (action === "list") {
       const mappings = await prisma.peyaMapping.findMany({ orderBy: { createdAt: "desc" } });
       return NextResponse.json({ mappings });
+    }
+
+    if (action === "getSetting") {
+      const setting = await prisma.setting.findUnique({ where: { key } });
+      return NextResponse.json({ value: setting?.value || "" });
+    }
+
+    if (action === "setSetting") {
+      await prisma.setting.upsert({
+        where: { key },
+        update: { value: String(value) },
+        create: { key, value: String(value) },
+      });
+      return NextResponse.json({ ok: true });
     }
 
     return NextResponse.json({ error: "Acción no válida" }, { status: 400 });

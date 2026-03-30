@@ -224,3 +224,28 @@ model PeyaMapping {
   @@index([puntouchSku])
   @@map("peya_mappings")
 }
+
+model CierreCaja {
+  id          Int      @id @default(autoincrement())
+  sucursal    String   @db.VarChar(5)
+  usuario     String   @db.VarChar(50)
+  desde       String   @db.VarChar(20)
+  cantVentas  Int
+  efectivo    Decimal  @db.Decimal(14, 2)
+  tarjeta     Decimal  @db.Decimal(14, 2)
+  deuda       Decimal  @db.Decimal(14, 2)
+  totalVentas Decimal  @db.Decimal(14, 2)
+  retiros     Decimal  @db.Decimal(14, 2)
+  ingresos    Decimal  @db.Decimal(14, 2)
+  pagos       Decimal  @db.Decimal(14, 2)
+  inicioCaja  Decimal  @db.Decimal(14, 2)
+  totalCaja   Decimal  @db.Decimal(14, 2)
+  nuevoInicio Decimal  @default(0) @db.Decimal(14, 2)
+  emailSent   Boolean  @default(false)
+  emailTo     String?  @db.VarChar(255)
+  createdAt   DateTime @default(now())
+
+  @@index([sucursal])
+  @@index([createdAt])
+  @@map("cierres_caja")
+}

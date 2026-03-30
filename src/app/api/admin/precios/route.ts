@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getTestPool as getPool, getDbName } from "@/lib/mssql";
+import { getPool, getDbName } from "@/lib/mssql";
 import { requireStaff } from "@/lib/api-auth";
 
 export async function GET(req: NextRequest) {

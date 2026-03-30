@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { HiOutlineDocumentDownload } from "react-icons/hi";
 
 interface PriceChange {
@@ -35,6 +35,53 @@ interface CompareResult {
   changes: PriceChange[];
   stockChanges: StockChange[];
   unmatchedList: UnmatchedItem[];
+}
+
+function StockMinSetting() {
+  const [value, setValue] = useState("");
+  const [loaded, setLoaded] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/admin/pedidosya", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "getSetting", key: "peya_stock_min" }),
+    }).then(r => r.json()).then(d => { setValue(d.value || "0"); setLoaded(true); }).catch(() => setLoaded(true));
+  }, []);
+
+  async function save() {
+    setSaving(true);
+    await fetch("/api/admin/pedidosya", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "setSetting", key: "peya_stock_min", value }),
+    });
+    setSaving(false);
+  }
+
+  if (!loaded) return null;
+
+  return (
+    <div className="mt-4 mb-2 flex items-center gap-2 text-sm">
+      <span className="text-gray-500">Stock mínimo para PedidosYa:</span>
+      <input
+        type="number"
+        min="0"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        className="w-16 px-2 py-1 border border-gray-300 rounded text-center text-sm focus:outline-none focus:border-brand-500"
+      />
+      <button
+        onClick={save}
+        disabled={saving}
+        className="text-xs text-brand-600 font-medium px-2 py-1 hover:bg-brand-50 rounded disabled:opacity-50"
+      >
+        {saving ? "..." : "Guardar"}
+      </button>
+      <span className="text-xs text-gray-400">Productos con stock &le; este valor se marcan inactivos</span>
+    </div>
+  );
 }
 
 function ImageLookup() {
@@ -696,6 +743,9 @@ export default function PedidosYaPage() {
           Renovar sesión
         </button>
       )}
+
+      {/* Stock minimum setting */}
+      <StockMinSetting />
 
       {error && (
         <div className="mt-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl">{error}</div>

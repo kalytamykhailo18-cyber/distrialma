@@ -36,6 +36,30 @@ const PRICE_FIELDS = [
   { key: "precio5", label: "Lista 5" },
 ] as const;
 
+function MarginInput({ margin, onChange }: { margin: string; onChange: (val: string) => void }) {
+  const [local, setLocal] = useState(margin);
+  const [focused, setFocused] = useState(false);
+
+  const displayVal = focused ? local : margin;
+
+  return (
+    <div className="flex items-center gap-1">
+      <input
+        type="number"
+        min="0"
+        step="0.01"
+        placeholder="%"
+        value={displayVal}
+        onChange={(e) => { setLocal(e.target.value); onChange(e.target.value); }}
+        onFocus={() => { setFocused(true); setLocal(margin); }}
+        onBlur={() => setFocused(false)}
+        className="w-16 text-right px-2 py-1.5 border border-gray-200 rounded text-xs text-gray-500 focus:outline-none focus:border-brand-600"
+      />
+      <span className="text-xs text-gray-400">%</span>
+    </div>
+  );
+}
+
 export default function PreciosPage() {
   const [query, setQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
@@ -228,23 +252,14 @@ export default function PreciosPage() {
           <div className="space-y-3">
             {PRICE_FIELDS.map((field) => {
               const isCosto = field.key === "costo";
-              const margin = !isCosto ? getMargin(field.key) : "";
               return (
                 <div key={field.key} className="flex items-center gap-3">
                   <span className="text-sm text-gray-700 w-24">{field.label}</span>
                   {!isCosto && (
-                    <div className="flex items-center gap-1">
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        placeholder="%"
-                        value={margin}
-                        onChange={(e) => updateFromMargin(field.key, e.target.value)}
-                        className="w-14 text-right px-1 py-1 border border-gray-200 rounded text-xs text-gray-500 focus:outline-none focus:border-brand-600"
-                      />
-                      <span className="text-xs text-gray-400">%</span>
-                    </div>
+                    <MarginInput
+                      margin={getMargin(field.key)}
+                      onChange={(pct) => updateFromMargin(field.key, pct)}
+                    />
                   )}
                   <div className="flex items-center gap-2 flex-1">
                     <span className="text-gray-400">$</span>
