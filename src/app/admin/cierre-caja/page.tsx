@@ -14,6 +14,7 @@ interface MovCaja {
 interface CierreData {
   sucursal: string;
   desde: string;
+  nroCaja: number;
   inicioCaja: number;
   ventas: {
     cantidad: number;
@@ -68,7 +69,13 @@ export default function CierreCajaPage() {
   const [fotos, setFotos] = useState<string[]>([]);
   const [empleados, setEmpleados] = useState<Array<{ cod: string; nombre: string }>>([]);
   const [selectedEmpleado, setSelectedEmpleado] = useState("");
-  const [sucursal, setSucursal] = useState("1");
+  const [sucursal, setSucursal] = useState(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      return params.get("suc") || "1";
+    }
+    return "1";
+  });
 
   const user = session?.user as { role?: string; name?: string } | undefined;
   const isAdmin = user?.role === "admin";
@@ -131,7 +138,7 @@ export default function CierreCajaPage() {
     doc.text("Distrialma — Cierre de Caja", 14, 14);
     doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
-    doc.text(`Sucursal ${data.sucursal} — Desde: ${data.desde}`, w - 14, 14, { align: "right" });
+    doc.text(`Sucursal ${data.sucursal} — Caja ${data.nroCaja} — Desde: ${data.desde}`, w - 14, 14, { align: "right" });
     doc.text(`Responsable: ${selectedEmpleado || user?.name || "—"} — ${new Date().toLocaleString("es-AR")}`, w - 14, 20, { align: "right" });
     y = 30;
 
@@ -361,6 +368,7 @@ export default function CierreCajaPage() {
         </button>
         {data && (
           <>
+            {isAdmin && (
             <button
               onClick={downloadPDF}
               className="flex items-center gap-2 px-5 py-2.5 bg-red-500 text-white rounded-xl font-semibold hover:bg-red-600 transition-colors"
@@ -368,6 +376,7 @@ export default function CierreCajaPage() {
               <HiOutlineDocumentDownload className="w-5 h-5" />
               PDF
             </button>
+            )}
             <button
               onClick={cerrarCaja}
               disabled={closing || !nuevoInicio}
@@ -396,7 +405,7 @@ export default function CierreCajaPage() {
 
       {data && (
         <div>
-          <p className="text-sm text-gray-500 mb-4">Desde: {data.desde} — Sucursal {data.sucursal}</p>
+          <p className="text-sm text-gray-500 mb-4">Desde: {data.desde} — Sucursal {data.sucursal} — Caja {data.nroCaja}</p>
 
           {/* Admin view: full details */}
           {isAdmin && (

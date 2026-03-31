@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDbName } from "@/lib/mssql";
 import { requireStaff } from "@/lib/api-auth";
 import { prisma } from "@/lib/prisma";
-import nodemailer from "nodemailer";
+import { Resend } from "resend";
 
 import sql from "mssql";
 
@@ -92,14 +92,16 @@ export async function POST(req: NextRequest) {
     try {
       const pool = await getPool();
       const dbTransas = getDbName("transas");
-      const now = new Date();
+      // Use Argentina time (UTC-3) to match PunTouch local clock
+      const now = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Argentina/Buenos_Aires" }));
       const fechora = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}${String(now.getSeconds()).padStart(2, "0")}`;
 
       // Get next Cod and NroCierreCaja
       const maxResult = await pool.request().query(`
-        SELECT MAX(CAST(LTRIM(RTRIM(Cod)) AS BIGINT)) AS maxCod,
+        SELECT MAX(CAST(LTRIM(RTRIM(Cod)) AS INT)) AS maxCod,
                MAX(NroCierreCaja) AS maxCierre
         FROM [${dbTransas}].dbo.Transas
+        WHERE LEN(LTRIM(RTRIM(Cod))) <= 7
       `);
       let nextCodNum = (maxResult.recordset[0]?.maxCod || 0) + 1;
       const nextCierre = (maxResult.recordset[0]?.maxCierre || 0) + 1;
@@ -119,9 +121,25 @@ export async function POST(req: NextRequest) {
         .input("nroCierre", nextCierre)
         .query(`
           INSERT INTO [${dbTransas}].dbo.Transas
-            (Cod, Boleta, Tipo, Sucursal, Fechora, InicioCaja, Sena, Efectivo, Tarjeta, Precio, Total, Deuda, Descuento, ImpoCos, NroCierreCaja, Terminal)
+            (Cod, Boleta, Itm, Tipo, TipoFac, Sucursal, Deposito, Terminal, Fechora, Producto,
+             Cant, Precio, Impo, Total, Costo, Efectivo, Tarjeta, Deuda, Vuelto, Sena,
+             Descuento, Recargo, ImpoIva, ImpoCos, InicioCaja, NroCierreCaja, PorceDescuento,
+             Observaciones, MovCaja, Concepto, CodTarjeta, NroTarjeta, ListaPrecio,
+             Usuario, Empleado, Proveedor, Nroped, NroMostra, NroTransa,
+             Telefono, Cliente, Nombre, Calle, Nume, PisoDto, Entre1, Entre2,
+             Localidad, CUIT, IVA, FechoraEntregar, Anulado, TalleColor,
+             Stkinicial, FillerNum1, FillerNum2, FillerNum3, FillerNum4, FillerNum5,
+             Filler1, Filler2, Filler3, FillerBit1, FillerBit2, FillerBit3, FillerBit4, FillerBit5)
           VALUES
-            (@cod, @cod, 'C', @suc, @fechora, @inicio, @inicio, @efectivo, @tarjeta, -@tarjeta, @deuda, -@deuda, @retiros, @impoCos, @nroCierre, 0)
+            (@cod, @cod, '', 'C', '', @suc, '', 0, @fechora, '',
+             0, -@tarjeta, 0, @deuda, 0, @efectivo, @tarjeta, -@deuda, 0, @inicio,
+             @retiros, 0, 0, @impoCos, @inicio, @nroCierre, 0,
+             '', '', '', '', '', 0,
+             '', '', '', '', '', '',
+             '', '', '', '', '', '', '', '',
+             '', '', '', '', '', '',
+             0, 0, 0, 0, 0, 0,
+             '', '', '', 0, 0, 0, 0, 0)
         `);
       console.log("PunTouch cierre written: NroCierre", nextCierre, "suc", suc);
 
@@ -135,8 +153,26 @@ export async function POST(req: NextRequest) {
           .input("fechora", fechora)
           .input("inicio", nuevoInicioVal)
           .query(`
-            INSERT INTO [${dbTransas}].dbo.Transas (Cod, Boleta, Tipo, Sucursal, Fechora, MovCaja, InicioCaja, Efectivo, Total, Terminal)
-            VALUES (@cod, @cod, 'H', @suc, @fechora, 'A', @inicio, 0, 0, 0)
+            INSERT INTO [${dbTransas}].dbo.Transas
+              (Cod, Boleta, Itm, Tipo, TipoFac, Sucursal, Deposito, Terminal, Fechora, Producto,
+               Cant, Precio, Impo, Total, Costo, Efectivo, Tarjeta, Deuda, Vuelto, Sena,
+               Descuento, Recargo, ImpoIva, ImpoCos, InicioCaja, NroCierreCaja, PorceDescuento,
+               Observaciones, MovCaja, Concepto, CodTarjeta, NroTarjeta, ListaPrecio,
+               Usuario, Empleado, Proveedor, Nroped, NroMostra, NroTransa,
+               Telefono, Cliente, Nombre, Calle, Nume, PisoDto, Entre1, Entre2,
+               Localidad, CUIT, IVA, FechoraEntregar, Anulado, TalleColor,
+               Stkinicial, FillerNum1, FillerNum2, FillerNum3, FillerNum4, FillerNum5,
+               Filler1, Filler2, Filler3, FillerBit1, FillerBit2, FillerBit3, FillerBit4, FillerBit5)
+            VALUES
+              (@cod, @cod, '', 'H', '', @suc, '', 0, @fechora, '',
+               0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+               0, 0, 0, 0, @inicio, 0, 0,
+               '', 'A', '', '', '', 0,
+               '', '', '', '', '', '',
+               '', '', '', '', '', '', '', '',
+               '', '', '', '', '', '',
+               0, 0, 0, 0, 0, 0,
+               '', '', '', 0, 0, 0, 0, 0)
           `);
         console.log("PunTouch apertura written:", nuevoInicioVal, "suc", suc);
       }
@@ -144,28 +180,20 @@ export async function POST(req: NextRequest) {
       console.error("Error writing cierre/apertura to PunTouch:", e);
     }
 
-    // Send email if configured
+    // Send email via Resend API (non-blocking)
     let emailSent = false;
-    if (emailTo && pdfBase64) {
-      try {
-        const smtpHost = process.env.SMTP_HOST || "smtp.gmail.com";
-        const smtpPort = parseInt(process.env.SMTP_PORT || "587");
-        const smtpUser = process.env.SMTP_USER || "";
-        const smtpPass = process.env.SMTP_PASS || "";
-
-        if (smtpUser && smtpPass) {
-          const transporter = nodemailer.createTransport({
-            host: smtpHost,
-            port: smtpPort,
-            secure: smtpPort === 465,
-            auth: { user: smtpUser, pass: smtpPass },
-          });
-
+    const resendKey = process.env.RESEND_API_KEY || "";
+    if (emailTo && pdfBase64 && resendKey) {
+      emailSent = true;
+      const cierreId = cierre.id;
+      (async () => {
+        try {
+          const resend = new Resend(resendKey);
           const fecha = new Date().toLocaleDateString("es-AR");
           const filename = `CierreCaja-Suc${suc}-${new Date().toISOString().slice(0, 10)}.pdf`;
 
-          await transporter.sendMail({
-            from: smtpUser,
+          await resend.emails.send({
+            from: process.env.RESEND_FROM || "Distrialma <onboarding@resend.dev>",
             to: emailTo,
             subject: `Cierre de Caja — Sucursal ${suc} — ${fecha}`,
             html: `
@@ -173,7 +201,7 @@ export async function POST(req: NextRequest) {
               <p><strong>Fecha:</strong> ${fecha}</p>
               <p><strong>Responsable:</strong> ${userName}</p>
               <p><strong>Ventas:</strong> ${data.ventas.cantidad}</p>
-              <p><strong>Total:</strong> $${data.ventas.total.toLocaleString("es-AR", { minimumFractionDigits: 2 })}</p>
+              <p><strong>Total:</strong> $${(data.ventas.total || 0).toLocaleString("es-AR", { minimumFractionDigits: 2 })}</p>
               <p><strong>Inicio de caja siguiente:</strong> $${nuevoInicioVal.toLocaleString("es-AR", { minimumFractionDigits: 2 })}</p>
               <p>Ver detalle en el PDF adjunto.</p>
               <hr>
@@ -182,26 +210,24 @@ export async function POST(req: NextRequest) {
             attachments: [
               {
                 filename,
-                content: Buffer.from(pdfBase64, "base64"),
-                contentType: "application/pdf",
+                content: pdfBase64,
               },
               ...allFotos.map((foto: string, i: number) => ({
                 filename: `Ticket-Posnet-${i + 1}-${new Date().toISOString().slice(0, 10)}.jpg`,
-                content: Buffer.from(foto, "base64"),
-                contentType: "image/jpeg" as const,
+                content: foto,
               })),
             ],
           });
 
-          emailSent = true;
           await prisma.cierreCaja.update({
-            where: { id: cierre.id },
+            where: { id: cierreId },
             data: { emailSent: true },
           });
+          console.log("Cierre email sent to", emailTo);
+        } catch (emailErr) {
+          console.error("Error sending cierre email:", emailErr);
         }
-      } catch (emailErr) {
-        console.error("Error sending cierre email:", emailErr);
-      }
+      })();
     }
 
     return NextResponse.json({
@@ -222,18 +248,20 @@ async function getCajaData(sucursal: string) {
   const pool = await getPool();
   const dbTransas = getDbName("transas");
 
-  const lastApertura = await pool.request().input("suc", sucursal).query(`
-    SELECT TOP 1 Fechora, InicioCaja, LTRIM(RTRIM(Sucursal)) AS suc
+  const lastCierre = await pool.request().input("suc", sucursal).query(`
+    SELECT TOP 1 LTRIM(RTRIM(Cod)) AS cod, Fechora, InicioCaja, LTRIM(RTRIM(Sucursal)) AS suc, NroCierreCaja
     FROM [${dbTransas}].dbo.Transas
     WHERE Tipo = 'C'
       AND LTRIM(RTRIM(Sucursal)) = @suc
     ORDER BY Fechora DESC
   `);
 
-  const desde = lastApertura.recordset[0]?.Fechora?.trim() || "20260101000000";
-  const inicioCaja = lastApertura.recordset[0]?.InicioCaja || 0;
+  const cierreCod = lastCierre.recordset[0]?.cod?.trim() || "0";
+  const desde = lastCierre.recordset[0]?.Fechora?.trim() || "20260101000000";
+  const inicioCaja = lastCierre.recordset[0]?.InicioCaja || 0;
 
-  const ventas = await pool.request().input("suc", sucursal).input("desde", desde).query(`
+  // Filter by Cod > cierre Cod (captures all sales after the cierre record, regardless of timestamp)
+  const ventas = await pool.request().input("suc", sucursal).input("cierreCod", parseInt(cierreCod) || 0).query(`
     SELECT
       COUNT(*) AS cantVentas,
       SUM(ISNULL(Efectivo, 0)) AS efectivo,
@@ -245,11 +273,11 @@ async function getCajaData(sucursal: string) {
     FROM [${dbTransas}].dbo.Transas
     WHERE Tipo = 'V'
       AND LTRIM(RTRIM(Sucursal)) = @suc
-      AND Fechora > @desde
+      AND CAST(LTRIM(RTRIM(Cod)) AS BIGINT) > @cierreCod
       AND (Anulado IS NULL OR LTRIM(RTRIM(Anulado)) = '' OR Anulado = ' ')
   `);
 
-  const movimientos = await pool.request().input("suc", sucursal).input("desde", desde).query(`
+  const movimientos = await pool.request().input("suc", sucursal).input("cierreCod", parseInt(cierreCod) || 0).query(`
     SELECT
       LTRIM(RTRIM(MovCaja)) AS tipo,
       LTRIM(RTRIM(ISNULL(Concepto, ''))) AS concepto,
@@ -259,22 +287,22 @@ async function getCajaData(sucursal: string) {
     FROM [${dbTransas}].dbo.Transas
     WHERE LTRIM(RTRIM(MovCaja)) IN ('R', 'I', 'P')
       AND LTRIM(RTRIM(Sucursal)) = @suc
-      AND Fechora > @desde
+      AND CAST(LTRIM(RTRIM(Cod)) AS BIGINT) > @cierreCod
     ORDER BY Fechora ASC
   `);
 
-  const anuladas = await pool.request().input("suc", sucursal).input("desde", desde).query(`
+  const anuladas = await pool.request().input("suc", sucursal).input("cierreCod", parseInt(cierreCod) || 0).query(`
     SELECT COUNT(*) AS cnt, SUM(ISNULL(Total, 0)) AS total
     FROM [${dbTransas}].dbo.Transas
     WHERE Tipo = 'V'
       AND LTRIM(RTRIM(Sucursal)) = @suc
-      AND Fechora > @desde
+      AND CAST(LTRIM(RTRIM(Cod)) AS BIGINT) > @cierreCod
       AND Anulado IS NOT NULL AND LTRIM(RTRIM(Anulado)) != '' AND Anulado != ' '
   `);
 
   // Card payment breakdown by type
   const dbVarios = getDbName("transas").replace("BDTRANSAS", "BDVARIOS");
-  const tarjetasDetalle = await pool.request().input("suc", sucursal).input("desde", desde).query(`
+  const tarjetasDetalle = await pool.request().input("suc", sucursal).input("cierreCod", parseInt(cierreCod) || 0).query(`
     SELECT LTRIM(RTRIM(t.CodTarjeta)) AS cod,
       LTRIM(RTRIM(ISNULL(tj.[Desc], 'Otro'))) AS nombre,
       SUM(t.Tarjeta) AS total, COUNT(*) AS cnt
@@ -282,7 +310,7 @@ async function getCajaData(sucursal: string) {
     LEFT JOIN [${dbVarios}].dbo.Tarjetas tj ON tj.Cod COLLATE Modern_Spanish_CI_AS = t.CodTarjeta COLLATE Modern_Spanish_CI_AS
     WHERE t.Tipo = 'V' AND t.Tarjeta > 0
       AND LTRIM(RTRIM(t.Sucursal)) = @suc
-      AND t.Fechora > @desde
+      AND CAST(LTRIM(RTRIM(t.Cod)) AS BIGINT) > @cierreCod
       AND (t.Anulado IS NULL OR LTRIM(RTRIM(t.Anulado)) = '' OR t.Anulado = ' ')
     GROUP BY t.CodTarjeta, tj.[Desc]
     ORDER BY SUM(t.Tarjeta) DESC
@@ -309,6 +337,7 @@ async function getCajaData(sucursal: string) {
     sucursal,
     desde: desdeStr,
     desdeRaw: desde,
+    nroCaja: lastCierre.recordset[0]?.NroCierreCaja || 0,
     inicioCaja,
     ventas: {
       cantidad: v.cantVentas || 0,
