@@ -805,38 +805,38 @@ export default function PedidosYaPage() {
           </div>
 
           {/* Tabs + Export */}
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit">
+          <div className="flex items-center justify-between mb-4 gap-2">
+            <div className="flex gap-1 bg-gray-100 rounded-lg p-1 overflow-x-auto whitespace-nowrap">
               <button
                 onClick={() => setTab("prices")}
-                className={`px-4 py-1.5 text-sm rounded-md transition-colors ${tab === "prices" ? "bg-white text-gray-900 shadow-sm font-medium" : "text-gray-500"}`}
+                className={`px-2.5 py-1.5 text-xs sm:text-sm rounded-md transition-colors shrink-0 ${tab === "prices" ? "bg-white text-gray-900 shadow-sm font-medium" : "text-gray-500"}`}
               >
                 Precios ({result.changes.length})
               </button>
               <button
                 onClick={() => setTab("stock")}
-                className={`px-4 py-1.5 text-sm rounded-md transition-colors ${tab === "stock" ? "bg-white text-gray-900 shadow-sm font-medium" : "text-gray-500"}`}
+                className={`px-2.5 py-1.5 text-xs sm:text-sm rounded-md transition-colors shrink-0 ${tab === "stock" ? "bg-white text-gray-900 shadow-sm font-medium" : "text-gray-500"}`}
               >
                 Stock ({result.stockChanges.length})
               </button>
               {result.unmatchedList.length > 0 && (
                 <button
                   onClick={() => setTab("unmatched")}
-                  className={`px-4 py-1.5 text-sm rounded-md transition-colors ${tab === "unmatched" ? "bg-white text-gray-900 shadow-sm font-medium" : "text-gray-500"}`}
+                  className={`px-2.5 py-1.5 text-xs sm:text-sm rounded-md transition-colors shrink-0 ${tab === "unmatched" ? "bg-white text-gray-900 shadow-sm font-medium" : "text-gray-500"}`}
                 >
                   Sin asociar ({result.unmatchedList.length})
                 </button>
               )}
               <button
                 onClick={() => { setTab("mappings"); loadMappings(); }}
-                className={`px-4 py-1.5 text-sm rounded-md transition-colors ${tab === "mappings" ? "bg-white text-gray-900 shadow-sm font-medium" : "text-gray-500"}`}
+                className={`px-2.5 py-1.5 text-xs sm:text-sm rounded-md transition-colors shrink-0 ${tab === "mappings" ? "bg-white text-gray-900 shadow-sm font-medium" : "text-gray-500"}`}
               >
                 Asociaciones
               </button>
               {result.missingFromPeya && result.missingFromPeya.length > 0 && (
                 <button
                   onClick={() => setTab("missing")}
-                  className={`px-4 py-1.5 text-sm rounded-md transition-colors ${tab === "missing" ? "bg-white text-gray-900 shadow-sm font-medium" : "text-gray-500"}`}
+                  className={`px-2.5 py-1.5 text-xs sm:text-sm rounded-md transition-colors shrink-0 ${tab === "missing" ? "bg-white text-gray-900 shadow-sm font-medium" : "text-gray-500"}`}
                 >
                   Faltantes ({result.missingFromPeya.length})
                 </button>
