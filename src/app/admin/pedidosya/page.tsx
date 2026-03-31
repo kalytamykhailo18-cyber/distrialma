@@ -28,6 +28,15 @@ interface UnmatchedItem {
   active: boolean;
 }
 
+interface MissingProduct {
+  sku: string;
+  nombre: string;
+  codbar: string;
+  precio5: number;
+  stock: number;
+  unidad: string;
+}
+
 interface CompareResult {
   peyaTotal: number;
   puntouchTotal: number;
@@ -36,6 +45,7 @@ interface CompareResult {
   changes: PriceChange[];
   stockChanges: StockChange[];
   unmatchedList: UnmatchedItem[];
+  missingFromPeya: MissingProduct[];
 }
 
 function StockMinSetting() {
@@ -380,7 +390,7 @@ export default function PedidosYaPage() {
   const [successMsg, setSuccessMsg] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [selectedStock, setSelectedStock] = useState<Set<string>>(new Set());
-  const [tab, setTab] = useState<"prices" | "stock" | "unmatched" | "mappings">("prices");
+  const [tab, setTab] = useState<"prices" | "stock" | "unmatched" | "mappings" | "missing">("prices");
 
   // Mappings state
   interface Mapping { id: number; peyaSku: string; puntouchSku: string; multiplier: number; createdAt: string }
@@ -811,6 +821,14 @@ export default function PedidosYaPage() {
               >
                 Asociaciones
               </button>
+              {result.missingFromPeya && result.missingFromPeya.length > 0 && (
+                <button
+                  onClick={() => setTab("missing")}
+                  className={`px-4 py-1.5 text-sm rounded-md transition-colors ${tab === "missing" ? "bg-white text-gray-900 shadow-sm font-medium" : "text-gray-500"}`}
+                >
+                  Faltantes ({result.missingFromPeya.length})
+                </button>
+              )}
             </div>
             <button
               onClick={tab === "prices" ? exportPricesCSV : tab === "stock" ? exportStockCSV : exportUnmatchedCSV}
@@ -993,7 +1011,48 @@ export default function PedidosYaPage() {
           )}
 
           {/* Apply button — only for current tab */}
-          {currentTabCount > 0 && tab !== "unmatched" && tab !== "mappings" && (
+          {/* Missing from PeYa tab */}
+          {tab === "missing" && result.missingFromPeya && result.missingFromPeya.length > 0 && (
+            <div className="bg-white border rounded-xl overflow-hidden">
+              <div className="px-4 py-3 bg-gray-50 border-b">
+                <p className="text-sm text-gray-600">
+                  Productos en PunTouch con precio Lista 5 que no están en PedidosYa ({result.missingFromPeya.length}).
+                </p>
+              </div>
+              <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0 bg-white">
+                    <tr className="bg-gray-50 border-b text-left">
+                      <th className="p-3">SKU</th>
+                      <th className="p-3">Producto</th>
+                      <th className="p-3">EAN</th>
+                      <th className="p-3 text-right">Precio L5</th>
+                      <th className="p-3 text-center">Stock</th>
+                      <th className="p-3 text-center">Unidad</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {result.missingFromPeya.map((p) => (
+                      <tr key={p.sku} className={`border-b hover:bg-gray-50 ${p.stock <= 0 ? "bg-red-50/50" : ""}`}>
+                        <td className="p-3 font-mono text-sm font-bold text-brand-600">{p.sku}</td>
+                        <td className="p-3 font-medium">{p.nombre}</td>
+                        <td className="p-3 font-mono text-xs text-gray-400">{p.codbar || "—"}</td>
+                        <td className="p-3 text-right">{fmt(p.precio5)}</td>
+                        <td className="p-3 text-center">
+                          <span className={`font-mono font-bold ${p.stock <= 0 ? "text-red-500" : "text-green-600"}`}>
+                            {p.stock}
+                          </span>
+                        </td>
+                        <td className="p-3 text-center text-gray-500">{p.unidad}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {currentTabCount > 0 && tab !== "unmatched" && tab !== "mappings" && tab !== "missing" && (
             <div className="mt-4 flex items-center justify-between">
               <span className="text-sm text-gray-500">
                 {currentTabCount} de {tab === "prices" ? result.changes.length : result.stockChanges.length} seleccionados

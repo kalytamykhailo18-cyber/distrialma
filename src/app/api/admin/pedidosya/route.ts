@@ -305,6 +305,33 @@ export async function GET() {
       }
     }
 
+    // Build "missing from PeYa" — PunTouch products with Precio5 that aren't in PedidosYa
+    const matchedPtSkus = new Set<string>();
+    for (const peyaProd of peyaProducts) {
+      // Re-run matching to find which PT SKUs were matched
+      const manual = manualMap.get(peyaProd.sku);
+      if (manual) { matchedPtSkus.add(manual.puntouchSku); continue; }
+      for (const bc of peyaProd.barcodes) {
+        const pt = puntouchByBarcode.get(bc) || puntouchByBarcode.get(bc.replace(/^0+/, ""));
+        if (pt) { matchedPtSkus.add(pt.sku); break; }
+      }
+      const pt2 = puntouchBySku.get(peyaProd.sku);
+      if (pt2) { matchedPtSkus.add(pt2.sku); continue; }
+      const pt3 = puntouchByBarcode.get(peyaProd.sku) || puntouchByBarcode.get(peyaProd.sku.replace(/^0+/, ""));
+      if (pt3) { matchedPtSkus.add(pt3.sku); }
+    }
+
+    const missingFromPeya = result.recordset
+      .filter((r: { sku: string; precio5: number }) => r.precio5 > 0 && !matchedPtSkus.has(r.sku))
+      .map((r: { sku: string; nombre: string; codbar: string; precio5: number; stock: number; unidad: string }) => ({
+        sku: r.sku,
+        nombre: r.nombre,
+        codbar: r.codbar?.trim() || "",
+        precio5: r.unidad?.toUpperCase() === "KG" ? Math.round(r.precio5 / 10) : r.precio5,
+        stock: r.stock,
+        unidad: r.unidad,
+      }));
+
     return NextResponse.json({
       peyaTotal: peyaProducts.length,
       puntouchTotal: puntouchWithPrecio5,
@@ -313,6 +340,7 @@ export async function GET() {
       changes: priceChanges,
       stockChanges,
       unmatchedList,
+      missingFromPeya,
     });
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : "Error desconocido";
