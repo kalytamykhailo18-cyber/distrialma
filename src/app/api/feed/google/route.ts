@@ -53,9 +53,12 @@ export async function GET() {
       const availability = p.stock > 0 ? "in_stock" : "out_of_stock";
       const link = `${SITE_URL}/productos/${encodeURIComponent(p.sku)}`;
 
+      const description = [p.name, p.brand, p.category].filter(Boolean).join(" — ");
+
       return `    <item>
       <g:id>${escXml(p.sku)}</g:id>
       <title>${escXml(p.name)}</title>
+      <description>${escXml(description)}</description>
       <link>${escXml(link)}</link>
       ${imageUrl ? `<g:image_link>${escXml(imageUrl)}</g:image_link>` : ""}
       <g:price>${p.price.toFixed(2)} ${CURRENCY}</g:price>
