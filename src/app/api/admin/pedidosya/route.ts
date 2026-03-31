@@ -125,6 +125,51 @@ async function updatePeyaProducts(
   return { success: true };
 }
 
+async function batchUpdatePeyaProducts(
+  token: string,
+  updates: Array<{ sku: string; active?: boolean; maximumSalesQuantity?: number }>
+): Promise<{ success: boolean; updated: number; error?: string }> {
+  const products = updates.map((u) => {
+    const prod: Record<string, unknown> = { sku: u.sku };
+    if (u.active !== undefined) prod.active = u.active;
+    if (u.maximumSalesQuantity !== undefined) prod.maximumSalesQuantity = u.maximumSalesQuantity;
+    return prod;
+  });
+
+  const res = await fetch(PEYA_GRAPHQL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+      "x-client-source": "one-web",
+    },
+    body: JSON.stringify({
+      operationName: "ProductsUpdate",
+      query: `mutation ProductsUpdate($productsUpdate: ProductsUpdate!) {
+        productsUpdate(productsUpdate: $productsUpdate) {
+          ... on ProductsUpdatedSuccessResult { __typename status }
+          ... on ProductsUpdateAccepted { __typename bulkRequestId }
+          ... on ProductsUpdateAsyncAccepted { __typename }
+          ... on ProductsUpdateValidationErrors { __typename productsErrors { sku error } }
+        }
+      }`,
+      variables: {
+        productsUpdate: {
+          vendorIdentifiers: [VENDOR],
+          products,
+        },
+      },
+    }),
+  });
+
+  if (!res.ok || !res.headers.get("content-type")?.includes("json")) {
+    return { success: false, updated: 0, error: "Token expirado" };
+  }
+  const data = await res.json();
+  if (data.errors) return { success: false, updated: 0, error: data.errors[0]?.message };
+  return { success: true, updated: products.length };
+}
+
 // GET: Compare PedidosYa prices with PunTouch Precio5
 export async function GET() {
   if (!(await requireStaff())) {
@@ -451,8 +496,24 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No hay cambios para aplicar" }, { status: 400 });
     }
 
-    for (let i = 0; i < allUpdates.length; i += 50) {
-      const batch = allUpdates.slice(i, i + 50);
+    // Use batch mutation for large stock-only updates, individual for price updates
+    const priceOnly = allUpdates.filter((u) => u.price !== undefined);
+    const stockOnly = allUpdates.filter((u) => u.price === undefined);
+
+    // Batch stock updates (fast, async)
+    for (let i = 0; i < stockOnly.length; i += 100) {
+      const batch = stockOnly.slice(i, i + 100);
+      const result = await batchUpdatePeyaProducts(token, batch);
+      if (result.success) {
+        totalUpdated += batch.length;
+      } else {
+        errors.push(`Stock batch ${Math.floor(i / 100) + 1}: ${result.error}`);
+      }
+    }
+
+    // Individual price updates (synchronous, reliable)
+    for (let i = 0; i < priceOnly.length; i += 50) {
+      const batch = priceOnly.slice(i, i + 50);
       const result = await updatePeyaProducts(token, batch);
       if (result.success) {
         totalUpdated += batch.length;
