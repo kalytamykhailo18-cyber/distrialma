@@ -18,6 +18,7 @@ interface StockChange {
   currentActive: boolean;
   shouldBeActive: boolean;
   stock: number;
+  maxQty: number;
 }
 
 interface UnmatchedItem {
@@ -513,7 +514,7 @@ export default function PedidosYaPage() {
       ? result.changes.filter((c) => selected.has(c.peyaSku)).map((c) => ({ sku: c.peyaSku, price: c.newPrice, puntouchSku: c.puntouchSku }))
       : [];
     const stockUpdates = tab === "stock"
-      ? result.stockChanges.filter((c) => selectedStock.has(c.peyaSku)).map((c) => ({ sku: c.peyaSku, active: c.shouldBeActive }))
+      ? result.stockChanges.filter((c) => selectedStock.has(c.peyaSku)).map((c) => ({ sku: c.peyaSku, active: c.shouldBeActive, maxQty: c.maxQty }))
       : [];
 
     if (priceUpdates.length === 0 && stockUpdates.length === 0) return;
@@ -567,11 +568,12 @@ export default function PedidosYaPage() {
 
   function exportStockCSV() {
     if (!result || result.stockChanges.length === 0) return;
-    const header = ["SKU PeYa", "Producto", "Stock", "Estado Actual", "Accion"];
+    const header = ["SKU PeYa", "Producto", "Stock", "Cant Max", "Estado Actual", "Accion"];
     const rows = result.stockChanges.map((c) => [
       c.peyaSku,
       c.peyaName,
       c.stock,
+      c.maxQty,
       c.currentActive ? "Activo" : "Inactivo",
       c.shouldBeActive ? "Activar" : "Desactivar",
     ]);
@@ -886,6 +888,7 @@ export default function PedidosYaPage() {
                         </th>
                         <th className="p-3">Producto</th>
                         <th className="p-3 text-center">Stock</th>
+                        <th className="p-3 text-center">Cant Máx</th>
                         <th className="p-3 text-center">Estado actual</th>
                         <th className="p-3 text-center">Acción</th>
                       </tr>
@@ -900,6 +903,11 @@ export default function PedidosYaPage() {
                           <td className="p-3 text-center">
                             <span className={`font-mono font-bold ${c.stock <= 0 ? "text-red-500" : "text-green-600"}`}>
                               {c.stock === -999 ? "Sin L5" : c.stock}
+                            </span>
+                          </td>
+                          <td className="p-3 text-center">
+                            <span className="font-mono text-sm font-bold text-blue-600">
+                              {c.maxQty}
                             </span>
                           </td>
                           <td className="p-3 text-center">

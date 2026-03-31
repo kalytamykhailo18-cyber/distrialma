@@ -67,9 +67,8 @@ async function fetchPeyaProducts(token: string): Promise<Array<{ sku: string; na
 
 async function updatePeyaProducts(
   token: string,
-  updates: Array<{ sku: string; price?: number; active?: boolean }>
+  updates: Array<{ sku: string; price?: number; active?: boolean; maximumSalesQuantity?: number }>
 ): Promise<{ success: boolean; error?: string }> {
-  // Use individual synchronous mutation (more reliable than batch async)
   const errors: string[] = [];
   let successCount = 0;
 
@@ -80,6 +79,7 @@ async function updatePeyaProducts(
     };
     if (u.price !== undefined) productUpdate.price = u.price;
     if (u.active !== undefined) productUpdate.active = u.active;
+    if (u.maximumSalesQuantity !== undefined) productUpdate.maximumSalesQuantity = u.maximumSalesQuantity;
 
     try {
       const res = await fetch(PEYA_GRAPHQL, {
@@ -213,6 +213,7 @@ export async function GET() {
       currentActive: boolean;
       shouldBeActive: boolean;
       stock: number;
+      maxQty: number;
     }> = [];
     let matched = 0;
     let unmatched = 0;
@@ -287,15 +288,19 @@ export async function GET() {
         });
       }
 
-      // Stock/active: deactivate if stock<=0 OR precio5=0
+      // Stock/active: deactivate if stock<=stockMin OR precio5=0
       const shouldBeActive = ptProd.stock > stockMin && ptProd.precio5 > 0;
+      // Max quantity = stock - reserve (stockMin), minimum 0
+      const maxQty = ptProd.precio5 > 0 ? Math.max(0, Math.floor(ptProd.stock) - stockMin) : 0;
+
       if (peyaProd.active !== shouldBeActive) {
         stockChanges.push({
           peyaSku: peyaProd.sku,
           peyaName: peyaProd.name,
           currentActive: peyaProd.active,
           shouldBeActive,
-          stock: ptProd.precio5 <= 0 ? -999 : ptProd.stock, // -999 = sin precio en lista 5
+          stock: ptProd.precio5 <= 0 ? -999 : ptProd.stock,
+          maxQty,
         });
       }
     }
@@ -327,7 +332,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const { updates, stockUpdates, skuUpdates } = await req.json();
-    const allUpdates: Array<{ sku: string; price?: number; active?: boolean }> = [];
+    const allUpdates: Array<{ sku: string; price?: number; active?: boolean; maximumSalesQuantity?: number }> = [];
     const puntouchPriceUpdates: Array<{ peyaSku: string; puntouchSku: string; price: number }> = [];
     const skuChangeResults: string[] = [];
 
@@ -347,12 +352,16 @@ export async function POST(req: NextRequest) {
     }
     if (stockUpdates && Array.isArray(stockUpdates)) {
       for (const u of stockUpdates) {
-        // Merge with existing price update if same SKU
         const existing = allUpdates.find((a) => a.sku === u.sku);
         if (existing) {
           existing.active = u.active;
+          if (u.maxQty !== undefined) existing.maximumSalesQuantity = u.maxQty;
         } else {
-          allUpdates.push({ sku: u.sku, active: u.active });
+          allUpdates.push({
+            sku: u.sku,
+            active: u.active,
+            ...(u.maxQty !== undefined ? { maximumSalesQuantity: u.maxQty } : {}),
+          });
         }
       }
     }
