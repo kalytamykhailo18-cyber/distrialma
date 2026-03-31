@@ -46,6 +46,7 @@ interface CompareResult {
   stockChanges: StockChange[];
   unmatchedList: UnmatchedItem[];
   missingFromPeya: MissingProduct[];
+  allMatched: Array<{ peyaSku: string; maxQty: number; active: boolean }>;
 }
 
 function StockMinSetting() {
@@ -404,6 +405,34 @@ export default function PedidosYaPage() {
     return sortDir === "asc" ? " ↑" : " ↓";
   }
 
+  const [bulkSyncing, setBulkSyncing] = useState(false);
+
+  async function bulkSyncStock() {
+    if (!result || !result.allMatched) return;
+    setBulkSyncing(true);
+    setError("");
+    try {
+      const stockUpdates = result.allMatched.map((m) => ({
+        sku: m.peyaSku,
+        active: m.active,
+        maxQty: m.maxQty,
+      }));
+      const res = await fetch("/api/admin/pedidosya", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ stockUpdates }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setSuccessMsg(`Stock sincronizado: ${data.updated} productos actualizados`);
+      if (data.errors?.length > 0) setError(data.errors.join("; "));
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Error");
+    } finally {
+      setBulkSyncing(false);
+    }
+  }
+
   // Mappings state
   interface Mapping { id: number; peyaSku: string; puntouchSku: string; multiplier: number; createdAt: string }
   const [mappings, setMappings] = useState<Mapping[]>([]);
@@ -758,6 +787,16 @@ export default function PedidosYaPage() {
       >
         {loading ? "Comparando..." : "Comparar"}
       </button>
+
+      {result && result.allMatched && (
+        <button
+          onClick={bulkSyncStock}
+          disabled={bulkSyncing}
+          className="ml-3 bg-purple-600 text-white px-4 py-3 rounded-xl font-semibold hover:bg-purple-700 disabled:opacity-50 transition-colors text-sm"
+        >
+          {bulkSyncing ? "Sincronizando..." : `Sync Todo Stock (${result.allMatched.length})`}
+        </button>
+      )}
 
       {!tokenExpired && loginStep === "idle" && !result && (
         <button

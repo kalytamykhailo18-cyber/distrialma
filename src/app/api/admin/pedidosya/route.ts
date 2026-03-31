@@ -217,6 +217,7 @@ export async function GET() {
     }> = [];
     let matched = 0;
     let unmatched = 0;
+    const allMatched: Array<{ peyaSku: string; maxQty: number; active: boolean }> = [];
     const unmatchedList: Array<{ peyaSku: string; peyaName: string; barcode: string; active: boolean }> = [];
     const puntouchWithPrecio5 = result.recordset.filter((r: { precio5: number }) => r.precio5 > 0).length;
 
@@ -272,6 +273,11 @@ export async function GET() {
       }
 
       matched++;
+
+      // Track all matched for bulk stock sync
+      const maxQtyAll = ptProd.precio5 > 0 ? Math.max(0, Math.floor(ptProd.stock) - stockMin) : 0;
+      const shouldBeActiveAll = ptProd.stock > stockMin && ptProd.precio5 > 0;
+      allMatched.push({ peyaSku: peyaProd.sku, maxQty: maxQtyAll, active: shouldBeActiveAll });
 
       // Price: Precio5=0 means should deactivate, otherwise compare prices
       const roundedPt = Math.round(ptProd.precio5);
@@ -341,6 +347,7 @@ export async function GET() {
       stockChanges,
       unmatchedList,
       missingFromPeya,
+      allMatched,
     });
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : "Error desconocido";
