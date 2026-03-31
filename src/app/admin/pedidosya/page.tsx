@@ -391,6 +391,18 @@ export default function PedidosYaPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [selectedStock, setSelectedStock] = useState<Set<string>>(new Set());
   const [tab, setTab] = useState<"prices" | "stock" | "unmatched" | "mappings" | "missing">("prices");
+  const [sortField, setSortField] = useState<string>("");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+
+  function toggleSort(field: string) {
+    if (sortField === field) setSortDir((d) => d === "asc" ? "desc" : "asc");
+    else { setSortField(field); setSortDir("asc"); }
+  }
+
+  function sortIcon(field: string) {
+    if (sortField !== field) return " ↕";
+    return sortDir === "asc" ? " ↑" : " ↓";
+  }
 
   // Mappings state
   interface Mapping { id: number; peyaSku: string; puntouchSku: string; multiplier: number; createdAt: string }
@@ -1021,18 +1033,24 @@ export default function PedidosYaPage() {
               </div>
               <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
                 <table className="w-full text-sm">
-                  <thead className="sticky top-0 bg-white">
+                  <thead className="sticky top-0 bg-white z-10">
                     <tr className="bg-gray-50 border-b text-left">
-                      <th className="p-3">SKU</th>
-                      <th className="p-3">Producto</th>
+                      <th className="p-3 cursor-pointer hover:bg-gray-100" onClick={() => toggleSort("sku")}>SKU{sortIcon("sku")}</th>
+                      <th className="p-3 cursor-pointer hover:bg-gray-100" onClick={() => toggleSort("nombre")}>Producto{sortIcon("nombre")}</th>
                       <th className="p-3">EAN</th>
-                      <th className="p-3 text-right">Precio L5</th>
-                      <th className="p-3 text-center">Stock</th>
+                      <th className="p-3 text-right cursor-pointer hover:bg-gray-100" onClick={() => toggleSort("precio5")}>Precio L5{sortIcon("precio5")}</th>
+                      <th className="p-3 text-center cursor-pointer hover:bg-gray-100" onClick={() => toggleSort("stock")}>Stock{sortIcon("stock")}</th>
                       <th className="p-3 text-center">Unidad</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {result.missingFromPeya.map((p) => (
+                    {[...result.missingFromPeya].sort((a, b) => {
+                      if (!sortField) return 0;
+                      const av = a[sortField as keyof MissingProduct];
+                      const bv = b[sortField as keyof MissingProduct];
+                      const cmp = typeof av === "number" ? (av as number) - (bv as number) : String(av).localeCompare(String(bv));
+                      return sortDir === "asc" ? cmp : -cmp;
+                    }).map((p) => (
                       <tr key={p.sku} className={`border-b hover:bg-gray-50 ${p.stock <= 0 ? "bg-red-50/50" : ""}`}>
                         <td className="p-3 font-mono text-sm font-bold text-brand-600">{p.sku}</td>
                         <td className="p-3 font-medium">{p.nombre}</td>
