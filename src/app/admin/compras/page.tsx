@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { formatPrice } from "@/lib/utils";
-import { HiOutlineDocumentDownload, HiOutlineTable } from "react-icons/hi";
+import { HiOutlineDocumentDownload, HiOutlineTable, HiOutlineTrash } from "react-icons/hi";
 
 interface StockEntry {
   id: number;
@@ -47,6 +48,8 @@ function formatDateShort(iso: string): string {
 }
 
 export default function ComprasPage() {
+  const { data: session } = useSession();
+  const isAdmin = (session?.user as { role?: string })?.role === "admin";
   const [entries, setEntries] = useState<StockEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("pendiente");
@@ -59,6 +62,20 @@ export default function ComprasPage() {
       .catch(() => setEntries([]))
       .finally(() => setLoading(false));
   }, [tab]);
+
+  async function deleteEntry(id: number, e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!confirm("¿Eliminar este ingreso pendiente?")) return;
+    try {
+      const res = await fetch("/api/admin/stock-entries", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      if (res.ok) setEntries((prev) => prev.filter((entry) => entry.id !== id));
+    } catch { /* silent */ }
+  }
 
   async function exportPDF() {
     if (entries.length === 0) return;
@@ -314,8 +331,19 @@ export default function ComprasPage() {
                     )}
                   </div>
                 </div>
-                <div className="shrink-0 text-sm font-semibold text-gray-900">
-                  {entry.total > 0 ? formatPrice(entry.total) : "—"}
+                <div className="shrink-0 flex items-center gap-2">
+                  <span className="text-sm font-semibold text-gray-900">
+                    {entry.total > 0 ? formatPrice(entry.total) : "—"}
+                  </span>
+                  {isAdmin && entry.estado === "pendiente" && (
+                    <button
+                      onClick={(e) => deleteEntry(entry.id, e)}
+                      className="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded"
+                      title="Eliminar"
+                    >
+                      <HiOutlineTrash className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
               </div>
             </Link>

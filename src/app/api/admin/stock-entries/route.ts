@@ -267,3 +267,41 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+
+export async function DELETE(req: NextRequest) {
+  const session = await requireStaff();
+  if (!session) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  }
+
+  // Only admin can delete
+  const user = session.user as { role?: string };
+  if (user.role !== "admin") {
+    return NextResponse.json({ error: "Solo admin puede eliminar" }, { status: 403 });
+  }
+
+  try {
+    const { id } = await req.json();
+    if (!id) {
+      return NextResponse.json({ error: "ID requerido" }, { status: 400 });
+    }
+
+    const entry = await prisma.stockEntry.findUnique({ where: { id: parseInt(id) } });
+    if (!entry) {
+      return NextResponse.json({ error: "Ingreso no encontrado" }, { status: 404 });
+    }
+
+    if (entry.estado !== "pendiente") {
+      return NextResponse.json({ error: "Solo se pueden eliminar ingresos pendientes" }, { status: 400 });
+    }
+
+    // Delete items first, then entry
+    await prisma.stockEntryItem.deleteMany({ where: { entryId: parseInt(id) } });
+    await prisma.stockEntry.delete({ where: { id: parseInt(id) } });
+
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    console.error("Error deleting stock entry:", error);
+    return NextResponse.json({ error: "Error al eliminar" }, { status: 500 });
+  }
+}
