@@ -4,27 +4,9 @@ import { requireStaff } from "@/lib/api-auth";
 import { prisma } from "@/lib/prisma";
 import { Resend } from "resend";
 
-import sql from "mssql";
-
-// Use Server01 for cierre-caja testing
-const server01Config: sql.config = {
-  server: process.env.MSSQL_SERVER01_HOST || process.env.MSSQL_HOST!,
-  port: parseInt(process.env.MSSQL_SERVER01_PORT || process.env.MSSQL_PORT || "1433"),
-  user: process.env.MSSQL_USER!,
-  password: process.env.MSSQL_PASSWORD!,
-  options: { encrypt: false, trustServerCertificate: true },
-  connectionTimeout: 15000,
-  requestTimeout: 15000,
-  pool: { max: 3, min: 0, idleTimeoutMillis: 30000 },
-};
-
-let server01Pool: sql.ConnectionPool | null = null;
-
-async function getPool(): Promise<sql.ConnectionPool> {
-  if (server01Pool && server01Pool.connected) return server01Pool;
-  server01Pool = await new sql.ConnectionPool(server01Config).connect();
-  return server01Pool;
-}
+// Using production server for cierre-caja (Server01 testing complete)
+import { getPool as getMssqlPool } from "@/lib/mssql";
+async function getPool() { return getMssqlPool(); }
 
 export const dynamic = "force-dynamic";
 
