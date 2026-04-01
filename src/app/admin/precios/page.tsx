@@ -33,7 +33,7 @@ const PRICE_FIELDS = [
   { key: "precio2", label: "Mayorista" },
   { key: "precio3", label: "Especial" },
   { key: "precio4", label: "Caja Cerrada" },
-  { key: "precio5", label: "Lista 5" },
+  { key: "precio5", label: "PedidosYa" },
 ] as const;
 
 function MarginInput({ margin, onChange }: { margin: string; onChange: (val: string) => void }) {
