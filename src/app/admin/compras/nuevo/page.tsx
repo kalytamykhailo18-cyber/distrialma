@@ -71,8 +71,8 @@ export default function NuevoIngresoPage() {
     }
     return "";
   });
-  const [facturaFile, setFacturaFile] = useState<File | null>(null);
-  const [facturaPreview, setFacturaPreview] = useState<string | null>(null);
+  const [facturaFiles, setFacturaFiles] = useState<File[]>([]);
+  const [facturaPreviews, setFacturaPreviews] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
@@ -353,12 +353,14 @@ export default function NuevoIngresoPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Error");
 
-      // Upload factura photo if selected
-      if (facturaFile && data.entry?.id) {
-        const formData = new FormData();
-        formData.append("image", facturaFile);
-        formData.append("entryId", String(data.entry.id));
-        await fetch("/api/admin/stock-entries/upload-factura", { method: "POST", body: formData }).catch(() => {});
+      // Upload factura photos if selected
+      for (const file of facturaFiles) {
+        if (data.entry?.id) {
+          const formData = new FormData();
+          formData.append("image", file);
+          formData.append("entryId", String(data.entry.id));
+          await fetch("/api/admin/stock-entries/upload-factura", { method: "POST", body: formData }).catch(() => {});
+        }
       }
 
       // Clear saved draft on success
@@ -371,8 +373,8 @@ export default function NuevoIngresoPage() {
         setItems([]);
         setNotas("");
         setNroFactura("");
-        setFacturaFile(null);
-        setFacturaPreview(null);
+        setFacturaFiles([]);
+        setFacturaPreviews([]);
         setSelectedProv("");
         setSelectedProvName("");
         setTimeout(() => setSuccessMsg(""), 5000);
@@ -636,14 +638,30 @@ export default function NuevoIngresoPage() {
 
       {/* Photo + Notes + Invoice number */}
       <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {/* Factura photo */}
+        {/* Factura photos (multiple) */}
         <div className="sm:col-span-2">
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Foto de factura (opcional)
+            Fotos de factura (opcional)
           </label>
+          {facturaPreviews.length > 0 && (
+            <div className="flex flex-wrap gap-3 mb-2">
+              {facturaPreviews.map((preview, i) => (
+                <div key={i} className="relative">
+                  <img src={preview} alt={`Factura ${i + 1}`} className="h-16 rounded border" />
+                  <button
+                    onClick={() => {
+                      setFacturaFiles((prev) => prev.filter((_, j) => j !== i));
+                      setFacturaPreviews((prev) => prev.filter((_, j) => j !== i));
+                    }}
+                    className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center"
+                  >x</button>
+                </div>
+              ))}
+            </div>
+          )}
           <div className="flex items-center gap-3">
             <label className="cursor-pointer px-4 py-2 text-sm font-medium text-brand-600 bg-brand-50 border border-brand-200 rounded-lg hover:bg-brand-100 transition-colors">
-              {facturaPreview ? "Cambiar foto" : "Sacar foto / Elegir archivo"}
+              {facturaPreviews.length > 0 ? "Agregar otra foto" : "Sacar foto / Elegir archivo"}
               <input
                 type="file"
                 accept="image/*"
@@ -652,23 +670,13 @@ export default function NuevoIngresoPage() {
                 onChange={(e) => {
                   const file = e.target.files?.[0];
                   if (file) {
-                    setFacturaFile(file);
-                    setFacturaPreview(URL.createObjectURL(file));
+                    setFacturaFiles((prev) => [...prev, file]);
+                    setFacturaPreviews((prev) => [...prev, URL.createObjectURL(file)]);
                   }
+                  e.target.value = "";
                 }}
               />
             </label>
-            {facturaPreview && (
-              <>
-                <img src={facturaPreview} alt="Factura" className="h-16 rounded border" />
-                <button
-                  onClick={() => { setFacturaFile(null); setFacturaPreview(null); }}
-                  className="text-xs text-red-500 hover:underline"
-                >
-                  Quitar
-                </button>
-              </>
-            )}
           </div>
         </div>
       </div>
