@@ -13,6 +13,8 @@ interface OrderItem {
   cant: number;
   precio: number;
   impo: number;
+  unit: string;
+  pesoHorma: string;
 }
 
 interface Order {
@@ -42,6 +44,7 @@ export default function MisPedidosPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [saldo, setSaldo] = useState(0);
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -53,7 +56,7 @@ export default function MisPedidosPage() {
     if (status === "authenticated") {
       fetch("/api/client/orders")
         .then((r) => r.json())
-        .then((data) => setOrders(data.orders || []))
+        .then((data) => { setOrders(data.orders || []); setSaldo(data.saldo || 0); })
         .catch(() => setOrders([]))
         .finally(() => setLoading(false));
     }
@@ -106,7 +109,9 @@ export default function MisPedidosPage() {
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(8);
     doc.setFont("helvetica", "bold");
-    doc.text("Producto", 14, y + 5.5);
+    doc.text("SKU", 14, y + 5.5);
+    doc.text("Producto", 30, y + 5.5);
+    doc.text("Aprox", w - 90, y + 5.5, { align: "right" });
     doc.text("Cant", w - 70, y + 5.5, { align: "right" });
     doc.text("Precio", w - 40, y + 5.5, { align: "right" });
     doc.text("Importe", w - 14, y + 5.5, { align: "right" });
@@ -122,19 +127,28 @@ export default function MisPedidosPage() {
         y = 15;
       }
 
-      // Zebra stripe
       if (i % 2 === 0) {
         doc.setFillColor(245, 245, 245);
         doc.rect(10, y - 3.5, w - 20, 7, "F");
       }
 
-      // Grid line
       doc.setDrawColor(220, 220, 220);
       doc.line(10, y + 3.5, w - 10, y + 3.5);
 
+      doc.setTextColor(150, 150, 150);
+      doc.text(item.sku, 14, y + 1);
       doc.setTextColor(50, 50, 50);
-      const name = item.name.length > 55 ? item.name.substring(0, 52) + "..." : item.name;
-      doc.text(name, 14, y + 1);
+      const name = item.name.length > 42 ? item.name.substring(0, 40) + "..." : item.name;
+      doc.text(name, 30, y + 1);
+
+      const pesoH = parseFloat(item.pesoHorma || "0");
+      const isKg = item.unit?.toUpperCase() === "KG";
+      if (isKg && pesoH > 0) {
+        doc.setTextColor(59, 130, 246);
+        doc.text(`~${Math.round(item.cant / pesoH)}u`, w - 90, y + 1, { align: "right" });
+      }
+
+      doc.setTextColor(50, 50, 50);
       doc.text(String(item.cant), w - 70, y + 1, { align: "right" });
       doc.text(formatPrice(item.precio), w - 40, y + 1, { align: "right" });
       doc.setFont("helvetica", "bold");
@@ -152,6 +166,15 @@ export default function MisPedidosPage() {
     doc.setFont("helvetica", "bold");
     doc.text("TOTAL", 14, y + 7);
     doc.text(formatPrice(order.total), w - 14, y + 7, { align: "right" });
+
+    // Saldo
+    if (saldo !== 0) {
+      y += 14;
+      doc.setTextColor(saldo > 0 ? 220 : 34, saldo > 0 ? 38 : 197, saldo > 0 ? 38 : 94);
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "bold");
+      doc.text(`Estado de cuenta: ${saldo > 0 ? "Debe" : "A favor"} ${formatPrice(Math.abs(saldo))}`, 14, y);
+    }
 
     // Footer
     doc.setTextColor(160, 160, 160);
@@ -240,30 +263,48 @@ export default function MisPedidosPage() {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="text-gray-500 text-xs">
+                        <th className="text-left pb-2">SKU</th>
                         <th className="text-left pb-2">Producto</th>
+                        <th className="text-right pb-2">Aprox</th>
                         <th className="text-right pb-2">Cant</th>
                         <th className="text-right pb-2">Precio</th>
                         <th className="text-right pb-2">Importe</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y">
-                      {order.items.map((item, idx) => (
+                      {order.items.map((item, idx) => {
+                        const pesoH = parseFloat(item.pesoHorma) || 0;
+                        const isKg = item.unit?.toUpperCase() === "KG";
+                        const aproxUnidades = isKg && pesoH > 0 ? Math.round(item.cant / pesoH) : null;
+                        return (
                         <tr key={idx}>
-                          <td className="py-1.5">
-                            <span className="text-gray-900">{item.name}</span>
-                            <span className="text-gray-400 text-xs ml-1">({item.sku})</span>
-                          </td>
+                          <td className="py-1.5 text-gray-400 text-xs font-mono">{item.sku}</td>
+                          <td className="py-1.5 text-gray-900">{item.name}</td>
+                          <td className="text-right py-1.5 text-blue-600 text-xs">{aproxUnidades !== null ? `~${aproxUnidades}u` : ""}</td>
                           <td className="text-right py-1.5 text-gray-700">{item.cant}</td>
                           <td className="text-right py-1.5 text-gray-700">{formatPrice(item.precio)}</td>
                           <td className="text-right py-1.5 font-medium text-gray-900">{formatPrice(item.impo)}</td>
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
               )}
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Estado de cuenta */}
+      {saldo !== 0 && (
+        <div className={`mt-6 rounded-lg border p-4 ${saldo > 0 ? "bg-red-50 border-red-200" : "bg-green-50 border-green-200"}`}>
+          <div className="flex justify-between items-center">
+            <span className="text-sm font-medium text-gray-700">Estado de cuenta</span>
+            <span className={`text-lg font-bold ${saldo > 0 ? "text-red-600" : "text-green-600"}`}>
+              {saldo > 0 ? "Debe: " : "A favor: "}{formatPrice(Math.abs(saldo))}
+            </span>
+          </div>
         </div>
       )}
     </div>

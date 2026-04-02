@@ -78,7 +78,9 @@ export async function GET() {
           LTRIM(RTRIM(ISNULL(pr.Nombre,''))) AS name,
           p.Cant AS cant,
           p.Precio AS precio,
-          p.Impo AS impo
+          p.Impo AS impo,
+          LTRIM(RTRIM(ISNULL(pr.Unidad,''))) AS unit,
+          LTRIM(RTRIM(ISNULL(pr.Palabra2,''))) AS pesoHorma
         FROM [${dbPedidos}].dbo.Pedidos p
         LEFT JOIN [${dbProductos}].dbo.Productos pr ON pr.Cod = p.Producto
         WHERE p.Tipo = 'I'
@@ -97,14 +99,16 @@ export async function GET() {
           LTRIM(RTRIM(ISNULL(pr.Nombre,''))) AS name,
           t.Cant AS cant,
           t.Precio AS precio,
-          t.Impo AS impo
+          t.Impo AS impo,
+          LTRIM(RTRIM(ISNULL(pr.Unidad,''))) AS unit,
+          LTRIM(RTRIM(ISNULL(pr.Palabra2,''))) AS pesoHorma
         FROM [${dbTransas}].dbo.Transas t
         LEFT JOIN [${dbProductos}].dbo.Productos pr ON pr.Cod = t.Producto
         WHERE t.Tipo = 'I'
           AND t.Cliente = @cliente`
       );
 
-    const itemsByBoleta = new Map<string, Array<{ sku: string; name: string; cant: number; precio: number; impo: number }>>();
+    const itemsByBoleta = new Map<string, Array<{ sku: string; name: string; cant: number; precio: number; impo: number; unit: string; pesoHorma: string }>>();
     for (const item of [...webItems.recordset, ...invoiceItems.recordset]) {
       if (!itemsByBoleta.has(item.boleta)) itemsByBoleta.set(item.boleta, []);
       itemsByBoleta.get(item.boleta)!.push(item);
@@ -122,7 +126,17 @@ export async function GET() {
       items: itemsByBoleta.get(h.boleta) || [],
     }));
 
-    return NextResponse.json({ orders });
+    // Get client account balance (saldo)
+    const dbClientes = getDbName("clientes");
+    let saldo = 0;
+    try {
+      const saldoResult = await pool.request().input("cliente", clientePadded).query(
+        `SELECT ISNULL(Saldo, 0) AS saldo FROM [${dbClientes}].dbo.Clientes WHERE Cod = @cliente`
+      );
+      saldo = saldoResult.recordset[0]?.saldo || 0;
+    } catch { /* silent */ }
+
+    return NextResponse.json({ orders, saldo });
   } catch (error) {
     console.error("Error fetching client orders:", error);
     return NextResponse.json(
