@@ -8,6 +8,7 @@ import { HiOutlineDocumentDownload, HiOutlineTable, HiOutlineTrash } from "react
 
 interface StockEntry {
   id: number;
+  tipo: string;
   proveedorCod: string;
   proveedorName: string;
   usuario: string;
@@ -238,12 +239,20 @@ export default function ComprasPage() {
     <div className="max-w-5xl mx-auto px-4 py-6">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Compras / Ingresos</h1>
-        <Link
-          href="/admin/compras/nuevo"
-          className="px-4 py-2 text-sm text-white bg-brand-400 rounded-lg hover:bg-brand-500 transition-colors"
-        >
-          Nuevo ingreso
-        </Link>
+        <div className="flex gap-2">
+          <Link
+            href="/admin/compras/nuevo?tipo=devolucion"
+            className="px-4 py-2 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors"
+          >
+            Pre-nota de crédito
+          </Link>
+          <Link
+            href="/admin/compras/nuevo"
+            className="px-4 py-2 text-sm text-white bg-brand-400 rounded-lg hover:bg-brand-500 transition-colors"
+          >
+            Nuevo ingreso
+          </Link>
+        </div>
       </div>
 
       {/* Tabs */}
@@ -306,6 +315,11 @@ export default function ComprasPage() {
                     <span className="text-sm text-gray-700">
                       {entry.proveedorName}
                     </span>
+                    {entry.tipo === "devolucion" && (
+                      <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-red-100 text-red-700">
+                        Devolución
+                      </span>
+                    )}
                     <span
                       className={`text-xs px-2 py-0.5 rounded-full font-medium ${
                         entry.estado === "costeado"
@@ -313,7 +327,7 @@ export default function ComprasPage() {
                           : "bg-amber-100 text-amber-700"
                       }`}
                     >
-                      {entry.estado === "costeado" ? "Costeado" : "Pendiente"}
+                      {entry.estado === "costeado" ? (entry.tipo === "devolucion" ? "Aprobada" : "Costeado") : "Pendiente"}
                     </span>
                   </div>
                   <div className="text-xs text-gray-400 mt-0.5">

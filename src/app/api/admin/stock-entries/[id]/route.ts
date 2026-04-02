@@ -132,6 +132,7 @@ export async function GET(
     return NextResponse.json({
       entry: {
         id: entry.id,
+        tipo: entry.tipo || "ingreso",
         proveedorCod: entry.proveedorCod,
         proveedorName: entry.proveedorName,
         usuario: entry.usuario,
@@ -188,6 +189,33 @@ export async function PUT(
     }
 
     const body = await req.json();
+
+    // Handle devolucion approval — just subtract stock
+    if (entry.tipo === "devolucion") {
+      const pool = await getPool();
+      const dbProd = getDbName("productos");
+
+      for (const item of entry.items) {
+        const codPadded = item.sku.padStart(7, " ");
+        const cant = Number(item.cantidad);
+        await pool.request()
+          .input("cod", codPadded)
+          .input("cant", cant)
+          .query(`
+            UPDATE [${dbProd}].dbo.Stock
+            SET Stk = ISNULL(Stk, 0) - @cant
+            WHERE CodProducto = @cod AND LTRIM(RTRIM(Deposito)) = '0'
+          `);
+      }
+
+      await prisma.stockEntry.update({
+        where: { id },
+        data: { estado: "costeado" },
+      });
+
+      return NextResponse.json({ ok: true, message: "Devolución aprobada, stock descontado" });
+    }
+
     const { items: costeoItems, newProductData, subtotal: subIn, iva: ivaIn, iibb: iibbIn, percepciones: percIn, total: totalIn } = body;
 
     const pool = await getPool();

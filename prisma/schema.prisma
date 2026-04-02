@@ -156,6 +156,7 @@ model User {
 
 model StockEntry {
   id            Int      @id @default(autoincrement())
+  tipo          String   @default("ingreso") @db.VarChar(20)
   proveedorCod  String   @db.VarChar(7)
   proveedorName String   @db.VarChar(60)
   usuario       String   @db.VarChar(50)

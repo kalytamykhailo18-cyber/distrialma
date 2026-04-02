@@ -35,6 +35,9 @@ export default function NuevoIngresoPage() {
   const user = session?.user as { role?: string; permissions?: string[] } | undefined;
   const hasCosteo = user?.role === "admin" || (user?.permissions?.includes("costeo") ?? false);
 
+  // Check if this is a devolucion
+  const isDevolucion = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("tipo") === "devolucion";
+
   const [proveedores, setProveedores] = useState<Proveedor[]>([]);
   const [selectedProv, setSelectedProv] = useState("");
   const [selectedProvName, setSelectedProvName] = useState("");
@@ -284,6 +287,7 @@ export default function NuevoIngresoPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          tipo: isDevolucion ? "devolucion" : "ingreso",
           proveedorCod: selectedProv,
           proveedorName: selectedProvName,
           notas: notas.trim() || null,
@@ -651,7 +655,7 @@ export default function NuevoIngresoPage() {
           disabled={saving}
           className="px-6 py-2 text-sm text-white bg-brand-400 rounded-lg hover:bg-brand-500 disabled:opacity-50 transition-colors"
         >
-          {saving ? "Guardando..." : "Confirmar ingreso"}
+          {saving ? "Guardando..." : isDevolucion ? "Confirmar devolución" : "Confirmar ingreso"}
         </button>
         <button
           onClick={() => router.push("/admin/compras")}

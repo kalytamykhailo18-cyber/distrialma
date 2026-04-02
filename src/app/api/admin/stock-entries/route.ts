@@ -33,6 +33,7 @@ export async function GET(req: NextRequest) {
 
     const result = entries.map((e) => ({
       id: e.id,
+      tipo: e.tipo || "ingreso",
       proveedorCod: e.proveedorCod,
       proveedorName: e.proveedorName,
       usuario: e.usuario,
@@ -83,7 +84,9 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { proveedorCod, proveedorName, notas, nroFactura, items, subtotal: subIn, iva: ivaIn, iibb: iibbIn, percepciones: percIn, total: totalIn } = body;
+    const { proveedorCod, proveedorName, notas, nroFactura, items, subtotal: subIn, iva: ivaIn, iibb: iibbIn, percepciones: percIn, total: totalIn, tipo: tipoIn } = body;
+    const tipo = tipoIn === "devolucion" ? "devolucion" : "ingreso";
+    const isDevolucion = tipo === "devolucion";
 
     if (!proveedorCod || !items?.length) {
       return NextResponse.json(
@@ -185,17 +188,19 @@ export async function POST(req: NextRequest) {
           isNewProduct: true,
         });
       } else {
-        // Update existing stock
-        const codPadded = padLeft(sku, 7);
-        await pool
-          .request()
-          .input("cod", codPadded)
-          .input("cant", cantidad)
-          .query(`
-            UPDATE [${dbProd}].dbo.Stock
-            SET Stk = ISNULL(Stk, 0) + @cant
-            WHERE CodProducto = @cod AND LTRIM(RTRIM(Deposito)) = '0'
-          `);
+        // Update existing stock (only for ingreso, not devolucion)
+        if (!isDevolucion) {
+          const codPadded = padLeft(sku, 7);
+          await pool
+            .request()
+            .input("cod", codPadded)
+            .input("cant", cantidad)
+            .query(`
+              UPDATE [${dbProd}].dbo.Stock
+              SET Stk = ISNULL(Stk, 0) + @cant
+              WHERE CodProducto = @cod AND LTRIM(RTRIM(Deposito)) = '0'
+            `);
+        }
 
         pgItems.push({
           sku,
@@ -235,6 +240,7 @@ export async function POST(req: NextRequest) {
     // Save in PostgreSQL
     const entry = await prisma.stockEntry.create({
       data: {
+        tipo,
         proveedorCod,
         proveedorName,
         usuario,

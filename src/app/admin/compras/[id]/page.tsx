@@ -113,6 +113,7 @@ interface EntryItem {
 
 interface StockEntry {
   id: number;
+  tipo: string;
   proveedorCod: string;
   proveedorName: string;
   usuario: string;
@@ -1087,15 +1088,41 @@ export default function EntryDetailPage() {
         </div>
       )}
 
-      {/* Costeo button */}
-      {isPendiente && (
-        <button
-          onClick={handleCosteo}
-          disabled={saving}
-          className="w-full sm:w-auto px-8 py-3 text-lg font-bold text-white bg-brand-400 rounded-lg hover:bg-brand-500 disabled:opacity-50 transition-colors"
-        >
-          {saving ? "Guardando costeo..." : "Confirmar costeo"}
-        </button>
+      {/* Costeo / Devolucion button */}
+      {isPendiente && entry.tipo === "devolucion" && (
+          <button
+            onClick={async () => {
+              if (!confirm("Aprobar esta devolucion? Se descontara el stock.")) return;
+              setSaving(true);
+              try {
+                const res = await fetch(`/api/admin/stock-entries/${entry.id}`, {
+                  method: "PUT",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({}),
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error);
+                alert("Devolucion aprobada, stock descontado");
+                window.location.href = "/admin/compras";
+              } catch (e: unknown) {
+                setError(e instanceof Error ? e.message : "Error");
+                setSaving(false);
+              }
+            }}
+            disabled={saving}
+            className="w-full sm:w-auto px-8 py-3 text-lg font-bold text-white bg-red-500 rounded-lg hover:bg-red-600 disabled:opacity-50 transition-colors"
+          >
+            {saving ? "Aprobando..." : "Aprobar devolucion (descuenta stock)"}
+          </button>
+      )}
+      {isPendiente && entry.tipo !== "devolucion" && (
+          <button
+            onClick={handleCosteo}
+            disabled={saving}
+            className="w-full sm:w-auto px-8 py-3 text-lg font-bold text-white bg-brand-400 rounded-lg hover:bg-brand-500 disabled:opacity-50 transition-colors"
+          >
+            {saving ? "Guardando costeo..." : "Confirmar costeo"}
+          </button>
       )}
 
       {/* Apply similar confirmation modal */}
