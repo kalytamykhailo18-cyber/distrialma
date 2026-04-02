@@ -955,15 +955,21 @@ export default function PedidosYaPage() {
                         <th className="p-3">
                           <input type="checkbox" checked={selectedStock.size === result.stockChanges.length && result.stockChanges.length > 0} onChange={() => toggleAll("stock")} className="rounded" />
                         </th>
-                        <th className="p-3">Producto</th>
-                        <th className="p-3 text-center">Stock</th>
-                        <th className="p-3 text-center">Cant Máx</th>
+                        <th className="p-3 cursor-pointer hover:bg-gray-100" onClick={() => toggleSort("peyaName")}>Producto{sortIcon("peyaName")}</th>
+                        <th className="p-3 text-center cursor-pointer hover:bg-gray-100" onClick={() => toggleSort("stock")}>Stock{sortIcon("stock")}</th>
+                        <th className="p-3 text-center cursor-pointer hover:bg-gray-100" onClick={() => toggleSort("maxQty")}>Cant Máx{sortIcon("maxQty")}</th>
                         <th className="p-3 text-center">Estado actual</th>
                         <th className="p-3 text-center">Acción</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {result.stockChanges.map((c) => (
+                      {[...result.stockChanges].sort((a, b) => {
+                        if (!sortField) return 0;
+                        const av = a[sortField as keyof StockChange];
+                        const bv = b[sortField as keyof StockChange];
+                        const cmp = typeof av === "number" ? (av as number) - (bv as number) : String(av).localeCompare(String(bv));
+                        return sortDir === "asc" ? cmp : -cmp;
+                      }).map((c) => (
                         <tr key={c.peyaSku} className={`border-b hover:bg-gray-50 ${selectedStock.has(c.peyaSku) ? "bg-blue-50" : ""}`}>
                           <td className="p-3">
                             <input type="checkbox" checked={selectedStock.has(c.peyaSku)} onChange={() => toggle(c.peyaSku, "stock")} className="rounded" />
