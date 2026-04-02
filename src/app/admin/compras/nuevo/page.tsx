@@ -38,17 +38,65 @@ export default function NuevoIngresoPage() {
   // Check if this is a devolucion
   const isDevolucion = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("tipo") === "devolucion";
 
+  const STORAGE_KEY = isDevolucion ? "compras_devolucion_draft" : "compras_ingreso_draft";
+
   const [proveedores, setProveedores] = useState<Proveedor[]>([]);
-  const [selectedProv, setSelectedProv] = useState("");
-  const [selectedProvName, setSelectedProvName] = useState("");
-  const [items, setItems] = useState<CartItem[]>([]);
-  const [notas, setNotas] = useState("");
-  const [nroFactura, setNroFactura] = useState("");
+  const [selectedProv, setSelectedProv] = useState(() => {
+    if (typeof window !== "undefined") {
+      try { const d = JSON.parse(sessionStorage.getItem(STORAGE_KEY) || "{}"); return d.selectedProv || ""; } catch { return ""; }
+    }
+    return "";
+  });
+  const [selectedProvName, setSelectedProvName] = useState(() => {
+    if (typeof window !== "undefined") {
+      try { const d = JSON.parse(sessionStorage.getItem(STORAGE_KEY) || "{}"); return d.selectedProvName || ""; } catch { return ""; }
+    }
+    return "";
+  });
+  const [items, setItems] = useState<CartItem[]>(() => {
+    if (typeof window !== "undefined") {
+      try { const d = JSON.parse(sessionStorage.getItem(STORAGE_KEY) || "{}"); return d.items || []; } catch { return []; }
+    }
+    return [];
+  });
+  const [notas, setNotas] = useState(() => {
+    if (typeof window !== "undefined") {
+      try { const d = JSON.parse(sessionStorage.getItem(STORAGE_KEY) || "{}"); return d.notas || ""; } catch { return ""; }
+    }
+    return "";
+  });
+  const [nroFactura, setNroFactura] = useState(() => {
+    if (typeof window !== "undefined") {
+      try { const d = JSON.parse(sessionStorage.getItem(STORAGE_KEY) || "{}"); return d.nroFactura || ""; } catch { return ""; }
+    }
+    return "";
+  });
   const [facturaFile, setFacturaFile] = useState<File | null>(null);
   const [facturaPreview, setFacturaPreview] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
+
+  // Persist form state to sessionStorage
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify({
+        selectedProv, selectedProvName, items, notas, nroFactura,
+      }));
+    }
+  }, [selectedProv, selectedProvName, items, notas, nroFactura, STORAGE_KEY]);
+
+  // Warn before leaving with unsaved data
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (items.length > 0) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [items]);
 
 
   // Search state
@@ -313,10 +361,13 @@ export default function NuevoIngresoPage() {
         await fetch("/api/admin/stock-entries/upload-factura", { method: "POST", body: formData }).catch(() => {});
       }
 
+      // Clear saved draft on success
+      sessionStorage.removeItem(STORAGE_KEY);
+
       if (hasCosteo) {
         router.push(`/admin/compras/${data.entry.id}`);
       } else {
-        setSuccessMsg("Ingreso aceptado correctamente");
+        setSuccessMsg(isDevolucion ? "Devolución cargada correctamente" : "Ingreso aceptado correctamente");
         setItems([]);
         setNotas("");
         setNroFactura("");
@@ -335,7 +386,18 @@ export default function NuevoIngresoPage() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-6">
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Nuevo Ingreso de Stock</h1>
+      <div className="flex items-center gap-3 mb-6">
+        <button
+          onClick={() => {
+            if (items.length > 0 && !confirm("Tenés productos cargados. ¿Salir? Los datos quedan guardados.")) return;
+            router.push("/admin/compras");
+          }}
+          className="text-gray-400 hover:text-gray-600"
+        >
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+        </button>
+        <h1 className="text-2xl font-bold text-gray-900">{isDevolucion ? "Pre-nota de Crédito" : "Nuevo Ingreso de Stock"}</h1>
+      </div>
 
       {/* Supplier selector */}
       <div className="mb-4">
