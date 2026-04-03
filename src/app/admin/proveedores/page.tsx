@@ -444,12 +444,14 @@ export default function ProveedoresPage() {
             <div className="flex-1 min-w-[120px]">
               <label className="block text-xs text-gray-500 mb-1">Monto</label>
               <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={payMonto}
-                onChange={(e) => setPayMonto(e.target.value)}
-                placeholder="0.00"
+                type="text"
+                inputMode="decimal"
+                value={payMonto ? Number(payMonto).toLocaleString("es-AR") : ""}
+                onChange={(e) => {
+                  const raw = e.target.value.replace(/\./g, "").replace(",", ".");
+                  if (raw === "" || !isNaN(Number(raw))) setPayMonto(raw);
+                }}
+                placeholder="0"
                 className="w-full px-3 py-2 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
               />
             </div>
