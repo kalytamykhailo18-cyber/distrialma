@@ -75,24 +75,51 @@ export default function MisPedidosPage() {
     const { default: jsPDF } = await import("jspdf");
     const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
     const w = doc.internal.pageSize.getWidth();
-    let y = 15;
+    const pageH = doc.internal.pageSize.getHeight();
+    let y = 10;
 
-    // Header
-    doc.setFillColor(251, 154, 71); // brand orange
-    doc.rect(0, 0, w, 28, "F");
+    // Load logo
+    try {
+      const logoRes = await fetch("/logo-pdf.txt");
+      const logoB64 = await logoRes.text();
+      if (logoB64 && logoB64.length > 100) {
+        doc.addImage(`data:image/png;base64,${logoB64}`, "PNG", 12, 8, 35, 25);
+      }
+    } catch { /* no logo */ }
+
+    // Header - brand bar
+    doc.setFillColor(251, 154, 71);
+    doc.rect(50, 8, w - 60, 12, "F");
     doc.setTextColor(255, 255, 255);
-    doc.setFontSize(18);
-    doc.setFont("helvetica", "bold");
-    doc.text("Distrialma", 14, 13);
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-    doc.text("Siempre con vos", 14, 19);
     doc.setFontSize(14);
-    doc.text(`Boleta #${order.nroped}`, w - 14, 13, { align: "right" });
-    doc.setFontSize(9);
-    doc.text(formatDate(order.date), w - 14, 19, { align: "right" });
+    doc.setFont("helvetica", "bold");
+    doc.text("Distrialma", 54, 15);
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    doc.text("Siempre con vos", 54, 19);
 
-    y = 36;
+    // Boleta info box
+    doc.setFillColor(55, 65, 81);
+    doc.roundedRect(50, 22, w - 60, 14, 2, 2, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.text(`Boleta #${order.nroped}`, 54, 30);
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    doc.text(formatDate(order.date), w - 14, 30, { align: "right" });
+    if (order.estado) {
+      doc.setFontSize(8);
+      doc.text(order.estado, w - 14, 25, { align: "right" });
+    }
+
+    y = 42;
+
+    // Thin brand line
+    doc.setDrawColor(251, 154, 71);
+    doc.setLineWidth(0.5);
+    doc.line(10, y, w - 10, y);
+    y += 4;
 
     // Order info
     doc.setTextColor(80, 80, 80);
@@ -184,11 +211,24 @@ export default function MisPedidosPage() {
     doc.text("Nuevo estado de cuenta:", 14, y);
     doc.text(formatPrice(saldo), w - 14, y, { align: "right" });
 
-    // Footer
-    doc.setTextColor(160, 160, 160);
-    doc.setFontSize(7);
-    doc.setFont("helvetica", "normal");
-    doc.text("distrialma.com.ar", w / 2, 290, { align: "center" });
+    // Footer on all pages
+    const pageCount = doc.getNumberOfPages();
+    for (let p = 1; p <= pageCount; p++) {
+      doc.setPage(p);
+      // Brand line
+      doc.setDrawColor(251, 154, 71);
+      doc.setLineWidth(0.5);
+      doc.line(10, pageH - 18, w - 10, pageH - 18);
+      // Contact info
+      doc.setTextColor(120, 120, 120);
+      doc.setFontSize(7);
+      doc.setFont("helvetica", "normal");
+      doc.text("Distrialma — Av. Calle Real 435, Merlo, Buenos Aires", 14, pageH - 14);
+      doc.text("WhatsApp: +54 9 11 3949-1861 — distrialma.com.ar", 14, pageH - 10);
+      if (pageCount > 1) {
+        doc.text(`Página ${p}/${pageCount}`, w - 14, pageH - 10, { align: "right" });
+      }
+    }
 
     doc.save(`Boleta-${order.nroped}.pdf`);
   }
