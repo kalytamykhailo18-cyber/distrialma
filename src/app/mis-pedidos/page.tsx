@@ -15,6 +15,7 @@ interface OrderItem {
   impo: number;
   unit: string;
   pesoHorma: string;
+  listaPrecio: number;
 }
 
 interface Order {
@@ -142,7 +143,8 @@ export default function MisPedidosPage() {
     doc.text("SKU", 14, y + 5.5);
     doc.text("Producto", 30, y + 5.5);
     doc.text("Aprox", w - 90, y + 5.5, { align: "right" });
-    doc.text("Cant", w - 70, y + 5.5, { align: "right" });
+    doc.text("Cant", w - 78, y + 5.5, { align: "right" });
+    doc.text("LP", w - 65, y + 5.5, { align: "center" });
     doc.text("Precio", w - 40, y + 5.5, { align: "right" });
     doc.text("Importe", w - 14, y + 5.5, { align: "right" });
     y += 10;
@@ -179,7 +181,10 @@ export default function MisPedidosPage() {
       }
 
       doc.setTextColor(50, 50, 50);
-      doc.text(String(item.cant), w - 70, y + 1, { align: "right" });
+      doc.text(String(item.cant), w - 78, y + 1, { align: "right" });
+      doc.setTextColor(150, 150, 150);
+      doc.text(item.listaPrecio ? String(item.listaPrecio) : "", w - 65, y + 1, { align: "center" });
+      doc.setTextColor(50, 50, 50);
       doc.text(formatPrice(item.precio), w - 40, y + 1, { align: "right" });
       doc.setFont("helvetica", "bold");
       doc.text(formatPrice(item.impo), w - 14, y + 1, { align: "right" });
@@ -318,6 +323,7 @@ export default function MisPedidosPage() {
                         <th className="text-left pb-2">Producto</th>
                         <th className="text-right pb-2">Aprox</th>
                         <th className="text-right pb-2">Cant</th>
+                        <th className="text-center pb-2">LP</th>
                         <th className="text-right pb-2">Precio</th>
                         <th className="text-right pb-2">Importe</th>
                       </tr>
@@ -333,6 +339,7 @@ export default function MisPedidosPage() {
                           <td className="py-1.5 text-gray-900">{item.name}</td>
                           <td className="text-right py-1.5 text-blue-600 text-xs">{aproxUnidades !== null ? `~${aproxUnidades}u` : ""}</td>
                           <td className="text-right py-1.5 text-gray-700">{item.cant}</td>
+                          <td className="text-center py-1.5 text-gray-400 text-xs">{item.listaPrecio || ""}</td>
                           <td className="text-right py-1.5 text-gray-700">{formatPrice(item.precio)}</td>
                           <td className="text-right py-1.5 font-medium text-gray-900">{formatPrice(item.impo)}</td>
                         </tr>

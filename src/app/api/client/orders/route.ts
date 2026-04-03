@@ -80,7 +80,8 @@ export async function GET() {
           p.Precio AS precio,
           p.Impo AS impo,
           LTRIM(RTRIM(ISNULL(pr.Unidad,''))) AS unit,
-          LTRIM(RTRIM(ISNULL(pr.Palabra2,''))) AS pesoHorma
+          LTRIM(RTRIM(ISNULL(pr.Palabra2,''))) AS pesoHorma,
+          p.ListaPrecio AS listaPrecio
         FROM [${dbPedidos}].dbo.Pedidos p
         LEFT JOIN [${dbProductos}].dbo.Productos pr ON pr.Cod = p.Producto
         WHERE p.Tipo = 'I'
@@ -101,7 +102,8 @@ export async function GET() {
           t.Precio AS precio,
           t.Impo AS impo,
           LTRIM(RTRIM(ISNULL(pr.Unidad,''))) AS unit,
-          LTRIM(RTRIM(ISNULL(pr.Palabra2,''))) AS pesoHorma
+          LTRIM(RTRIM(ISNULL(pr.Palabra2,''))) AS pesoHorma,
+          t.ListaPrecio AS listaPrecio
         FROM [${dbTransas}].dbo.Transas t
         LEFT JOIN [${dbProductos}].dbo.Productos pr ON pr.Cod = t.Producto
         WHERE t.Tipo = 'I'
