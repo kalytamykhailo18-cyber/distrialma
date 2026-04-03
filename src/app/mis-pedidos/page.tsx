@@ -112,6 +112,9 @@ export default function MisPedidosPage() {
       doc.setFontSize(8);
       doc.text(order.estado, w - 14, 25, { align: "right" });
     }
+    doc.setFontSize(7);
+    doc.setTextColor(200, 200, 200);
+    doc.text("Documento no válido como factura", 54, 34);
 
     y = 42;
 
