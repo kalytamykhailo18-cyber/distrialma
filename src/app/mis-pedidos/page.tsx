@@ -167,14 +167,22 @@ export default function MisPedidosPage() {
     doc.text("TOTAL", 14, y + 7);
     doc.text(formatPrice(order.total), w - 14, y + 7, { align: "right" });
 
-    // Saldo
-    if (saldo !== 0) {
-      y += 14;
-      doc.setTextColor(saldo > 0 ? 220 : 34, saldo > 0 ? 38 : 197, saldo > 0 ? 38 : 94);
-      doc.setFontSize(9);
-      doc.setFont("helvetica", "bold");
-      doc.text(`Estado de cuenta: ${saldo > 0 ? "Debe" : "A favor"} ${formatPrice(Math.abs(saldo))}`, 14, y);
-    }
+    // Estado de cuenta
+    y += 14;
+    const saldoAnterior = saldo - order.total;
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(80, 80, 80);
+    doc.text("Saldo anterior:", 14, y);
+    doc.text(formatPrice(saldoAnterior), w - 14, y, { align: "right" });
+    y += 6;
+    doc.text("Actual:", 14, y);
+    doc.text(formatPrice(order.total), w - 14, y, { align: "right" });
+    y += 6;
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(saldo > 0 ? 220 : 34, saldo > 0 ? 38 : 197, saldo > 0 ? 38 : 94);
+    doc.text("Nuevo estado de cuenta:", 14, y);
+    doc.text(formatPrice(saldo), w - 14, y, { align: "right" });
 
     // Footer
     doc.setTextColor(160, 160, 160);
@@ -297,13 +305,22 @@ export default function MisPedidosPage() {
       )}
 
       {/* Estado de cuenta */}
-      {saldo !== 0 && (
-        <div className={`mt-6 rounded-lg border p-4 ${saldo > 0 ? "bg-red-50 border-red-200" : "bg-green-50 border-green-200"}`}>
-          <div className="flex justify-between items-center">
-            <span className="text-sm font-medium text-gray-700">Estado de cuenta</span>
-            <span className={`text-lg font-bold ${saldo > 0 ? "text-red-600" : "text-green-600"}`}>
-              {saldo > 0 ? "Debe: " : "A favor: "}{formatPrice(Math.abs(saldo))}
-            </span>
+      {orders.length > 0 && (
+        <div className="mt-6 rounded-lg border bg-gray-50 p-4">
+          <p className="text-sm font-bold text-gray-700 mb-2">Estado de cuenta</p>
+          <div className="space-y-1">
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-500">Saldo anterior</span>
+              <span className="text-gray-700">{formatPrice(saldo - (orders[0]?.total || 0))}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-500">Último pedido</span>
+              <span className="text-gray-700">{formatPrice(orders[0]?.total || 0)}</span>
+            </div>
+            <div className={`flex justify-between text-sm font-bold pt-1 border-t ${saldo > 0 ? "text-red-600" : "text-green-600"}`}>
+              <span>Nuevo estado de cuenta</span>
+              <span>{formatPrice(saldo)}</span>
+            </div>
           </div>
         </div>
       )}
