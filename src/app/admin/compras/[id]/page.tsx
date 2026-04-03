@@ -576,7 +576,7 @@ export default function EntryDetailPage() {
             { field: "precio2" as const, label: "Mayorista" },
             { field: "precio3" as const, label: "Especial" },
             { field: "precio4" as const, label: "Caja" },
-            { field: "precio5" as const, label: "Lista 5" },
+            { field: "precio5" as const, label: "PedidosYa" },
           ];
 
           return (
@@ -744,6 +744,11 @@ export default function EntryDetailPage() {
                                 placeholder={item[field] > 0 ? String(item[field]) : "0.00"}
                                 className="w-full text-right px-3 py-1.5 border-2 border-gray-300 rounded-lg text-base focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 disabled:opacity-50 disabled:bg-gray-100"
                               />
+                              {item[field] > 0 && priceVal > 0 && Math.round(priceVal) !== Math.round(item[field]) && (
+                                <span className="text-xs text-amber-600 mt-0.5 block text-right">
+                                  era {formatPrice(item[field])}
+                                </span>
+                              )}
                             </div>
                           ) : (
                             <span className="block text-right text-gray-900 text-base font-medium">{formatPrice(item[field])}</span>
