@@ -16,6 +16,14 @@ export const metadata: Metadata = {
     "Tienda online de productos mayoristas. Bebidas, alimentos, limpieza y más.",
   icons: {
     icon: "/favicon.png",
+    apple: "/icon-192.png",
+  },
+  manifest: "/manifest.json",
+  themeColor: "#fb9a47",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Distrialma",
   },
 };
 
