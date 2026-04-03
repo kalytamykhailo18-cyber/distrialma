@@ -29,6 +29,11 @@ interface Order {
   items: OrderItem[];
 }
 
+const LP_NAMES: Record<number, string> = {
+  1: "Min", 2: "May", 3: "Esp", 4: "Caja", 5: "PeYa",
+};
+function lpName(lp: number): string { return LP_NAMES[lp] || String(lp); }
+
 function formatDate(fechora: string): string {
   if (!fechora || fechora.length < 8) return fechora;
   const d = fechora.slice(6, 8);
@@ -183,7 +188,7 @@ export default function MisPedidosPage() {
       doc.setTextColor(50, 50, 50);
       doc.text(String(item.cant), w - 78, y + 1, { align: "right" });
       doc.setTextColor(150, 150, 150);
-      doc.text(item.listaPrecio ? String(item.listaPrecio) : "", w - 65, y + 1, { align: "center" });
+      doc.text(item.listaPrecio ? lpName(item.listaPrecio) : "", w - 65, y + 1, { align: "center" });
       doc.setTextColor(50, 50, 50);
       doc.text(formatPrice(item.precio), w - 40, y + 1, { align: "right" });
       doc.setFont("helvetica", "bold");
@@ -339,7 +344,7 @@ export default function MisPedidosPage() {
                           <td className="py-1.5 text-gray-900">{item.name}</td>
                           <td className="text-right py-1.5 text-blue-600 text-xs">{aproxUnidades !== null ? `~${aproxUnidades}u` : ""}</td>
                           <td className="text-right py-1.5 text-gray-700">{item.cant}</td>
-                          <td className="text-center py-1.5 text-gray-400 text-xs">{item.listaPrecio || ""}</td>
+                          <td className="text-center py-1.5 text-gray-400 text-xs">{item.listaPrecio ? lpName(item.listaPrecio) : ""}</td>
                           <td className="text-right py-1.5 text-gray-700">{formatPrice(item.precio)}</td>
                           <td className="text-right py-1.5 font-medium text-gray-900">{formatPrice(item.impo)}</td>
                         </tr>
