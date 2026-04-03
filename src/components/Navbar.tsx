@@ -250,7 +250,7 @@ export default function Navbar() {
           menuOpen ? "max-h-[calc(100vh-56px)] opacity-100" : "max-h-0 opacity-0"
         }`}
       >
-        <div className="border-t bg-white px-4 py-3 space-y-3 overflow-y-auto max-h-[calc(100vh-56px)] scroll-auto">
+        <div className="border-t bg-white px-4 py-3 space-y-3 overflow-y-auto max-h-[calc(100vh-56px)] pb-20">
           <div className="flex flex-col gap-3">
             {navLinks}
           </div>
