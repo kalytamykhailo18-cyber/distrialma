@@ -20,14 +20,21 @@ interface CartItem {
   unidad: string;
 }
 
-const DESTINOS = [
+const DESTINOS_LOCALES = [
   "Local 1 Minorista",
   "Local 2 Envío a Vimar",
   "Local 3 Mayorista Merlo",
   "Local 4 Mayorista Pontevedra",
+];
+
+const DESTINOS_OTROS = [
   "Descuento empleados",
   "Descuento local",
+  "Rotura de proveedor",
+  "Rotura de empleado",
 ];
+
+// All destinos used for validation on server side
 
 export default function NuevoMovimiento() {
   const router = useRouter();
@@ -160,15 +167,31 @@ export default function NuevoMovimiento() {
 
       {/* Destino selector */}
       <div className="bg-white border rounded-xl p-4 mb-4">
-        <label className="block text-sm font-medium text-gray-700 mb-2">Destino / Tipo</label>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-          {DESTINOS.map((d) => (
+        <label className="block text-sm font-medium text-gray-700 mb-2">Envío a local</label>
+        <div className="grid grid-cols-2 gap-2 mb-4">
+          {DESTINOS_LOCALES.map((d) => (
             <button
               key={d}
               onClick={() => setDestino(d)}
               className={`px-3 py-2 text-sm rounded-lg border transition-colors text-left ${
                 destino === d
                   ? "border-brand-400 bg-brand-50 text-brand-600 font-medium"
+                  : "border-gray-200 hover:border-gray-300 text-gray-700"
+              }`}
+            >
+              {d}
+            </button>
+          ))}
+        </div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">Descuentos / Roturas</label>
+        <div className="grid grid-cols-2 gap-2">
+          {DESTINOS_OTROS.map((d) => (
+            <button
+              key={d}
+              onClick={() => setDestino(d)}
+              className={`px-3 py-2 text-sm rounded-lg border transition-colors text-left ${
+                destino === d
+                  ? "border-red-400 bg-red-50 text-red-600 font-medium"
                   : "border-gray-200 hover:border-gray-300 text-gray-700"
               }`}
             >

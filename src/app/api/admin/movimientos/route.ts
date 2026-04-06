@@ -8,9 +8,11 @@ const DESTINOS = [
   "Local 2 Envío a Vimar",
   "Local 3 Mayorista Merlo",
   "Local 4 Mayorista Pontevedra",
+  "Descuento empleados",
+  "Descuento local",
+  "Rotura de proveedor",
+  "Rotura de empleado",
 ];
-
-const SUBTIPOS = ["Descuento empleados", "Descuento local"];
 
 function padLeft(value: string | number, length: number): string {
   return String(value).padStart(length, " ");
@@ -71,7 +73,7 @@ export async function GET(req: NextRequest) {
       movements: result,
       total,
       destinos: DESTINOS,
-      subtipos: SUBTIPOS,
+      subtipos: [],
     });
   } catch (error) {
     console.error("Error fetching movements:", error);
@@ -99,8 +101,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Validate destino or subtipo
-    const validDestino = DESTINOS.includes(destino) || SUBTIPOS.includes(destino);
+    const validDestino = DESTINOS.includes(destino);
     if (!validDestino) {
       return NextResponse.json({ error: "Destino no válido" }, { status: 400 });
     }
