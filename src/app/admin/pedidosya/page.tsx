@@ -644,6 +644,107 @@ export default function PedidosYaPage() {
     URL.revokeObjectURL(url);
   }
 
+  async function exportStockPDF() {
+    if (!result || result.stockChanges.length === 0) return;
+    const { default: jsPDF } = await import("jspdf");
+    const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+    const w = doc.internal.pageSize.getWidth();
+    let y = 15;
+
+    // Header bar
+    doc.setFillColor(251, 154, 71);
+    doc.rect(0, 0, w, 22, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "bold");
+    doc.text("Distrialma — PedidosYa Stock", 14, 14);
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    doc.text(`${result.stockChanges.length} productos — ${new Date().toLocaleDateString("es-AR")}`, w - 14, 14, { align: "right" });
+    y = 28;
+
+    // Summary boxes
+    const activos = result.stockChanges.filter((c) => c.currentActive).length;
+    const inactivos = result.stockChanges.length - activos;
+    doc.setFillColor(240, 240, 240);
+    doc.roundedRect(8, y, 60, 12, 2, 2, "F");
+    doc.roundedRect(72, y, 60, 12, 2, 2, "F");
+    doc.setTextColor(50, 50, 50);
+    doc.setFontSize(8);
+    doc.text(`Activos: ${activos}`, 14, y + 7.5);
+    doc.text(`Inactivos: ${inactivos}`, 78, y + 7.5);
+    y += 18;
+
+    // Table header
+    doc.setFillColor(55, 65, 81);
+    doc.rect(8, y, w - 16, 8, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "bold");
+    doc.text("SKU", 12, y + 5.5);
+    doc.text("Producto", 40, y + 5.5);
+    doc.text("Stock", 180, y + 5.5, { align: "right" });
+    doc.text("Cant Máx", 210, y + 5.5, { align: "right" });
+    doc.text("Estado", 240, y + 5.5);
+    doc.text("Acción", 268, y + 5.5);
+    y += 10;
+
+    // Rows
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7);
+
+    for (let i = 0; i < result.stockChanges.length; i++) {
+      const c = result.stockChanges[i];
+      if (y > 190) {
+        doc.addPage();
+        y = 15;
+      }
+
+      if (i % 2 === 0) {
+        doc.setFillColor(248, 248, 248);
+        doc.rect(8, y - 3, w - 16, 7, "F");
+      }
+
+      doc.setTextColor(50, 50, 50);
+      doc.text(c.peyaSku, 12, y + 1.5);
+      const name = c.peyaName.length > 55 ? c.peyaName.substring(0, 53) + "..." : c.peyaName;
+      doc.text(name, 40, y + 1.5);
+      doc.text(String(c.stock), 180, y + 1.5, { align: "right" });
+      doc.text(String(c.maxQty), 210, y + 1.5, { align: "right" });
+
+      // Estado badge
+      if (c.currentActive) {
+        doc.setTextColor(21, 128, 61);
+        doc.text("Activo", 240, y + 1.5);
+      } else {
+        doc.setTextColor(185, 28, 28);
+        doc.text("Inactivo", 240, y + 1.5);
+      }
+
+      // Acción
+      if (c.shouldBeActive !== c.currentActive) {
+        doc.setTextColor(180, 83, 9);
+        doc.text(c.shouldBeActive ? "Activar" : "Desactivar", 268, y + 1.5);
+      } else {
+        doc.setTextColor(150, 150, 150);
+        doc.text("—", 268, y + 1.5);
+      }
+
+      y += 7;
+    }
+
+    // Footer
+    doc.setTextColor(160, 160, 160);
+    doc.setFontSize(7);
+    const pageCount = doc.getNumberOfPages();
+    for (let p = 1; p <= pageCount; p++) {
+      doc.setPage(p);
+      doc.text(`Página ${p}/${pageCount}`, w / 2, 205, { align: "center" });
+    }
+
+    doc.save(`PedidosYa-Stock-${new Date().toISOString().slice(0, 10)}.pdf`);
+  }
+
   function exportPricesCSV() {
     if (!result || result.changes.length === 0) return;
     const header = ["SKU PeYa", "Producto", "EAN", "Precio Actual", "Precio Nuevo", "Diferencia"];
@@ -881,13 +982,24 @@ export default function PedidosYaPage() {
                 </button>
               )}
             </div>
-            <button
-              onClick={tab === "prices" ? exportPricesCSV : tab === "stock" ? exportStockCSV : exportUnmatchedCSV}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-green-600 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100"
-            >
-              <HiOutlineDocumentDownload className="w-4 h-4" />
-              Excel
-            </button>
+            <div className="flex gap-2">
+              {tab === "stock" && (
+                <button
+                  onClick={exportStockPDF}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100"
+                >
+                  <HiOutlineDocumentDownload className="w-4 h-4" />
+                  PDF
+                </button>
+              )}
+              <button
+                onClick={tab === "prices" ? exportPricesCSV : tab === "stock" ? exportStockCSV : exportUnmatchedCSV}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-green-600 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100"
+              >
+                <HiOutlineDocumentDownload className="w-4 h-4" />
+                Excel
+              </button>
+            </div>
           </div>
 
           {/* Price changes tab */}

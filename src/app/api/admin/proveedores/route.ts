@@ -110,7 +110,7 @@ export async function PUT(req: NextRequest) {
     await pool
       .request()
       .input("cod", codPadded)
-      .input("monto", parseFloat(monto))
+      .input("monto", Math.round(parseFloat(monto) * 100) / 100)
       .query(`
         UPDATE [${dbProd}].dbo.Proveedores
         SET Saldo = ISNULL(Saldo, 0) - @monto
@@ -133,7 +133,7 @@ export async function PUT(req: NextRequest) {
       data: {
         proveedorCod: String(cod),
         proveedorName: result.recordset[0]?.nombre || "",
-        monto: parseFloat(monto),
+        monto: Math.round(parseFloat(monto) * 100) / 100,
         concepto: (concepto || "Pago").substring(0, 100),
         usuario: userName,
       },

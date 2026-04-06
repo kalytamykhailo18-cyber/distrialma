@@ -217,8 +217,10 @@ model PriceMargin {
 
 model InternalMovement {
   id          Int      @id @default(autoincrement())
+  sucursal    String   @db.VarChar(50)
   destino     String   @db.VarChar(50)
   subtipo     String?  @db.VarChar(30)
+  empleados   String?  @db.Text
   usuario     String   @db.VarChar(50)
   estado      String   @default("pendiente") @db.VarChar(20)
   notas       String?  @db.Text
@@ -239,6 +241,7 @@ model InternalMovementItem {
   sku         String   @db.VarChar(7)
   productName String   @db.VarChar(60)
   cantidad    Decimal  @db.Decimal(12, 3)
+  costo       Decimal? @db.Decimal(12, 2)
   movement    InternalMovement @relation(fields: [movementId], references: [id], onDelete: Cascade)
 
   @@index([movementId])

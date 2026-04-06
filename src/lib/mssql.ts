@@ -89,6 +89,49 @@ export async function getTestPool(): Promise<sql.ConnectionPool> {
   }
 }
 
+// Server01 pool for testing (201.177.141.110)
+const server01Config: sql.config = {
+  server: process.env.MSSQL_SERVER01_HOST || process.env.MSSQL_HOST!,
+  port: parseInt(process.env.MSSQL_SERVER01_PORT || process.env.MSSQL_PORT || "1433"),
+  user: process.env.MSSQL_USER!,
+  password: process.env.MSSQL_PASSWORD!,
+  options: {
+    encrypt: false,
+    trustServerCertificate: true,
+  },
+  connectionTimeout: 15000,
+  requestTimeout: 15000,
+  pool: {
+    max: 3,
+    min: 0,
+    idleTimeoutMillis: 30000,
+  },
+};
+
+let server01Pool: sql.ConnectionPool | null = null;
+let server01LastFailure = 0;
+
+export async function getServer01Pool(): Promise<sql.ConnectionPool> {
+  if (server01Pool && server01Pool.connected) {
+    return server01Pool;
+  }
+
+  const now = Date.now();
+  if (server01LastFailure && now - server01LastFailure < RETRY_COOLDOWN) {
+    throw new Error("Server01 no disponible.");
+  }
+
+  try {
+    server01Pool = await new sql.ConnectionPool(server01Config).connect();
+    server01LastFailure = 0;
+    return server01Pool;
+  } catch (err) {
+    server01LastFailure = Date.now();
+    server01Pool = null;
+    throw err;
+  }
+}
+
 export function getDbName(key: string): string {
   const map: Record<string, string> = {
     productos: process.env.MSSQL_DB_PRODUCTOS!,

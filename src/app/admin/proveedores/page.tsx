@@ -126,7 +126,8 @@ export default function ProveedoresPage() {
 
   async function handlePayment() {
     if (!payingProv || !payMonto) return;
-    const monto = parseFloat(payMonto);
+    // Parse Argentine format: 1.197.207,12 → 1197207.12
+    const monto = parseFloat(payMonto.replace(/\./g, "").replace(",", "."));
     if (isNaN(monto) || monto <= 0) {
       setPayError("Monto inválido");
       return;
@@ -446,10 +447,11 @@ export default function ProveedoresPage() {
               <input
                 type="text"
                 inputMode="decimal"
-                value={payMonto ? Number(payMonto).toLocaleString("es-AR") : ""}
+                value={payMonto}
                 onChange={(e) => {
-                  const raw = e.target.value.replace(/\./g, "").replace(",", ".");
-                  if (raw === "" || !isNaN(Number(raw))) setPayMonto(raw);
+                  // Accept digits, comma and dot
+                  const val = e.target.value.replace(/[^0-9.,]/g, "");
+                  setPayMonto(val);
                 }}
                 placeholder="0"
                 className="w-full px-3 py-2 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"

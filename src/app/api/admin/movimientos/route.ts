@@ -1,17 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getPool, getDbName } from "@/lib/mssql";
+import { getTestPool, getDbName } from "@/lib/mssql";
 import { requireStaff } from "@/lib/api-auth";
 import { prisma } from "@/lib/prisma";
 
-const DESTINOS = [
+const SUCURSALES = [
   "Local 1 Minorista",
-  "Local 2 Envío a Vimar",
+  "Local 2 Vimar",
   "Local 3 Mayorista Merlo",
   "Local 4 Mayorista Pontevedra",
+];
+
+const MOTIVOS = [
+  "Envío a local",
   "Descuento empleados",
   "Descuento local",
   "Rotura de proveedor",
   "Rotura de empleado",
+  "Descuento global",
 ];
 
 function padLeft(value: string | number, length: number): string {
@@ -52,8 +57,10 @@ export async function GET(req: NextRequest) {
 
     const result = movements.map((m) => ({
       id: m.id,
+      sucursal: m.sucursal,
       destino: m.destino,
       subtipo: m.subtipo,
+      empleados: m.empleados ? JSON.parse(m.empleados) : null,
       usuario: m.usuario,
       estado: m.estado,
       notas: m.notas,
@@ -66,14 +73,15 @@ export async function GET(req: NextRequest) {
         sku: i.sku,
         productName: i.productName,
         cantidad: Number(i.cantidad),
+        costo: Number(i.costo || 0),
       })),
     }));
 
     return NextResponse.json({
       movements: result,
       total,
-      destinos: DESTINOS,
-      subtipos: [],
+      sucursales: SUCURSALES,
+      motivos: MOTIVOS,
     });
   } catch (error) {
     console.error("Error fetching movements:", error);
@@ -91,40 +99,56 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { destino, subtipo, items, notas } = body;
+    const { sucursal, destino, items, notas, empleados } = body;
     const usuario = session.user?.name || "usuario";
 
-    if (!destino || !items?.length) {
+    if (!sucursal || !destino || !items?.length) {
       return NextResponse.json(
-        { error: "Destino e items requeridos" },
+        { error: "Sucursal, motivo e items requeridos" },
         { status: 400 }
       );
     }
 
-    const validDestino = DESTINOS.includes(destino);
-    if (!validDestino) {
-      return NextResponse.json({ error: "Destino no válido" }, { status: 400 });
+    if (!SUCURSALES.includes(sucursal)) {
+      return NextResponse.json({ error: "Sucursal no válida" }, { status: 400 });
     }
+    if (!MOTIVOS.includes(destino)) {
+      return NextResponse.json({ error: "Motivo no válido" }, { status: 400 });
+    }
+
+    // Fetch current cost for each product from SQL Server
+    const pool = await getTestPool();
+    const dbProd = getDbName("productos");
+    const itemsWithCost = await Promise.all(
+      items.map(async (item: { sku: string; productName: string; cantidad: number }) => {
+        const cantidad = Math.round((parseFloat(String(item.cantidad).replace(/,/g, ".")) || 0) * 1000) / 1000;
+        let costo = 0;
+        try {
+          const codPadded = padLeft(item.sku, 7);
+          const result = await pool.request().input("cod", codPadded).query(
+            `SELECT ISNULL(Costo, 0) AS costo FROM [${dbProd}].dbo.Stock WHERE CodProducto = @cod AND LTRIM(RTRIM(Deposito)) = '0'`
+          );
+          costo = result.recordset[0]?.costo || 0;
+        } catch { /* ignore */ }
+        return { sku: item.sku, productName: item.productName, cantidad, costo };
+      })
+    );
 
     const movement = await prisma.internalMovement.create({
       data: {
+        sucursal,
         destino,
-        subtipo: subtipo || null,
+        empleados: empleados ? JSON.stringify(empleados) : null,
         usuario,
         estado: "pendiente",
         notas: notas || null,
         items: {
-          create: items.map(
-            (item: { sku: string; productName: string; cantidad: number }) => ({
-              sku: item.sku,
-              productName: item.productName,
-              cantidad:
-                Math.round(
-                  (parseFloat(String(item.cantidad).replace(/,/g, ".")) || 0) *
-                    1000
-                ) / 1000,
-            })
-          ),
+          create: itemsWithCost.map((item) => ({
+            sku: item.sku,
+            productName: item.productName,
+            cantidad: item.cantidad,
+            costo: item.costo,
+          })),
         },
       },
       include: { items: true },
@@ -140,7 +164,7 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// PATCH: Approve movement (admin only) — deducts stock
+// PATCH: Approve or reject movement (admin only)
 export async function PATCH(req: NextRequest) {
   const session = await requireStaff();
   if (!session)
@@ -149,13 +173,13 @@ export async function PATCH(req: NextRequest) {
   const user = session.user as { role?: string; name?: string };
   if (user.role !== "admin") {
     return NextResponse.json(
-      { error: "Solo admin puede aprobar" },
+      { error: "Solo admin puede aprobar/rechazar" },
       { status: 403 }
     );
   }
 
   try {
-    const { id } = await req.json();
+    const { id, action } = await req.json();
     if (!id)
       return NextResponse.json({ error: "ID requerido" }, { status: 400 });
 
@@ -176,8 +200,21 @@ export async function PATCH(req: NextRequest) {
         { status: 400 }
       );
 
-    // Deduct stock in SQL Server
-    const pool = await getPool();
+    if (action === "rechazar") {
+      // Reject — keep record but mark as rechazado
+      await prisma.internalMovement.update({
+        where: { id: parseInt(id) },
+        data: {
+          estado: "rechazado",
+          aprobadoPor: user.name || "admin",
+          aprobadoAt: new Date(),
+        },
+      });
+      return NextResponse.json({ ok: true });
+    }
+
+    // Approve — deduct stock
+    const pool = await getTestPool();
     const dbProd = getDbName("productos");
 
     for (const item of movement.items) {
@@ -193,7 +230,6 @@ export async function PATCH(req: NextRequest) {
         );
     }
 
-    // Mark as approved
     await prisma.internalMovement.update({
       where: { id: parseInt(id) },
       data: {
@@ -205,9 +241,9 @@ export async function PATCH(req: NextRequest) {
 
     return NextResponse.json({ ok: true });
   } catch (error) {
-    console.error("Error approving movement:", error);
+    console.error("Error processing movement:", error);
     return NextResponse.json(
-      { error: "Error al aprobar movimiento" },
+      { error: "Error al procesar movimiento" },
       { status: 500 }
     );
   }

@@ -11,12 +11,19 @@ interface MovementItem {
   sku: string;
   productName: string;
   cantidad: number;
+  costo: number;
+}
+
+function formatPrice(n: number) {
+  return new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 }).format(n);
 }
 
 interface Movement {
   id: number;
+  sucursal: string;
   destino: string;
   subtipo: string | null;
+  empleados: Array<{ cod: string; nombre: string }> | null;
   usuario: string;
   estado: string;
   notas: string | null;
@@ -130,17 +137,19 @@ export default function MovimientoDetail() {
             Movimiento #{movement.id}
           </h1>
           <p className="text-sm text-gray-500">
-            {movement.destino}
+            {movement.sucursal} → {movement.destino}
           </p>
         </div>
         <span
           className={`ml-auto text-xs px-3 py-1 rounded-full font-medium ${
-            isPendiente
+            movement.estado === "pendiente"
               ? "bg-amber-100 text-amber-700"
+              : movement.estado === "rechazado"
+              ? "bg-red-100 text-red-700"
               : "bg-green-100 text-green-700"
           }`}
         >
-          {isPendiente ? "Pendiente aprobación" : "Aprobado"}
+          {movement.estado === "pendiente" ? "Pendiente aprobación" : movement.estado === "rechazado" ? "Rechazado" : "Aprobado"}
         </span>
       </div>
 
@@ -148,7 +157,11 @@ export default function MovimientoDetail() {
       <div className="bg-white border rounded-xl p-4 mb-4">
         <div className="grid grid-cols-2 gap-4 text-sm">
           <div>
-            <span className="text-gray-500">Destino:</span>
+            <span className="text-gray-500">Sucursal:</span>
+            <span className="ml-2 font-medium">{movement.sucursal}</span>
+          </div>
+          <div>
+            <span className="text-gray-500">Motivo:</span>
             <span className="ml-2 font-medium">{movement.destino}</span>
           </div>
           <div>
@@ -161,8 +174,8 @@ export default function MovimientoDetail() {
           </div>
           {movement.aprobadoPor && (
             <div>
-              <span className="text-gray-500">Aprobado por:</span>
-              <span className="ml-2 font-medium text-green-600">
+              <span className="text-gray-500">{movement.estado === "rechazado" ? "Rechazado por:" : "Aprobado por:"}</span>
+              <span className={`ml-2 font-medium ${movement.estado === "rechazado" ? "text-red-600" : "text-green-600"}`}>
                 {movement.aprobadoPor}
               </span>
               {movement.aprobadoAt && (
@@ -170,6 +183,18 @@ export default function MovimientoDetail() {
                   ({formatDate(movement.aprobadoAt)})
                 </span>
               )}
+            </div>
+          )}
+          {movement.empleados && movement.empleados.length > 0 && (
+            <div className="col-span-2">
+              <span className="text-gray-500">Empleado(s) responsable(s):</span>
+              <div className="mt-1 flex flex-wrap gap-1.5">
+                {movement.empleados.map((e) => (
+                  <span key={e.cod} className="text-xs px-2 py-1 rounded-full bg-red-50 text-red-700 font-medium">
+                    {e.nombre}
+                  </span>
+                ))}
+              </div>
             </div>
           )}
           {movement.notas && (
@@ -195,14 +220,28 @@ export default function MovimientoDetail() {
                 <p className="text-sm font-medium text-gray-800">
                   {item.productName}
                 </p>
-                <p className="text-xs text-gray-400">SKU: {item.sku}</p>
+                <p className="text-xs text-gray-400">
+                  SKU: {item.sku}
+                  {item.costo > 0 && <span className="ml-2">Costo: {formatPrice(item.costo)}</span>}
+                </p>
               </div>
-              <div className="text-sm font-semibold text-gray-900">
-                {item.cantidad}
+              <div className="text-right">
+                <p className="text-sm font-semibold text-gray-900">x{item.cantidad}</p>
+                {item.costo > 0 && (
+                  <p className="text-xs text-gray-500">{formatPrice(item.costo * item.cantidad)}</p>
+                )}
               </div>
             </div>
           ))}
         </div>
+        {movement.items.some((i) => i.costo > 0) && (
+          <div className="px-4 py-3 border-t bg-gray-50 flex justify-between">
+            <span className="text-sm font-medium text-gray-700">Total valorizado</span>
+            <span className="text-sm font-bold text-gray-900">
+              {formatPrice(movement.items.reduce((sum, i) => sum + (i.costo || 0) * i.cantidad, 0))}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Approval button (admin only, pending only) */}
@@ -218,13 +257,15 @@ export default function MovimientoDetail() {
           </button>
           <button
             onClick={() => {
-              if (!confirm("¿Rechazar este movimiento?")) return;
+              if (!confirm("¿Rechazar este movimiento? Queda registrado como rechazado.")) return;
               fetch("/api/admin/movimientos", {
-                method: "DELETE",
+                method: "PATCH",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ id: movement.id }),
+                body: JSON.stringify({ id: movement.id, action: "rechazar" }),
               }).then((r) => {
-                if (r.ok) router.push("/admin/movimientos");
+                if (r.ok) {
+                  setMovement({ ...movement, estado: "rechazado", aprobadoPor: (session?.user as { name?: string })?.name || "admin", aprobadoAt: new Date().toISOString() });
+                }
               });
             }}
             className="flex items-center justify-center gap-2 px-6 py-3 text-sm font-medium text-red-600 bg-red-50 border border-red-200 rounded-xl hover:bg-red-100 transition-colors"
