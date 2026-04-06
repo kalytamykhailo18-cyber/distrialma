@@ -13,6 +13,8 @@ export const ALL_PERMISSIONS = [
   { key: "compras", label: "Compras" },
   { key: "costeo", label: "Costeo" },
   { key: "movimientos", label: "Movimientos Internos" },
+  { key: "vendedores", label: "Vendedores (admin)" },
+  { key: "vendedor", label: "Vendedor (toma pedidos)" },
   { key: "cierre-caja", label: "Cierre de Caja" },
   { key: "usuarios", label: "Usuarios" },
 ] as const;
@@ -44,6 +46,8 @@ export const PAGE_PERMISSION_MAP: Record<string, Permission> = {
   "/admin/precios": "costeo",
   "/admin/proveedores": "compras",
   "/admin/movimientos": "movimientos",
+  "/admin/vendedores": "vendedores",
+  "/vendedor": "vendedor",
   "/admin/picking": "picking",
   "/admin/pedidosya": "costeo",
   "/admin/cierre-caja": "cierre-caja",

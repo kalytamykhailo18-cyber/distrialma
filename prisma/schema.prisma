@@ -215,6 +215,67 @@ model PriceMargin {
   @@map("price_margins")
 }
 
+model VendedorComision {
+  id          Int      @id @default(autoincrement())
+  vendedorCod String   @db.VarChar(7)
+  rubroCod    String   @db.VarChar(4)
+  porcentaje  Decimal  @db.Decimal(5, 2)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([vendedorCod, rubroCod])
+  @@index([vendedorCod])
+  @@map("vendedor_comisiones")
+}
+
+model ArticuloPromocional {
+  id        Int      @id @default(autoincrement())
+  sku       String   @unique @db.VarChar(7)
+  createdAt DateTime @default(now())
+
+  @@map("articulos_promocionales")
+}
+
+model VendedorOrder {
+  id           Int      @id @default(autoincrement())
+  vendedorCod  String   @db.VarChar(7)
+  vendedorName String   @db.VarChar(60)
+  clienteCod   String   @db.VarChar(7)
+  clienteName  String   @db.VarChar(60)
+  total        Decimal  @db.Decimal(14, 2)
+  comisionTotal Decimal @default(0) @db.Decimal(14, 2)
+  estado       String   @default("pendiente") @db.VarChar(20)
+  puntouchCod  String?  @db.VarChar(9)
+  latitude     Decimal? @db.Decimal(10, 7)
+  longitude    Decimal? @db.Decimal(10, 7)
+  notas        String?  @db.Text
+  createdAt    DateTime @default(now())
+  items        VendedorOrderItem[]
+
+  @@index([vendedorCod])
+  @@index([clienteCod])
+  @@index([createdAt])
+  @@map("vendedor_orders")
+}
+
+model VendedorOrderItem {
+  id              Int      @id @default(autoincrement())
+  orderId         Int
+  sku             String   @db.VarChar(7)
+  productName     String   @db.VarChar(60)
+  rubroCod        String?  @db.VarChar(4)
+  cantidad        Decimal  @db.Decimal(12, 3)
+  precioMayorista Decimal  @db.Decimal(12, 2)
+  precioVenta     Decimal  @db.Decimal(12, 2)
+  comisionPorc    Decimal  @default(0) @db.Decimal(5, 2)
+  comisionMonto   Decimal  @default(0) @db.Decimal(12, 2)
+  esPromocional   Boolean  @default(false)
+  order           VendedorOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@map("vendedor_order_items")
+}
+
 model InternalMovement {
   id          Int      @id @default(autoincrement())
   sucursal    String   @db.VarChar(50)
