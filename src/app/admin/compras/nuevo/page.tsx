@@ -641,7 +641,7 @@ export default function NuevoIngresoPage() {
         {/* Factura photos (multiple) */}
         <div className="sm:col-span-2">
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Fotos de factura (opcional)
+            {isDevolucion ? "Fotos de mercadería a devolución" : "Fotos de factura (opcional)"}
           </label>
           {facturaPreviews.length > 0 && (
             <div className="flex flex-wrap gap-3 mb-2">

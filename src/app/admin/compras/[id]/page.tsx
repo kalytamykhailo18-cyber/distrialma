@@ -452,7 +452,7 @@ export default function EntryDetailPage() {
       <div className="flex items-start justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">
-            Ingreso #{entry.id}
+            {entry.tipo === "devolucion" ? "Devolución" : "Ingreso"} #{entry.id}
           </h1>
           <div className="text-base text-gray-600 mt-2 space-y-1">
             <p><span className="font-semibold">Proveedor:</span> {entry.proveedorName}</p>
@@ -474,12 +474,14 @@ export default function EntryDetailPage() {
               : "bg-amber-100 text-amber-700 border-2 border-amber-300"
           }`}
         >
-          {entry.estado === "costeado" ? "Costeado" : "Pendiente"}
+          {entry.tipo === "devolucion"
+            ? (entry.estado === "costeado" ? "Aprobada" : "Pendiente aprobación")
+            : (entry.estado === "costeado" ? "Costeado" : "Pendiente")}
         </span>
       </div>
 
-      {/* Total */}
-      {entry.total > 0 && (
+      {/* Total — hide for devolucion */}
+      {entry.total > 0 && entry.tipo !== "devolucion" && (
         <div className="mb-5 bg-blue-50 rounded-lg border-2 border-blue-200 p-5">
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-base">
             <div>
@@ -570,6 +572,24 @@ export default function EntryDetailPage() {
       {/* Items cards */}
       <div className="space-y-6 mb-8">
         {entry.items.map((item) => {
+          // Simplified view for devolucion
+          if (entry.tipo === "devolucion") {
+            return (
+              <div key={item.id} className="bg-white rounded-lg border-2">
+                <div className="flex items-center justify-between px-5 py-3 bg-red-50 rounded-t-lg border-b">
+                  <div>
+                    <span className="text-lg font-bold text-gray-900">{item.productName}</span>
+                    <span className="text-base text-gray-500 ml-3">SKU {item.sku}</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-xl font-bold text-red-600">{item.cantidad}</span>
+                    <span className="text-sm text-gray-500 ml-1">{item.unidad || "UN"}</span>
+                  </div>
+                </div>
+              </div>
+            );
+          }
+
           const costeoRow = costeoRows.find((r) => r.id === item.id);
           const priceFields = [
             { field: "precio" as const, label: "Minorista" },
@@ -978,7 +998,7 @@ export default function EntryDetailPage() {
         }
 
         return (
-          <div className="bg-white rounded-lg border-2 p-5 mb-6">
+          <div className="bg-white rounded-lg border-2 p-5 mb-6" style={{ display: entry.tipo === "devolucion" ? "none" : undefined }}>
             <h3 className="text-lg font-bold text-gray-800 mb-4">Datos de la factura</h3>
             <div className="space-y-4">
               {/* Subtotal (con IVA) */}
@@ -1082,7 +1102,7 @@ export default function EntryDetailPage() {
       })()}
 
       {/* Factura X — just total, no tax breakdown */}
-      {isPendiente && invoiceType === "X" && (
+      {isPendiente && entry.tipo !== "devolucion" && invoiceType === "X" && (
         <div className="bg-white rounded-lg border-2 p-5 mb-6">
           <div className="flex justify-between items-center">
             <span className="text-base font-bold text-gray-800">Total factura</span>
