@@ -118,6 +118,7 @@ export default function Navbar() {
     { href: "/admin/compras", label: "Compras", perm: "compras", iconKey: "compras" },
     { href: "/admin/precios", label: "Precios", perm: "costeo", iconKey: "precios" },
     { href: "/admin/proveedores", label: "Proveedores", perm: "compras", iconKey: "proveedores" },
+    { href: "/admin/movimientos", label: "Movimientos", perm: "movimientos", iconKey: "compras" },
     { href: "/admin/pedidosya", label: "PedidosYa", perm: "costeo", iconKey: "pedidosya" },
     { href: "/admin/cierre-caja", label: "Cierre Caja", perm: "informes", iconKey: "informes" },
     { href: "/admin/usuarios", label: "Usuarios", perm: "usuarios", iconKey: "usuarios" },
