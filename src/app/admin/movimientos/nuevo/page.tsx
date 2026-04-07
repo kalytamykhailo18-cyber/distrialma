@@ -399,7 +399,7 @@ export default function NuevoMovimiento() {
               value={search}
               onChange={(e) => handleSearchChange(e.target.value)}
               placeholder="Nombre, SKU o código de barras..."
-              className="w-full pl-10 pr-4 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-brand-400 focus:border-brand-400"
+              className="w-full pl-10 pr-4 py-2.5 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
             />
             {searching && (
               <div className="absolute right-3 top-1/2 -translate-y-1/2">
@@ -480,7 +480,7 @@ export default function NuevoMovimiento() {
                     onChange={(e) => updateQty(item.sku, e.target.value)}
                     min="0"
                     step={item.unidad === "KG" ? "0.001" : "1"}
-                    className="w-20 text-sm text-center border rounded-lg px-2 py-1.5 focus:ring-2 focus:ring-brand-400"
+                    className="w-20 text-sm text-center border border-brand-400 rounded-lg px-2 py-1.5 focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
                   />
                   <span className="text-xs text-gray-400 w-6">{item.unidad || "UN"}</span>
                   <button onClick={() => removeItem(item.sku)} className="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded">
@@ -500,7 +500,7 @@ export default function NuevoMovimiento() {
           value={notas}
           onChange={(e) => setNotas(e.target.value)}
           rows={2}
-          className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-400"
+          className="w-full border border-brand-400 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
           placeholder="Observaciones sobre el movimiento..."
         />
       </div>

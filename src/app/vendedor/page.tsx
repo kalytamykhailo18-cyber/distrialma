@@ -264,7 +264,7 @@ export default function VendedorPage() {
                   value={search}
                   onChange={(e) => handleSearchChange(e.target.value)}
                   placeholder="Buscar producto..."
-                  className="w-full pl-10 pr-4 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-brand-400"
+                  className="w-full pl-10 pr-4 py-2.5 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
                 />
               </div>
               <button className="px-3 py-2 border rounded-lg text-gray-600">
@@ -345,7 +345,7 @@ export default function VendedorPage() {
                 value={clienteSearch}
                 onChange={(e) => searchClientes(e.target.value)}
                 placeholder="Buscar cliente por nombre, CUIT o código..."
-                className="w-full pl-10 pr-4 py-2.5 border rounded-lg text-sm"
+                className="w-full pl-10 pr-4 py-2.5 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
               />
             </div>
 
@@ -405,7 +405,7 @@ export default function VendedorPage() {
               onChange={(e) => setNotas(e.target.value)}
               placeholder="Notas (opcional)"
               rows={2}
-              className="w-full px-3 py-2 border rounded-lg text-sm mb-3"
+              className="w-full px-3 py-2 border border-brand-400 rounded-lg text-sm mb-3 focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
             />
 
             <p className="text-xs text-gray-400 text-center mb-3">

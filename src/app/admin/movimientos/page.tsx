@@ -386,7 +386,7 @@ export default function MovimientosPage() {
             type="month"
             value={mesFilter}
             onChange={(e) => setMesFilter(e.target.value)}
-            className="text-sm border rounded-lg px-3 py-1.5"
+            className="text-sm border border-brand-400 rounded-lg px-3 py-1.5 focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
             placeholder="Filtrar mes"
           />
           {mesFilter && (

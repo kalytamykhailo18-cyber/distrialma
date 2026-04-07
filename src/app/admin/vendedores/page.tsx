@@ -116,12 +116,20 @@ export default function AdminVendedoresPage() {
     <div className="max-w-6xl mx-auto px-4 py-6">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Vendedores</h1>
-        <Link
-          href="/admin/vendedores/reporte"
-          className="px-4 py-2 text-sm text-white bg-brand-400 rounded-lg hover:bg-brand-500 transition-colors"
-        >
-          Reporte de comisiones
-        </Link>
+        <div className="flex gap-2">
+          <Link
+            href="/admin/vendedores/catalogo"
+            className="px-4 py-2 text-sm text-brand-600 bg-brand-50 border border-brand-200 rounded-lg hover:bg-brand-100 transition-colors"
+          >
+            Catálogo PDF
+          </Link>
+          <Link
+            href="/admin/vendedores/reporte"
+            className="px-4 py-2 text-sm text-white bg-brand-400 rounded-lg hover:bg-brand-500 transition-colors"
+          >
+            Reporte de comisiones
+          </Link>
+        </div>
       </div>
 
       {/* Tabs */}
@@ -195,7 +203,7 @@ export default function AdminVendedoresPage() {
                         defaultValue={getComision(selectedVendedor.cod, r.cod) || ""}
                         placeholder={String(settings.defaultComision)}
                         onBlur={(e) => updateComision(selectedVendedor.cod, r.cod, parseFloat(e.target.value) || 0)}
-                        className="w-16 px-2 py-1 text-sm text-center border rounded"
+                        className="w-16 px-2 py-1 text-sm text-center border border-brand-400 rounded focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
                       />
                       <span className="text-xs text-gray-400">%</span>
                     </div>
@@ -221,7 +229,7 @@ export default function AdminVendedoresPage() {
               value={searchProm}
               onChange={(e) => searchProductsForPromo(e.target.value)}
               placeholder="Buscar producto por nombre o SKU..."
-              className="w-full pl-10 pr-4 py-2 border rounded-lg text-sm"
+              className="w-full pl-10 pr-4 py-2 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
             />
           </div>
 
@@ -289,7 +297,7 @@ export default function AdminVendedoresPage() {
                 step="0.5"
                 value={settings.markup}
                 onChange={(e) => setSettings({ ...settings, markup: parseFloat(e.target.value) || 0 })}
-                className="w-32 px-3 py-2 border rounded-lg text-sm"
+                className="w-32 px-3 py-2 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
               />
               <span className="text-xs text-gray-400 ml-2">% (default: 3)</span>
             </div>
@@ -306,7 +314,7 @@ export default function AdminVendedoresPage() {
                 step="100"
                 value={settings.minOrder}
                 onChange={(e) => setSettings({ ...settings, minOrder: parseFloat(e.target.value) || 0 })}
-                className="w-40 px-3 py-2 border rounded-lg text-sm"
+                className="w-40 px-3 py-2 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
               />
               <span className="text-xs text-gray-400 ml-2">pesos (0 = sin mínimo)</span>
             </div>
@@ -323,7 +331,7 @@ export default function AdminVendedoresPage() {
                 step="0.5"
                 value={settings.defaultComision}
                 onChange={(e) => setSettings({ ...settings, defaultComision: parseFloat(e.target.value) || 0 })}
-                className="w-32 px-3 py-2 border rounded-lg text-sm"
+                className="w-32 px-3 py-2 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
               />
               <span className="text-xs text-gray-400 ml-2">% (default: 3)</span>
             </div>

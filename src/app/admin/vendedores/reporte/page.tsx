@@ -171,11 +171,11 @@ export default function ReporteVendedoresPage() {
       <div className="bg-white border rounded-xl p-4 mb-4 flex flex-wrap items-end gap-3">
         <div>
           <label className="block text-xs text-gray-500 mb-1">Desde</label>
-          <input type="date" value={desde} onChange={(e) => setDesde(e.target.value)} className="border rounded-lg px-3 py-2 text-sm" />
+          <input type="date" value={desde} onChange={(e) => setDesde(e.target.value)} className="border border-brand-400 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600" />
         </div>
         <div>
           <label className="block text-xs text-gray-500 mb-1">Hasta</label>
-          <input type="date" value={hasta} onChange={(e) => setHasta(e.target.value)} className="border rounded-lg px-3 py-2 text-sm" />
+          <input type="date" value={hasta} onChange={(e) => setHasta(e.target.value)} className="border border-brand-400 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600" />
         </div>
         <button onClick={() => { setDesde(fifteenDaysAgo()); setHasta(todayISO()); }} className="px-3 py-2 text-xs text-gray-600 border rounded-lg hover:bg-gray-50">
           Última quincena

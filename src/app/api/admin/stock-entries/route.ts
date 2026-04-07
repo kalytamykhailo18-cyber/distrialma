@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import sql from "mssql";
 import { getPool, getDbName } from "@/lib/mssql";
 import { requireStaff } from "@/lib/api-auth";
 import { prisma } from "@/lib/prisma";
@@ -101,168 +102,174 @@ export async function POST(req: NextRequest) {
     const fechora = getArgentinaTime();
     const usuario = session.user?.name || "admin";
 
-    // Get next Compras Cod
-    let nextCompraCod = 1;
-    try {
-      const maxCompra = await pool.request().query(`
-        SELECT MAX(CAST(LTRIM(RTRIM(Cod)) AS INT)) AS maxCod
-        FROM [${dbCompras}].dbo.Compras
-      `);
-      nextCompraCod = (maxCompra.recordset[0]?.maxCod || 0) + 1;
-    } catch {
-      // Table might be empty
-    }
-
-    // Header row gets its own Cod, then each item gets the next Cod
-    const boletaCod = padLeft(nextCompraCod, 9);
-    nextCompraCod++;
     const subtotal = parseFloat(subIn) || 0;
     const iva = parseFloat(ivaIn) || 0;
     const iibb = parseFloat(iibbIn) || 0;
     const percepciones = parseFloat(percIn) || 0;
     const totalAmount = parseFloat(totalIn) || (subtotal + iva + iibb + percepciones);
 
-    // Write Compras header row first
-    const provPaddedHeader = padLeft(proveedorCod, 7);
-    await pool
-      .request()
-      .input("cod", boletaCod)
-      .input("proveedor", provPaddedHeader)
-      .input("fechora", fechora)
-      .input("total", totalAmount)
-      .input("tipo", "V")
-      .query(`
-        INSERT INTO [${dbCompras}].dbo.Compras (Cod, Boleta, Proveedor, Fechora, Total, Tipo, Itm)
-        VALUES (@cod, @cod, @proveedor, @fechora, @total, @tipo, '0  ')
-      `);
+    // Begin transaction so all SQL Server changes are atomic
+    const transaction = new sql.Transaction(pool);
+    await transaction.begin();
 
-    const pgItems: Array<{
-      sku: string;
-      productName: string;
-      cantidad: number;
-      isNewProduct: boolean;
-    }> = [];
-
-    for (let i = 0; i < items.length; i++) {
-      const item = items[i];
-      let sku = item.sku;
-      const cantidad = Math.round((parseFloat(String(item.cantidad).replace(/,/g, ".")) || 0) * 1000) / 1000;
-
-      if (item.isNewProduct) {
-        // Create new product in SQL Server
-        const maxProdResult = await pool.request().query(`
+    let entry;
+    try {
+      // Get next Compras Cod (inside transaction for consistency)
+      let nextCompraCod = 1;
+      try {
+        const maxCompra = await new sql.Request(transaction).query(`
           SELECT MAX(CAST(LTRIM(RTRIM(Cod)) AS INT)) AS maxCod
-          FROM [${dbProd}].dbo.Productos
+          FROM [${dbCompras}].dbo.Compras
         `);
-        const nextProdCod = (maxProdResult.recordset[0]?.maxCod || 0) + 1;
-        const codPadded = padLeft(nextProdCod, 7);
-        sku = String(nextProdCod);
-
-        const productName = (item.newProductName || item.productName || "").substring(0, 60);
-        const barcode = (item.barcode || "").substring(0, 20);
-
-        await pool
-          .request()
-          .input("cod", codPadded)
-          .input("nombre", productName)
-          .input("codbar", barcode)
-          .query(`
-            INSERT INTO [${dbProd}].dbo.Productos (Cod, Nombre, Codbar)
-            VALUES (@cod, @nombre, @codbar)
-          `);
-
-        // Create Stock row
-        await pool
-          .request()
-          .input("codProd", codPadded)
-          .input("stk", cantidad)
-          .query(`
-            INSERT INTO [${dbProd}].dbo.Stock (CodProducto, Deposito, Stk, Costo)
-            VALUES (@codProd, '0  ', @stk, 0)
-          `);
-
-        pgItems.push({
-          sku: String(nextProdCod),
-          productName,
-          cantidad,
-          isNewProduct: true,
-        });
-      } else {
-        // Update existing stock (only for ingreso, not devolucion)
-        if (!isDevolucion) {
-          const codPadded = padLeft(sku, 7);
-          await pool
-            .request()
-            .input("cod", codPadded)
-            .input("cant", cantidad)
-            .query(`
-              UPDATE [${dbProd}].dbo.Stock
-              SET Stk = ISNULL(Stk, 0) + @cant
-              WHERE CodProducto = @cod AND LTRIM(RTRIM(Deposito)) = '0'
-            `);
-        }
-
-        pgItems.push({
-          sku,
-          productName: item.productName || "",
-          cantidad,
-          isNewProduct: false,
-        });
+        nextCompraCod = (maxCompra.recordset[0]?.maxCod || 0) + 1;
+      } catch {
+        // Table might be empty
       }
 
-      // Write to Compras table in SQL Server (item row — each gets unique Cod)
-      const itemCod = padLeft(nextCompraCod, 9);
-      const skuPadded = padLeft(item.isNewProduct ? sku : item.sku, 7);
-      const provPadded = padLeft(proveedorCod, 7);
-      const itm = padLeft(i + 1, 3);
+      const boletaCod = padLeft(nextCompraCod, 9);
+      nextCompraCod++;
 
-      await pool
-        .request()
-        .input("cod", itemCod)
-        .input("boleta", boletaCod)
-        .input("producto", skuPadded)
-        .input("proveedor", provPadded)
+      // Write Compras header row
+      const provPaddedHeader = padLeft(proveedorCod, 7);
+      await new sql.Request(transaction)
+        .input("cod", boletaCod)
+        .input("proveedor", provPaddedHeader)
         .input("fechora", fechora)
-        .input("cant", cantidad)
-        .input("tipo", "I")
-        .input("itm", itm)
+        .input("total", totalAmount)
+        .input("tipo", "V")
         .query(`
-          INSERT INTO [${dbCompras}].dbo.Compras (Cod, Boleta, Producto, Proveedor, Fechora, Cant, Tipo, Itm)
-          VALUES (@cod, @boleta, @producto, @proveedor, @fechora, @cant, @tipo, @itm)
+          INSERT INTO [${dbCompras}].dbo.Compras (Cod, Boleta, Proveedor, Fechora, Total, Tipo, Itm)
+          VALUES (@cod, @cod, @proveedor, @fechora, @total, @tipo, '0  ')
         `);
 
-      nextCompraCod++;
-    }
+      const pgItems: Array<{
+        sku: string;
+        productName: string;
+        cantidad: number;
+        isNewProduct: boolean;
+      }> = [];
 
-    // Supplier saldo is updated during costeo (PUT handler in [id]/route.ts),
-    // not here, to avoid double-charging when taxes are entered later.
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        let sku = item.sku;
+        const cantidad = Math.round((parseFloat(String(item.cantidad).replace(/,/g, ".")) || 0) * 1000) / 1000;
 
-    // Save in PostgreSQL
-    const entry = await prisma.stockEntry.create({
-      data: {
-        tipo,
-        proveedorCod,
-        proveedorName,
-        usuario,
-        estado: "pendiente",
-        subtotal,
-        iva,
-        iibb,
-        percepciones,
-        total: totalAmount,
-        notas: notas || null,
-        nroFactura: nroFactura || null,
-        items: {
-          create: pgItems.map((item) => ({
-            sku: item.sku,
-            productName: item.productName,
-            cantidad: item.cantidad,
-            isNewProduct: item.isNewProduct,
-          })),
+        if (item.isNewProduct) {
+          // Create new product in SQL Server
+          const maxProdResult = await new sql.Request(transaction).query(`
+            SELECT MAX(CAST(LTRIM(RTRIM(Cod)) AS INT)) AS maxCod
+            FROM [${dbProd}].dbo.Productos
+          `);
+          const nextProdCod = (maxProdResult.recordset[0]?.maxCod || 0) + 1;
+          const codPadded = padLeft(nextProdCod, 7);
+          sku = String(nextProdCod);
+
+          const productName = (item.newProductName || item.productName || "").substring(0, 60);
+          const barcode = (item.barcode || "").substring(0, 20);
+
+          await new sql.Request(transaction)
+            .input("cod", codPadded)
+            .input("nombre", productName)
+            .input("codbar", barcode)
+            .query(`
+              INSERT INTO [${dbProd}].dbo.Productos (Cod, Nombre, Codbar)
+              VALUES (@cod, @nombre, @codbar)
+            `);
+
+          // Create Stock row
+          await new sql.Request(transaction)
+            .input("codProd", codPadded)
+            .input("stk", cantidad)
+            .query(`
+              INSERT INTO [${dbProd}].dbo.Stock (CodProducto, Deposito, Stk, Costo)
+              VALUES (@codProd, '0  ', @stk, 0)
+            `);
+
+          pgItems.push({
+            sku: String(nextProdCod),
+            productName,
+            cantidad,
+            isNewProduct: true,
+          });
+        } else {
+          // Update existing stock (only for ingreso, not devolucion)
+          if (!isDevolucion) {
+            const codPadded = padLeft(sku, 7);
+            await new sql.Request(transaction)
+              .input("cod", codPadded)
+              .input("cant", cantidad)
+              .query(`
+                UPDATE [${dbProd}].dbo.Stock
+                SET Stk = ISNULL(Stk, 0) + @cant
+                WHERE CodProducto = @cod AND LTRIM(RTRIM(Deposito)) = '0'
+              `);
+          }
+
+          pgItems.push({
+            sku,
+            productName: item.productName || "",
+            cantidad,
+            isNewProduct: false,
+          });
+        }
+
+        // Write to Compras table in SQL Server (item row — each gets unique Cod)
+        const itemCod = padLeft(nextCompraCod, 9);
+        const skuPadded = padLeft(item.isNewProduct ? sku : item.sku, 7);
+        const provPadded = padLeft(proveedorCod, 7);
+        const itm = padLeft(i + 1, 3);
+
+        await new sql.Request(transaction)
+          .input("cod", itemCod)
+          .input("boleta", boletaCod)
+          .input("producto", skuPadded)
+          .input("proveedor", provPadded)
+          .input("fechora", fechora)
+          .input("cant", cantidad)
+          .input("tipo", "I")
+          .input("itm", itm)
+          .query(`
+            INSERT INTO [${dbCompras}].dbo.Compras (Cod, Boleta, Producto, Proveedor, Fechora, Cant, Tipo, Itm)
+            VALUES (@cod, @boleta, @producto, @proveedor, @fechora, @cant, @tipo, @itm)
+          `);
+
+        nextCompraCod++;
+      }
+
+      // Save in PostgreSQL — if this fails, we rollback the SQL Server transaction
+      entry = await prisma.stockEntry.create({
+        data: {
+          tipo,
+          proveedorCod,
+          proveedorName,
+          usuario,
+          estado: "pendiente",
+          subtotal,
+          iva,
+          iibb,
+          percepciones,
+          total: totalAmount,
+          notas: notas || null,
+          nroFactura: nroFactura || null,
+          items: {
+            create: pgItems.map((item) => ({
+              sku: item.sku,
+              productName: item.productName,
+              cantidad: item.cantidad,
+              isNewProduct: item.isNewProduct,
+            })),
+          },
         },
-      },
-      include: { items: true },
-    });
+        include: { items: true },
+      });
+
+      // All good — commit SQL Server transaction
+      await transaction.commit();
+    } catch (innerError) {
+      // Roll back SQL Server changes (stock updates, Compras inserts)
+      try { await transaction.rollback(); } catch { /* already rolled back */ }
+      throw innerError;
+    }
 
     return NextResponse.json({ entry });
   } catch (error) {

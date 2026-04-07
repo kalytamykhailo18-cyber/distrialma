@@ -617,29 +617,62 @@ export default function PedidosYaPage() {
     });
   }
 
-  function exportStockCSV() {
+  async function exportStockCSV() {
     if (!result || result.stockChanges.length === 0) return;
-    const header = ["SKU PeYa", "Producto", "Stock", "Cant Max", "Estado Actual", "Accion"];
-    const rows = result.stockChanges.map((c) => [
-      c.peyaSku,
-      c.peyaName,
-      c.stock,
-      c.maxQty,
-      c.currentActive ? "Activo" : "Inactivo",
-      c.shouldBeActive ? "Activar" : "Desactivar",
-    ]);
-    const BOM = "\uFEFF";
-    const csv = BOM + [header, ...rows].map((r) =>
-      r.map((c) => {
-        const s = String(c);
-        return s.includes(",") || s.includes('"') ? `"${s.replace(/"/g, '""')}"` : s;
-      }).join(",")
-    ).join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const ExcelJS = (await import("exceljs")).default;
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet("Stock PedidosYa");
+
+    // Compute auto-fit widths based on actual content
+    const data = result.stockChanges.map((c) => ({
+      sku: c.peyaSku,
+      name: c.peyaName,
+      stock: String(c.stock),
+      maxQty: String(c.maxQty),
+      estado: c.currentActive ? "Activo" : "Inactivo",
+      accion: c.shouldBeActive !== c.currentActive ? (c.shouldBeActive ? "Activar" : "Desactivar") : "—",
+    }));
+    const fit = (header: string, key: keyof typeof data[number], min = 8, max = 60) => {
+      const maxLen = Math.max(header.length, ...data.map((d) => String(d[key]).length));
+      return Math.min(max, Math.max(min, maxLen + 2));
+    };
+
+    ws.columns = [
+      { header: "SKU PeYa", key: "sku", width: fit("SKU PeYa", "sku") },
+      { header: "Producto", key: "name", width: fit("Producto", "name") },
+      { header: "Stock", key: "stock", width: fit("Stock", "stock") },
+      { header: "Cant Máx", key: "maxQty", width: fit("Cant Máx", "maxQty") },
+      { header: "Estado Actual", key: "estado", width: fit("Estado Actual", "estado") },
+      { header: "Acción", key: "accion", width: fit("Acción", "accion") },
+    ];
+    ws.getRow(1).font = { bold: true, color: { argb: "FFFFFFFF" } };
+    ws.getRow(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFB9A47" } };
+    ws.getRow(1).alignment = { horizontal: "center", vertical: "middle" };
+    ws.getRow(1).height = 22;
+
+    for (const c of result.stockChanges) {
+      const row = ws.addRow({
+        sku: c.peyaSku,
+        name: c.peyaName,
+        stock: c.stock,
+        maxQty: c.maxQty,
+        estado: c.currentActive ? "Activo" : "Inactivo",
+        accion: c.shouldBeActive !== c.currentActive ? (c.shouldBeActive ? "Activar" : "Desactivar") : "—",
+      });
+      row.getCell("estado").font = { color: { argb: c.currentActive ? "FF15803D" : "FFB91C1C" } };
+      row.getCell("accion").font = { color: { argb: c.shouldBeActive !== c.currentActive ? "FFB45309" : "FF999999" }, bold: c.shouldBeActive !== c.currentActive };
+      row.getCell("stock").alignment = { horizontal: "right" };
+      row.getCell("maxQty").alignment = { horizontal: "right" };
+    }
+    ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: 6 } };
+    ws.views = [{ state: "frozen", ySplit: 1 }];
+
+    const buf = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `PedidosYa-Stock-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = `PedidosYa-Stock-${new Date().toISOString().slice(0, 10)}.xlsx`;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -745,51 +778,114 @@ export default function PedidosYaPage() {
     doc.save(`PedidosYa-Stock-${new Date().toISOString().slice(0, 10)}.pdf`);
   }
 
-  function exportPricesCSV() {
+  async function exportPricesCSV() {
     if (!result || result.changes.length === 0) return;
-    const header = ["SKU PeYa", "Producto", "EAN", "Precio Actual", "Precio Nuevo", "Diferencia"];
-    const rows = result.changes.map((c) => [
-      c.peyaSku,
-      c.peyaName,
-      c.barcode,
-      c.currentPrice,
-      c.newPrice,
-      c.newPrice - c.currentPrice,
-    ]);
-    const BOM = "\uFEFF";
-    const csv = BOM + [header, ...rows].map((r) =>
-      r.map((c) => {
-        const s = String(c);
-        return s.includes(",") || s.includes('"') ? `"${s.replace(/"/g, '""')}"` : s;
-      }).join(",")
-    ).join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const ExcelJS = (await import("exceljs")).default;
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet("Cambios de Precio");
+
+    const fmtMoney = (n: number) => "$" + n.toLocaleString("es-AR");
+    const data = result.changes.map((c) => ({
+      sku: c.peyaSku,
+      name: c.peyaName,
+      ean: c.barcode,
+      current: fmtMoney(c.currentPrice),
+      new: fmtMoney(c.newPrice),
+      diff: fmtMoney(c.newPrice - c.currentPrice),
+    }));
+    const fit = (header: string, key: keyof typeof data[number], min = 8, max = 60) => {
+      const maxLen = Math.max(header.length, ...data.map((d) => String(d[key]).length));
+      return Math.min(max, Math.max(min, maxLen + 2));
+    };
+
+    ws.columns = [
+      { header: "SKU PeYa", key: "sku", width: fit("SKU PeYa", "sku") },
+      { header: "Producto", key: "name", width: fit("Producto", "name") },
+      { header: "EAN", key: "ean", width: fit("EAN", "ean") },
+      { header: "Precio Actual", key: "current", width: fit("Precio Actual", "current") },
+      { header: "Precio Nuevo", key: "new", width: fit("Precio Nuevo", "new") },
+      { header: "Diferencia", key: "diff", width: fit("Diferencia", "diff") },
+    ];
+    ws.getRow(1).font = { bold: true, color: { argb: "FFFFFFFF" } };
+    ws.getRow(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFB9A47" } };
+    ws.getRow(1).alignment = { horizontal: "center", vertical: "middle" };
+    ws.getRow(1).height = 22;
+
+    for (const c of result.changes) {
+      const diff = c.newPrice - c.currentPrice;
+      const row = ws.addRow({
+        sku: c.peyaSku,
+        name: c.peyaName,
+        ean: c.barcode,
+        current: c.currentPrice,
+        new: c.newPrice,
+        diff,
+      });
+      row.getCell("current").numFmt = '"$"#,##0';
+      row.getCell("new").numFmt = '"$"#,##0';
+      row.getCell("diff").numFmt = '"$"#,##0;[Red]"$"-#,##0';
+      row.getCell("diff").font = { color: { argb: diff > 0 ? "FF15803D" : "FFB91C1C" }, bold: true };
+    }
+    ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: 6 } };
+    ws.views = [{ state: "frozen", ySplit: 1 }];
+
+    const buf = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `PedidosYa-Precios-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = `PedidosYa-Precios-${new Date().toISOString().slice(0, 10)}.xlsx`;
     a.click();
     URL.revokeObjectURL(url);
   }
 
-  function exportUnmatchedCSV() {
+  async function exportUnmatchedCSV() {
     if (!result || result.unmatchedList.length === 0) return;
-    const header = ["SKU PeYa", "Producto", "EAN", "Activo"];
-    const rows = result.unmatchedList.map((c) => [
-      c.peyaSku, c.peyaName, c.barcode, c.active ? "Si" : "No",
-    ]);
-    const BOM = "\uFEFF";
-    const csv = BOM + [header, ...rows].map((r) =>
-      r.map((c) => {
-        const s = String(c);
-        return s.includes(",") || s.includes('"') ? `"${s.replace(/"/g, '""')}"` : s;
-      }).join(",")
-    ).join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const ExcelJS = (await import("exceljs")).default;
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet("Sin Asociar");
+
+    const data = result.unmatchedList.map((c) => ({
+      sku: c.peyaSku,
+      name: c.peyaName,
+      ean: c.barcode,
+      activo: c.active ? "Sí" : "No",
+    }));
+    const fit = (header: string, key: keyof typeof data[number], min = 8, max = 60) => {
+      const maxLen = Math.max(header.length, ...data.map((d) => String(d[key]).length));
+      return Math.min(max, Math.max(min, maxLen + 2));
+    };
+
+    ws.columns = [
+      { header: "SKU PeYa", key: "sku", width: fit("SKU PeYa", "sku") },
+      { header: "Producto", key: "name", width: fit("Producto", "name") },
+      { header: "EAN", key: "ean", width: fit("EAN", "ean") },
+      { header: "Activo", key: "activo", width: fit("Activo", "activo") },
+    ];
+    ws.getRow(1).font = { bold: true, color: { argb: "FFFFFFFF" } };
+    ws.getRow(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFB9A47" } };
+    ws.getRow(1).alignment = { horizontal: "center", vertical: "middle" };
+    ws.getRow(1).height = 22;
+
+    for (const c of result.unmatchedList) {
+      const row = ws.addRow({
+        sku: c.peyaSku,
+        name: c.peyaName,
+        ean: c.barcode,
+        activo: c.active ? "Sí" : "No",
+      });
+      row.getCell("activo").alignment = { horizontal: "center" };
+      row.getCell("activo").font = { color: { argb: c.active ? "FF15803D" : "FF999999" } };
+    }
+    ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: 4 } };
+    ws.views = [{ state: "frozen", ySplit: 1 }];
+
+    const buf = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `PedidosYa-SinAsociar-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = `PedidosYa-SinAsociar-${new Date().toISOString().slice(0, 10)}.xlsx`;
     a.click();
     URL.revokeObjectURL(url);
   }

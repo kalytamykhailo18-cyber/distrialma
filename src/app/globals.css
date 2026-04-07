@@ -34,6 +34,11 @@ body {
   }
 }
 
+::selection {
+  background: #fba147;
+  color: white;
+}
+
 /* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 8px;
