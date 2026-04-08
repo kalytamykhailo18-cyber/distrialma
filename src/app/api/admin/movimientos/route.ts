@@ -116,21 +116,34 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Motivo no válido" }, { status: 400 });
     }
 
-    // Fetch current cost for each product from SQL Server
+    // Fetch prices for each product from SQL Server
+    // Pricing rule per motivo:
+    //   - Empleado/global motives: charge at Mayorista (Precio2), fallback to Minorista (Precio)
+    //   - Other motives: use Costo (warehouse value)
     const pool = await getTestPool();
     const dbProd = getDbName("productos");
+    const isEmpleadoMotivo = ["Descuento empleados", "Rotura de empleado", "Descuento global"].includes(destino);
+
     const itemsWithCost = await Promise.all(
       items.map(async (item: { sku: string; productName: string; cantidad: number }) => {
         const cantidad = Math.round((parseFloat(String(item.cantidad).replace(/,/g, ".")) || 0) * 1000) / 1000;
-        let costo = 0;
+        let valor = 0;
         try {
           const codPadded = padLeft(item.sku, 7);
           const result = await pool.request().input("cod", codPadded).query(
-            `SELECT ISNULL(Costo, 0) AS costo FROM [${dbProd}].dbo.Stock WHERE CodProducto = @cod AND LTRIM(RTRIM(Deposito)) = '0'`
+            `SELECT ISNULL(Costo, 0) AS costo, ISNULL(Precio2, 0) AS mayorista, ISNULL(Precio, 0) AS minorista
+             FROM [${dbProd}].dbo.Stock WHERE CodProducto = @cod AND LTRIM(RTRIM(Deposito)) = '0'`
           );
-          costo = result.recordset[0]?.costo || 0;
+          const row = result.recordset[0];
+          if (row) {
+            if (isEmpleadoMotivo) {
+              valor = row.mayorista > 0 ? Number(row.mayorista) : Number(row.minorista);
+            } else {
+              valor = Number(row.costo);
+            }
+          }
         } catch { /* ignore */ }
-        return { sku: item.sku, productName: item.productName, cantidad, costo };
+        return { sku: item.sku, productName: item.productName, cantidad, costo: valor };
       })
     );
 

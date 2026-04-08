@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import sql from "mssql";
 import { getPool, getDbName } from "@/lib/mssql";
 import { requireStaff } from "@/lib/api-auth";
 import { prisma } from "@/lib/prisma";
@@ -141,6 +142,8 @@ export async function GET(
         iva: Number(entry.iva),
         iibb: Number(entry.iibb),
         percepciones: Number(entry.percepciones),
+        descuento: Number(entry.descuento),
+        descuentoBase: entry.descuentoBase,
         total: Number(entry.total),
         notas: entry.notas,
         nroFactura: entry.nroFactura,
@@ -190,169 +193,199 @@ export async function PUT(
 
     const body = await req.json();
 
-    // Handle devolucion approval — just subtract stock
+    const pool = await getPool();
+    const dbProd = getDbName("productos");
+
+    // Helper to clamp numbers to fit in numeric(12,2) (max ~999,999,999.99)
+    const clamp = (n: number) => {
+      if (!isFinite(n) || isNaN(n)) return 0;
+      const rounded = Math.round(n * 100) / 100;
+      return Math.max(0, Math.min(999999999, rounded));
+    };
+
+    // Handle devolucion approval — just subtract stock (atomic)
     if (entry.tipo === "devolucion") {
-      const pool = await getPool();
-      const dbProd = getDbName("productos");
-
-      for (const item of entry.items) {
-        const codPadded = item.sku.padStart(7, " ");
-        const cant = Number(item.cantidad);
-        await pool.request()
-          .input("cod", codPadded)
-          .input("cant", cant)
-          .query(`
-            UPDATE [${dbProd}].dbo.Stock
-            SET Stk = ISNULL(Stk, 0) - @cant
-            WHERE CodProducto = @cod AND LTRIM(RTRIM(Deposito)) = '0'
-          `);
+      const tx = new sql.Transaction(pool);
+      await tx.begin();
+      try {
+        for (const item of entry.items) {
+          const codPadded = item.sku.padStart(7, " ");
+          const cant = clamp(Number(item.cantidad));
+          await new sql.Request(tx)
+            .input("cod", codPadded)
+            .input("cant", cant)
+            .query(`
+              UPDATE [${dbProd}].dbo.Stock
+              SET Stk = ISNULL(Stk, 0) - @cant
+              WHERE CodProducto = @cod AND LTRIM(RTRIM(Deposito)) = '0'
+            `);
+        }
+        await prisma.stockEntry.update({
+          where: { id },
+          data: { estado: "costeado" },
+        });
+        await tx.commit();
+      } catch (e) {
+        try { await tx.rollback(); } catch { /* ignore */ }
+        throw e;
       }
-
-      await prisma.stockEntry.update({
-        where: { id },
-        data: { estado: "costeado" },
-      });
 
       return NextResponse.json({ ok: true, message: "Devolución aprobada, stock descontado" });
     }
 
-    const { items: costeoItems, newProductData, subtotal: subIn, iva: ivaIn, iibb: iibbIn, percepciones: percIn, total: totalIn } = body;
+    const { items: costeoItems, newProductData, subtotal: subIn, iva: ivaIn, iibb: iibbIn, percepciones: percIn, descuento: descIn, descuentoBase: descBaseIn, total: totalIn } = body;
 
-    const pool = await getPool();
-    const dbProd = getDbName("productos");
+    // Begin SQL Server transaction so all costeo changes are atomic
+    const tx = new sql.Transaction(pool);
+    await tx.begin();
 
     let totalCosto = 0;
+    let allCosteado = false;
 
-    for (const ci of costeoItems || []) {
-      const costo = parseFloat(ci.costo);
-      if (isNaN(costo) || costo <= 0) continue;
+    try {
+      for (const ci of costeoItems || []) {
+        const costo = clamp(parseFloat(ci.costo));
+        if (costo <= 0) continue;
 
-      const item = entry.items.find((i) => i.id === ci.id);
-      if (!item) continue;
+        const item = entry.items.find((i) => i.id === ci.id);
+        if (!item) continue;
 
-      const codPadded = padLeft(item.sku, 7);
+        const codPadded = padLeft(item.sku, 7);
 
-      // Update Stock.Costo and recalculate prices
-      // Only update selling prices if PorceGan > 0 OR explicit prices provided
-      const precio = parseFloat(ci.precio) || 0;
-      const precio2 = parseFloat(ci.precio2) || 0;
-      const precio3 = parseFloat(ci.precio3) || 0;
-      const precio4 = parseFloat(ci.precio4) || 0;
-      const precio5 = parseFloat(ci.precio5) || 0;
+        const precio = clamp(parseFloat(ci.precio) || 0);
+        const precio2 = clamp(parseFloat(ci.precio2) || 0);
+        const precio3 = clamp(parseFloat(ci.precio3) || 0);
+        const precio4 = clamp(parseFloat(ci.precio4) || 0);
+        const precio5 = clamp(parseFloat(ci.precio5) || 0);
 
-      const req = pool.request().input("cod", codPadded).input("costo", costo);
-      let priceUpdates = "";
+        const req = new sql.Request(tx).input("cod", codPadded).input("costo", costo);
+        let priceUpdates = "";
 
-      if (precio > 0 || precio2 > 0 || precio3 > 0 || precio4 > 0 || precio5 > 0) {
-        // Admin provided explicit prices
-        if (precio > 0) { req.input("p", Math.round(precio)); priceUpdates += ", Precio = @p"; }
-        if (precio2 > 0) { req.input("p2", Math.round(precio2)); priceUpdates += ", Precio2 = @p2"; }
-        if (precio3 > 0) { req.input("p3", Math.round(precio3)); priceUpdates += ", Precio3 = @p3"; }
-        if (precio4 > 0) { req.input("p4", Math.round(precio4)); priceUpdates += ", Precio4 = @p4"; }
-        if (precio5 > 0) { req.input("p5", Math.round(precio5)); priceUpdates += ", Precio5 = @p5"; }
-      } else {
-        // Auto-recalculate: maintain current margin ratio (like PunTouch does)
-        // New price = new cost * (old price / old cost), rounded to integer
-        // If old cost is 0 or old price is 0, keep existing price
-        priceUpdates = `,
-              Precio = CASE WHEN ISNULL(Costo, 0) > 0 AND ISNULL(Precio, 0) > 0 THEN ROUND(@costo * Precio / Costo, 0) ELSE Precio END,
-              Precio2 = CASE WHEN ISNULL(Costo, 0) > 0 AND ISNULL(Precio2, 0) > 0 THEN ROUND(@costo * Precio2 / Costo, 0) ELSE Precio2 END,
-              Precio3 = CASE WHEN ISNULL(Costo, 0) > 0 AND ISNULL(Precio3, 0) > 0 THEN ROUND(@costo * Precio3 / Costo, 0) ELSE Precio3 END,
-              Precio4 = CASE WHEN ISNULL(Costo, 0) > 0 AND ISNULL(Precio4, 0) > 0 THEN ROUND(@costo * Precio4 / Costo, 0) ELSE Precio4 END,
-              Precio5 = CASE WHEN ISNULL(Costo, 0) > 0 AND ISNULL(Precio5, 0) > 0 THEN ROUND(@costo * Precio5 / Costo, 0) ELSE Precio5 END`;
-      }
+        if (precio > 0 || precio2 > 0 || precio3 > 0 || precio4 > 0 || precio5 > 0) {
+          if (precio > 0) { req.input("p", Math.round(precio)); priceUpdates += ", Precio = @p"; }
+          if (precio2 > 0) { req.input("p2", Math.round(precio2)); priceUpdates += ", Precio2 = @p2"; }
+          if (precio3 > 0) { req.input("p3", Math.round(precio3)); priceUpdates += ", Precio3 = @p3"; }
+          if (precio4 > 0) { req.input("p4", Math.round(precio4)); priceUpdates += ", Precio4 = @p4"; }
+          if (precio5 > 0) { req.input("p5", Math.round(precio5)); priceUpdates += ", Precio5 = @p5"; }
+        } else {
+          // Auto-recalculate maintaining margin ratio, but clamp result to safe max
+          priceUpdates = `,
+                Precio = CASE WHEN ISNULL(Costo, 0) > 0 AND ISNULL(Precio, 0) > 0
+                  THEN CASE WHEN ROUND(@costo * Precio / Costo, 0) > 999999999 THEN 999999999 ELSE ROUND(@costo * Precio / Costo, 0) END
+                  ELSE Precio END,
+                Precio2 = CASE WHEN ISNULL(Costo, 0) > 0 AND ISNULL(Precio2, 0) > 0
+                  THEN CASE WHEN ROUND(@costo * Precio2 / Costo, 0) > 999999999 THEN 999999999 ELSE ROUND(@costo * Precio2 / Costo, 0) END
+                  ELSE Precio2 END,
+                Precio3 = CASE WHEN ISNULL(Costo, 0) > 0 AND ISNULL(Precio3, 0) > 0
+                  THEN CASE WHEN ROUND(@costo * Precio3 / Costo, 0) > 999999999 THEN 999999999 ELSE ROUND(@costo * Precio3 / Costo, 0) END
+                  ELSE Precio3 END,
+                Precio4 = CASE WHEN ISNULL(Costo, 0) > 0 AND ISNULL(Precio4, 0) > 0
+                  THEN CASE WHEN ROUND(@costo * Precio4 / Costo, 0) > 999999999 THEN 999999999 ELSE ROUND(@costo * Precio4 / Costo, 0) END
+                  ELSE Precio4 END,
+                Precio5 = CASE WHEN ISNULL(Costo, 0) > 0 AND ISNULL(Precio5, 0) > 0
+                  THEN CASE WHEN ROUND(@costo * Precio5 / Costo, 0) > 999999999 THEN 999999999 ELSE ROUND(@costo * Precio5 / Costo, 0) END
+                  ELSE Precio5 END`;
+        }
 
-      await req.query(`
+        await req.query(`
           UPDATE [${dbProd}].dbo.Stock
           SET Costo = @costo${priceUpdates}
           WHERE CodProducto = @cod AND LTRIM(RTRIM(Deposito)) = '0'
         `);
 
-      // Mark item as costeado in PostgreSQL
-      await prisma.stockEntryItem.update({
-        where: { id: ci.id },
-        data: { costo, costeado: true },
-      });
+        // Mark item as costeado in PostgreSQL
+        await prisma.stockEntryItem.update({
+          where: { id: ci.id },
+          data: { costo, costeado: true },
+        });
 
-      totalCosto += costo * Number(item.cantidad);
-    }
+        totalCosto += costo * Number(item.cantidad);
+      }
 
-    // Update new product extra data if provided
-    if (newProductData) {
-      for (const npd of Array.isArray(newProductData)
-        ? newProductData
-        : [newProductData]) {
-        if (!npd.sku) continue;
-        const codPadded = padLeft(npd.sku, 7);
+      // Update new product extra data if provided
+      if (newProductData) {
+        for (const npd of Array.isArray(newProductData) ? newProductData : [newProductData]) {
+          if (!npd.sku) continue;
+          const codPadded = padLeft(npd.sku, 7);
 
-        const updates: string[] = [];
-        const request = pool.request().input("cod", codPadded);
+          const updates: string[] = [];
+          const request = new sql.Request(tx).input("cod", codPadded);
 
-        if (npd.rubro !== undefined) {
-          request.input("rubro", padLeft(npd.rubro, 4));
-          updates.push("Rubro = @rubro");
-        }
-        if (npd.marca !== undefined) {
-          request.input("marca", padLeft(npd.marca, 4));
-          updates.push("Marca = @marca");
-        }
-        if (npd.unidad !== undefined) {
-          request.input("unidad", npd.unidad);
-          updates.push("Unidad = @unidad");
-        }
-        if (npd.cantidadPorCaja !== undefined) {
-          request.input("cantCaja", parseFloat(npd.cantidadPorCaja) || 0);
-          updates.push("CantxCaja = @cantCaja");
-        }
+          if (npd.rubro !== undefined) {
+            request.input("rubro", padLeft(npd.rubro, 4));
+            updates.push("Rubro = @rubro");
+          }
+          if (npd.marca !== undefined) {
+            request.input("marca", padLeft(npd.marca, 4));
+            updates.push("Marca = @marca");
+          }
+          if (npd.unidad !== undefined) {
+            request.input("unidad", npd.unidad);
+            updates.push("Unidad = @unidad");
+          }
+          if (npd.cantidadPorCaja !== undefined) {
+            request.input("cantCaja", clamp(parseFloat(npd.cantidadPorCaja) || 0));
+            updates.push("CantxCaja = @cantCaja");
+          }
 
-        if (updates.length > 0) {
-          await request.query(`
-            UPDATE [${dbProd}].dbo.Productos
-            SET ${updates.join(", ")}
-            WHERE Cod = @cod
-          `);
+          if (updates.length > 0) {
+            await request.query(`
+              UPDATE [${dbProd}].dbo.Productos
+              SET ${updates.join(", ")}
+              WHERE Cod = @cod
+            `);
+          }
         }
       }
-    }
 
-    // Check if all items are now costeado
-    const updatedItems = await prisma.stockEntryItem.findMany({
-      where: { entryId: id },
-    });
-    const allCosteado = updatedItems.every((i) => i.costeado);
+      // Check if all items are now costeado
+      const updatedItems = await prisma.stockEntryItem.findMany({
+        where: { entryId: id },
+      });
+      allCosteado = updatedItems.every((i) => i.costeado);
 
-    // Tax data
-    const subtotal = parseFloat(subIn) || 0;
-    const iva = parseFloat(ivaIn) || 0;
-    const iibb = parseFloat(iibbIn) || 0;
-    const percepciones = parseFloat(percIn) || 0;
-    const invoiceTotal = parseFloat(totalIn) || (subtotal + iva + iibb + percepciones);
+      // Tax data
+      const subtotal = clamp(parseFloat(subIn));
+      const iva = clamp(parseFloat(ivaIn));
+      const iibb = clamp(parseFloat(iibbIn));
+      const percepciones = clamp(parseFloat(percIn));
+      const descuento = Math.max(0, Math.min(100, parseFloat(descIn) || 0));
+      const descuentoBase = descBaseIn === "total" ? "total" : "neto";
+      const invoiceTotal = clamp(parseFloat(totalIn) || (subtotal + iva + iibb + percepciones));
 
-    // Update entry
-    await prisma.stockEntry.update({
-      where: { id },
-      data: {
-        estado: allCosteado ? "costeado" : "pendiente",
-        subtotal,
-        iva,
-        iibb,
-        percepciones,
-        total: invoiceTotal > 0 ? invoiceTotal : totalCosto,
-      },
-    });
+      // Update entry in PostgreSQL
+      await prisma.stockEntry.update({
+        where: { id },
+        data: {
+          estado: allCosteado ? "costeado" : "pendiente",
+          subtotal,
+          iva,
+          iibb,
+          percepciones,
+          descuento,
+          descuentoBase,
+          total: invoiceTotal > 0 ? invoiceTotal : clamp(totalCosto),
+        },
+      });
 
-    // Update supplier saldo if invoice total > 0 and all costeado
-    if (allCosteado && invoiceTotal > 0) {
-      const provPadded = entry.proveedorCod.padStart(7, " ");
-      await pool
-        .request()
-        .input("cod", provPadded)
-        .input("total", invoiceTotal)
-        .query(`
-          UPDATE [${dbProd}].dbo.Proveedores
-          SET Saldo = ISNULL(Saldo, 0) + @total
-          WHERE Cod = @cod
-        `);
+      // Update supplier saldo if invoice total > 0 and all costeado
+      if (allCosteado && invoiceTotal > 0) {
+        const provPadded = entry.proveedorCod.padStart(7, " ");
+        await new sql.Request(tx)
+          .input("cod", provPadded)
+          .input("total", invoiceTotal)
+          .query(`
+            UPDATE [${dbProd}].dbo.Proveedores
+            SET Saldo = ISNULL(Saldo, 0) + @total
+            WHERE Cod = @cod
+          `);
+      }
+
+      // All good — commit
+      await tx.commit();
+    } catch (innerError) {
+      try { await tx.rollback(); } catch { /* ignore */ }
+      throw innerError;
     }
 
     return NextResponse.json({ success: true, allCosteado });

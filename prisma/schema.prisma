@@ -165,6 +165,8 @@ model StockEntry {
   iva           Decimal  @default(0) @db.Decimal(12, 2)
   iibb          Decimal  @default(0) @db.Decimal(12, 2)
   percepciones  Decimal  @default(0) @db.Decimal(12, 2)
+  descuento     Decimal  @default(0) @db.Decimal(12, 2)
+  descuentoBase String   @default("neto") @db.VarChar(10)
   total         Decimal  @default(0) @db.Decimal(12, 2)
   notas         String?  @db.Text
   nroFactura    String?  @db.VarChar(30)

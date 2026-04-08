@@ -168,13 +168,13 @@ export default function CatalogoPage() {
     let processed = 0;
 
     // Layout config based on compact mode
-    const cols = includeImages ? (compactMode ? 3 : 2) : (compactMode ? 2 : 1);
+    const cols = includeImages ? 2 : (compactMode ? 2 : 1);
     const colWidth = (w - 28) / cols;
-    const rowHeight = includeImages ? (compactMode ? 26 : 36) : (compactMode ? 9 : 12);
-    const imgSize = compactMode ? 20 : 28;
-    const nameFontSize = compactMode ? 7 : 8;
-    const skuFontSize = compactMode ? 6 : 7;
-    const priceFontSize = compactMode ? 9 : 11;
+    const rowHeight = includeImages ? (compactMode ? 30 : 36) : (compactMode ? 10 : 12);
+    const imgSize = compactMode ? 24 : 28;
+    const nameFontSize = compactMode ? 8 : 8;
+    const skuFontSize = compactMode ? 7 : 7;
+    const priceFontSize = compactMode ? 10 : 11;
 
     // Start first page
     doc.addPage();
@@ -262,30 +262,31 @@ export default function CatalogoPage() {
         }
 
         // Text
-        const textX = includeImages ? xCol + imgSize + 3 : xCol + 2;
+        const textX = includeImages ? xCol + imgSize + 4 : xCol + 2;
         doc.setTextColor(30, 30, 30);
         doc.setFontSize(nameFontSize);
         doc.setFont("helvetica", "bold");
-        const availTextW = colWidth - (includeImages ? imgSize + 6 : 4);
-        const maxNameLen = compactMode
-          ? (includeImages ? 22 : 40)
-          : (includeImages ? 30 : 60);
-        const name = p.name.length > maxNameLen ? p.name.substring(0, maxNameLen - 2) + "..." : p.name;
-        doc.text(name, textX, rowY + (compactMode ? 5 : 6), { maxWidth: availTextW });
+
+        // Compute max chars that fit on ONE line (avoid wrapping that overlaps SKU)
+        const availTextW = colWidth - (includeImages ? imgSize + 8 : 4);
+        const charWidth = nameFontSize * 0.18; // approx mm per char for helvetica bold
+        const maxNameLen = Math.floor(availTextW / charWidth);
+        const name = p.name.length > maxNameLen ? p.name.substring(0, maxNameLen - 1) + "…" : p.name;
+        doc.text(name, textX, rowY + (compactMode ? 7 : 9));
 
         doc.setFontSize(skuFontSize);
         doc.setFont("helvetica", "normal");
-        doc.setTextColor(100, 100, 100);
+        doc.setTextColor(120, 120, 120);
         const skuText = `SKU: ${p.sku}${p.marca ? "  •  " + p.marca : ""}`;
-        doc.text(skuText, textX, rowY + (compactMode ? 9 : 11));
+        doc.text(skuText, textX, rowY + (compactMode ? 13 : 16));
 
         // Price
         doc.setFontSize(priceFontSize);
         doc.setFont("helvetica", "bold");
         doc.setTextColor(251, 154, 71);
         const priceY = compactMode
-          ? (includeImages ? rowY + 18 : rowY + 7)
-          : (includeImages ? rowY + 22 : rowY + 8);
+          ? (includeImages ? rowY + 23 : rowY + 8)
+          : (includeImages ? rowY + 28 : rowY + 10);
         doc.text(formatPrice(p.precioVenta), textX, priceY);
 
         col++;

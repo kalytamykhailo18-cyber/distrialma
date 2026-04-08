@@ -184,6 +184,8 @@ export default function EntryDetailPage() {
   // Tax fields
   const [taxSubtotal, setTaxSubtotal] = useState("");
   const [taxIvaPct, setTaxIvaPct] = useState("21");
+  const [taxDiscPct, setTaxDiscPct] = useState("");
+  const [taxDiscBase, setTaxDiscBase] = useState<"neto" | "total">("neto");
   const [taxIva, setTaxIva] = useState("");
   const [taxIibbPct, setTaxIibbPct] = useState("");
   const [taxIibb, setTaxIibb] = useState("");
@@ -238,6 +240,8 @@ export default function EntryDetailPage() {
           if (data.entry.iva > 0) setTaxIva(String(data.entry.iva));
           if (data.entry.iibb > 0) setTaxIibb(String(data.entry.iibb));
           if (data.entry.percepciones > 0) setTaxPerc(String(data.entry.percepciones));
+          if (data.entry.descuento > 0) setTaxDiscPct(String(data.entry.descuento));
+          if (data.entry.descuentoBase) setTaxDiscBase(data.entry.descuentoBase === "total" ? "total" : "neto");
         } else {
           // Auto-calculate subtotal from item costs
           let sub = 0;
@@ -395,9 +399,21 @@ export default function EntryDetailPage() {
           iva: invoiceType === "A" ? (parseFloat(taxIva) || 0) : 0,
           iibb: invoiceType === "A" ? (parseFloat(taxIibb) || 0) : 0,
           percepciones: invoiceType === "A" ? (parseFloat(taxPerc) || 0) : 0,
-          total: invoiceType === "A"
-            ? (parseFloat(taxSubtotal) || 0) + (parseFloat(taxIibb) || 0) + (parseFloat(taxPerc) || 0)
-            : (parseFloat(taxSubtotal) || 0),
+          descuento: invoiceType === "A" ? (parseFloat(taxDiscPct) || 0) : 0,
+          descuentoBase: invoiceType === "A" ? taxDiscBase : "neto",
+          total: (() => {
+            if (invoiceType !== "A") return parseFloat(taxSubtotal) || 0;
+            const sub = parseFloat(taxSubtotal) || 0;
+            const ivaPct = parseFloat(taxIvaPct) || 0;
+            const neto = ivaPct > 0 ? sub / (1 + ivaPct / 100) : sub;
+            const iibbAmt = parseFloat(taxIibb) || 0;
+            const percAmt = parseFloat(taxPerc) || 0;
+            const totalBefore = sub + iibbAmt + percAmt;
+            const discPct = parseFloat(taxDiscPct) || 0;
+            const discBase = taxDiscBase === "total" ? totalBefore : neto;
+            const discAmt = discBase * discPct / 100;
+            return totalBefore - discAmt;
+          })(),
         }),
       });
 
@@ -983,7 +999,11 @@ export default function EntryDetailPage() {
         const percPctVal = parseFloat(taxPercPct) || 0;
         const iibbCalc = neto * iibbPctVal / 100;
         const percCalc = neto * percPctVal / 100;
-        const total = sub + iibbCalc + percCalc;
+        const totalBeforeDiscount = sub + iibbCalc + percCalc;
+        const discPctVal = parseFloat(taxDiscPct) || 0;
+        const discBase = taxDiscBase === "total" ? totalBeforeDiscount : neto;
+        const discCalc = discBase * discPctVal / 100;
+        const total = totalBeforeDiscount - discCalc;
 
         function recalcAll(newSub: string, newIvaPct: string, newIibbPct: string, newPercPct: string) {
           const s = parseFloat(newSub) || 0;
@@ -1090,12 +1110,59 @@ export default function EntryDetailPage() {
                   {parseFloat(taxPerc) > 0 && <p className="text-right text-xs text-gray-500 mt-0.5">$ {parseFloat(taxPerc).toLocaleString("es-AR", { minimumFractionDigits: 2 })}</p>}
                 </div>
               </div>
+
+              {/* Descuento al pie */}
+              <div className="bg-red-50 rounded-lg p-3 border border-red-200">
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-sm font-semibold text-gray-700">Descuento al pie</label>
+                  <div className="flex gap-1 bg-white rounded-lg border border-gray-200 p-0.5">
+                    <button type="button" onClick={() => setTaxDiscBase("neto")}
+                      className={`px-2 py-0.5 text-xs rounded ${taxDiscBase === "neto" ? "bg-brand-400 text-white" : "text-gray-600"}`}>
+                      sobre Neto
+                    </button>
+                    <button type="button" onClick={() => setTaxDiscBase("total")}
+                      className={`px-2 py-0.5 text-xs rounded ${taxDiscBase === "total" ? "bg-brand-400 text-white" : "text-gray-600"}`}>
+                      sobre Total
+                    </button>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="relative flex-1">
+                    <input type="number" min="0" step="0.01" value={taxDiscPct}
+                      onChange={(e) => setTaxDiscPct(e.target.value)}
+                      disabled={saving}
+                      placeholder="0"
+                      className="w-full text-right pr-7 pl-2 py-2 border-2 border-gray-300 rounded-lg text-base focus:outline-none focus:border-brand-600 disabled:opacity-50 disabled:bg-gray-100"
+                    />
+                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-base font-bold text-red-500 pointer-events-none">%</span>
+                  </div>
+                  {discCalc > 0 && (
+                    <span className="text-sm font-medium text-red-700 whitespace-nowrap">
+                      − $ {discCalc.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                  )}
+                </div>
+              </div>
             </div>
-            <div className="flex justify-between items-center mt-4 pt-4 border-t-2">
-              <span className="text-base font-bold text-gray-800">Total factura</span>
-              <span className="text-2xl font-bold text-gray-900">
-                $ {total.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </span>
+            <div className="mt-4 pt-4 border-t-2 space-y-1">
+              {discCalc > 0 && (
+                <div className="flex justify-between items-center text-sm text-gray-500">
+                  <span>Subtotal antes de descuento</span>
+                  <span>$ {totalBeforeDiscount.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </div>
+              )}
+              {discCalc > 0 && (
+                <div className="flex justify-between items-center text-sm text-red-600">
+                  <span>Descuento ({discPctVal}% sobre {taxDiscBase})</span>
+                  <span>− $ {discCalc.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </div>
+              )}
+              <div className="flex justify-between items-center pt-1">
+                <span className="text-base font-bold text-gray-800">Total factura</span>
+                <span className="text-2xl font-bold text-gray-900">
+                  $ {total.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </div>
             </div>
           </div>
         );
