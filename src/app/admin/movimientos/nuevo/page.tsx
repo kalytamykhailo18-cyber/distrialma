@@ -58,7 +58,7 @@ export default function NuevoMovimiento() {
 
   // Load employees
   useEffect(() => {
-    fetch("/api/admin/cierre-caja/empleados")
+    fetch("/api/admin/cierre-caja/empleados?all=1")
       .then((r) => r.json())
       .then((data) => setEmpleados(data.empleados || []))
       .catch(() => {});
@@ -254,7 +254,7 @@ export default function NuevoMovimiento() {
   async function handleSubmit() {
     if (!sucursal) { alert("Seleccioná una sucursal"); return; }
     if (!motivo) { alert("Seleccioná un motivo"); return; }
-    if (motivo === "Rotura de empleado" && selectedEmpleados.length === 0) {
+    if ((motivo === "Rotura de empleado" || motivo === "Descuento empleados") && selectedEmpleados.length === 0) {
       alert("Seleccioná al menos un empleado responsable"); return;
     }
     if (items.length === 0) { alert("Agregá al menos un producto"); return; }
@@ -272,7 +272,7 @@ export default function NuevoMovimiento() {
           destino: motivo,
           notas,
           items,
-          empleados: motivo === "Rotura de empleado" ? selectedEmpleados : null,
+          empleados: (motivo === "Rotura de empleado" || motivo === "Descuento empleados") ? selectedEmpleados : null,
         }),
       });
 
@@ -352,7 +352,7 @@ export default function NuevoMovimiento() {
       </div>
 
       {/* Step 2b: Empleados (only for Rotura de empleado) */}
-      {motivo === "Rotura de empleado" && (
+      {(motivo === "Rotura de empleado" || motivo === "Descuento empleados") && (
         <div className="bg-white border rounded-xl p-4 mb-4">
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Empleado(s) responsable(s) <span className="text-red-500">*</span>
@@ -373,7 +373,7 @@ export default function NuevoMovimiento() {
                       : "border-gray-200 hover:border-gray-300 text-gray-700"
                   }`}
                 >
-                  {emp.nombre}
+                  <span className="text-xs text-gray-400 mr-1">#{emp.cod}</span> {emp.nombre}
                 </button>
               );
             })}

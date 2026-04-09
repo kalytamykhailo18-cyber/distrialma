@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireStaff } from "@/lib/api-auth";
 import { prisma } from "@/lib/prisma";
-import { getTestPool, getDbName } from "@/lib/mssql";
+import { getPool, getDbName } from "@/lib/mssql";
 
 export async function GET(req: NextRequest) {
   const session = await requireStaff();
@@ -26,13 +26,13 @@ export async function GET(req: NextRequest) {
       orderBy: { createdAt: "asc" },
     });
 
-    // Get all employees from PunTouch
-    const pool = await getTestPool();
+    // Get all active employees from PunTouch (no Vendedor/Usuario filter — same source as the form)
+    const pool = await getPool();
     const dbEmpleados = getDbName("empleados");
     const empResult = await pool.request().query(`
       SELECT LTRIM(RTRIM(Cod)) AS cod, LTRIM(RTRIM(Nombre)) AS nombre
       FROM [${dbEmpleados}].dbo.Empleados
-      WHERE (DeBaja = 0 OR DeBaja IS NULL) AND (Vendedor = 1 OR Usuario = 1)
+      WHERE (DeBaja = 0 OR DeBaja IS NULL)
       ORDER BY Nombre
     `);
     const allEmpleados: Array<{ cod: string; nombre: string }> = empResult.recordset;
@@ -63,7 +63,8 @@ export async function GET(req: NextRequest) {
       const fecha = mov.createdAt.toISOString();
       const montoTotal = mov.items.reduce((sum, i) => sum + Number(i.costo || 0) * Number(i.cantidad), 0);
 
-      if (mov.destino === "Rotura de empleado" && mov.empleados) {
+      // Both "Rotura de empleado" and "Descuento empleados" go to the per-employee bucket
+      if ((mov.destino === "Rotura de empleado" || mov.destino === "Descuento empleados") && mov.empleados) {
         const emps: Array<{ cod: string; nombre: string }> = JSON.parse(mov.empleados);
         const shareCount = emps.length;
         const montoPorEmpleado = shareCount > 0 ? Math.round(montoTotal / shareCount) : 0;

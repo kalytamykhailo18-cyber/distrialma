@@ -211,6 +211,25 @@ export default function EntryDetailPage() {
     loadMargins();
   }, []);
 
+  // Auto-recalculate taxSubtotal whenever items or costos change
+  useEffect(() => {
+    if (!entry || costeoRows.length === 0) return;
+    let sub = 0;
+    for (const r of costeoRows) {
+      const c = parseFloat(r.costo) || 0;
+      const item = entry.items.find((i) => i.id === r.id);
+      const cant = item ? Number(item.cantidad) : 0;
+      const itemCost = c > 0 ? c : (item?.costo || 0);
+      if (itemCost > 0 && cant > 0) {
+        sub += itemCost * cant;
+      }
+    }
+    if (sub > 0) {
+      setTaxSubtotal(sub.toFixed(2));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [costeoRows, entry?.items]);
+
   function loadMargins() {
     fetch("/api/admin/price-margins")
       .then((r) => r.json())

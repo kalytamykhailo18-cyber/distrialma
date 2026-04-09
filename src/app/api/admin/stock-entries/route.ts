@@ -201,7 +201,7 @@ export async function POST(req: NextRequest) {
               .query(`
                 UPDATE [${dbProd}].dbo.Stock
                 SET Stk = ISNULL(Stk, 0) + @cant
-                WHERE CodProducto = @cod AND LTRIM(RTRIM(Deposito)) = '0'
+                WHERE LTRIM(RTRIM(CodProducto)) = LTRIM(RTRIM(@cod)) AND LTRIM(RTRIM(Deposito)) = '0' AND (TalleColor IS NULL OR LTRIM(RTRIM(TalleColor)) = '')
               `);
           }
 

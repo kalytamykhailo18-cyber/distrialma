@@ -76,6 +76,14 @@ export default function CierreCajaPage() {
     }
     return "1";
   });
+  // If the URL has ?suc=N, lock the sucursal selector to that value
+  const sucursalLocked = (() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      return !!params.get("suc");
+    }
+    return false;
+  })();
 
   const user = session?.user as { role?: string; name?: string } | undefined;
   const isAdmin = user?.role === "admin";
@@ -344,16 +352,22 @@ export default function CierreCajaPage() {
       {/* Sucursal selector */}
       <div className="flex items-center gap-3 mb-4">
         <span className="text-sm text-gray-600">Sucursal:</span>
-        <select
-          value={sucursal}
-          onChange={(e) => { setSucursal(e.target.value); setData(null); }}
-          className="px-3 py-2 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600"
-        >
-          <option value="1">Sucursal 1</option>
-          <option value="2">Sucursal 2</option>
-          <option value="6">Sucursal 6</option>
-          <option value="7">Sucursal 7</option>
-        </select>
+        {sucursalLocked ? (
+          <span className="px-3 py-2 border border-brand-400 bg-brand-50 rounded-lg text-sm font-semibold text-brand-700">
+            Sucursal {sucursal}
+          </span>
+        ) : (
+          <select
+            value={sucursal}
+            onChange={(e) => { setSucursal(e.target.value); setData(null); }}
+            className="px-3 py-2 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600"
+          >
+            <option value="1">Sucursal 1</option>
+            <option value="2">Sucursal 2</option>
+            <option value="6">Sucursal 6</option>
+            <option value="7">Sucursal 7</option>
+          </select>
+        )}
       </div>
 
       <div className="flex flex-wrap gap-3 mb-4">

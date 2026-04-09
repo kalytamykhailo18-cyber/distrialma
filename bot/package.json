@@ -1,0 +1,14 @@
+{
+  "name": "distrialma-bot",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "start": "node --env-file=.env --env-file=/home/distrialma/.env --env-file=/home/distrialma/.env.local index.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.27.0",
+    "whatsapp-web.js": "^1.23.0",
+    "qrcode-terminal": "^0.12.0",
+    "mssql": "^11.0.0"
+  }
+}

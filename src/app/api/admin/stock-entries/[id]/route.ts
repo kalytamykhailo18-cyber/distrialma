@@ -217,7 +217,7 @@ export async function PUT(
             .query(`
               UPDATE [${dbProd}].dbo.Stock
               SET Stk = ISNULL(Stk, 0) - @cant
-              WHERE CodProducto = @cod AND LTRIM(RTRIM(Deposito)) = '0'
+              WHERE LTRIM(RTRIM(CodProducto)) = LTRIM(RTRIM(@cod)) AND LTRIM(RTRIM(Deposito)) = '0' AND (TalleColor IS NULL OR LTRIM(RTRIM(TalleColor)) = '')
             `);
         }
         await prisma.stockEntry.update({
@@ -290,7 +290,7 @@ export async function PUT(
         await req.query(`
           UPDATE [${dbProd}].dbo.Stock
           SET Costo = @costo${priceUpdates}
-          WHERE CodProducto = @cod AND LTRIM(RTRIM(Deposito)) = '0'
+          WHERE LTRIM(RTRIM(CodProducto)) = LTRIM(RTRIM(@cod)) AND LTRIM(RTRIM(Deposito)) = '0' AND (TalleColor IS NULL OR LTRIM(RTRIM(TalleColor)) = '')
         `);
 
         // Mark item as costeado in PostgreSQL
@@ -431,7 +431,7 @@ export async function PATCH(
         const codPadded = item.sku.padStart(7, " ");
         await pool.request().input("cod", codPadded).input("diff", diff).query(`
           UPDATE [${dbProd}].dbo.Stock SET Stk = ISNULL(Stk, 0) + @diff
-          WHERE CodProducto = @cod AND LTRIM(RTRIM(Deposito)) = '0'
+          WHERE LTRIM(RTRIM(CodProducto)) = LTRIM(RTRIM(@cod)) AND LTRIM(RTRIM(Deposito)) = '0' AND (TalleColor IS NULL OR LTRIM(RTRIM(TalleColor)) = '')
         `);
         await prisma.stockEntryItem.update({ where: { id: itemId }, data: { cantidad: newCant } });
       }
@@ -453,7 +453,7 @@ export async function PATCH(
       .query(`
         UPDATE [${dbProd}].dbo.Stock
         SET Stk = ISNULL(Stk, 0) + @cant
-        WHERE CodProducto = @cod AND LTRIM(RTRIM(Deposito)) = '0'
+        WHERE LTRIM(RTRIM(CodProducto)) = LTRIM(RTRIM(@cod)) AND LTRIM(RTRIM(Deposito)) = '0' AND (TalleColor IS NULL OR LTRIM(RTRIM(TalleColor)) = '')
       `);
 
     // Add item to PostgreSQL
@@ -512,7 +512,7 @@ export async function DELETE(
         .query(`
           UPDATE [${dbProd}].dbo.Stock
           SET Stk = ISNULL(Stk, 0) - @cant
-          WHERE CodProducto = @cod AND LTRIM(RTRIM(Deposito)) = '0'
+          WHERE LTRIM(RTRIM(CodProducto)) = LTRIM(RTRIM(@cod)) AND LTRIM(RTRIM(Deposito)) = '0' AND (TalleColor IS NULL OR LTRIM(RTRIM(TalleColor)) = '')
         `);
 
       await prisma.stockEntryItem.delete({ where: { id: itemId } });

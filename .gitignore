@@ -2,6 +2,8 @@
 
 # dependencies
 /node_modules
+/bot/node_modules
+/bot/session
 /.pnp
 .pnp.js
 .yarn/install-state.gz
@@ -36,3 +38,4 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 .claude
+.wwebjs_cache/

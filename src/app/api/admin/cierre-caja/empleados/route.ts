@@ -10,10 +10,13 @@ export async function GET(req: NextRequest) {
   }
 
   const sucursal = req.nextUrl.searchParams.get("sucursal") || "";
+  const all = req.nextUrl.searchParams.get("all") === "1";
 
   try {
     const pool = await getPool();
     const dbEmpleados = getDbName("empleados");
+
+    const filterClause = all ? "" : "AND (Vendedor = 1 OR Usuario = 1)";
 
     const result = await pool.request().query(`
       SELECT
@@ -22,19 +25,19 @@ export async function GET(req: NextRequest) {
         LTRIM(RTRIM(ISNULL(Observaciones, ''))) AS observaciones
       FROM [${dbEmpleados}].dbo.Empleados
       WHERE (DeBaja = 0 OR DeBaja IS NULL)
-        AND (Vendedor = 1 OR Usuario = 1)
+        ${filterClause}
       ORDER BY Nombre
     `);
 
     // Filter by sucursal if specified (check Observaciones field)
-    const all = result.recordset as Array<{ cod: string; nombre: string; observaciones: string }>;
+    const records = result.recordset as Array<{ cod: string; nombre: string; observaciones: string }>;
     const filtered = sucursal
-      ? all.filter((e) => {
+      ? records.filter((e) => {
           const obs = e.observaciones.trim();
           if (!obs) return true; // No restriction = all sucursales
           return obs.split(",").map((s) => s.trim()).includes(sucursal);
         })
-      : all;
+      : records;
 
     return NextResponse.json({
       empleados: filtered.map((e) => ({ cod: e.cod, nombre: e.nombre })),
