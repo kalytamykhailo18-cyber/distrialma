@@ -34,10 +34,11 @@ Atendés clientes que escriben por WhatsApp. Tu personalidad: amable, breve, dir
 
 REGLAS IMPORTANTES:
 1. Si te preguntan por productos, usá la herramienta search_products para buscar en la base real. Nunca inventes productos ni precios.
-2. Mostrá siempre el precio Mayorista. Si hay precio Caja Cerrada, también mencionalo. Siempre agregá al final: "Stock sujeto a disponibilidad de sucursal."
+2. Mostrá siempre el precio Mayorista. Si hay precio Caja Cerrada, también mencionalo. Siempre agregá al final: "Stock sujeto a disponibilidad de sucursal." NUNCA muestres la cantidad de stock exacta (no digas "9 unidades" ni "22.6 kg"). Solo decí si hay o no hay disponibilidad.
 3. Si el producto exacto no existe, ofrecé alternativas similares de la misma categoría.
-4. Si el cliente quiere hacer un pedido, decile que entre a https://distrialma.com.ar y arme el pedido desde ahí. NO le des ningún número de teléfono para hacer pedidos.
-5. Si te preguntan algo que no sabés (descuentos especiales, plazos, etc.), decí que un asesor lo va a contactar y no inventes.
+3b. Cuando busques por marca, siempre incluí el link a la página de la marca que te devuelve la herramienta (ej: "Podés ver todos los productos de Tonadita acá: https://distrialma.com.ar/marca/123").
+4. Si el cliente quiere hacer un pedido, decile que entre a https://distrialma.com.ar y arme el pedido desde ahí. NO le des ningún número de teléfono para hacer pedidos. Cuando mostrás un producto, incluí el link directo: https://distrialma.com.ar/productos/{sku} (reemplazá {sku} por el código del producto que te devuelve la herramienta).
+5. Si te preguntan algo que no sabés (descuentos especiales, plazos, etc.), decí que un asesor lo va a contactar y no inventes. EXCEPCIÓN: si el cliente está registrado y pregunta por su cuenta, saldo o estado de cuenta, SÍ podés darle la información que tenés (nombre, CUIT, saldo). Esa info te llega en el contexto del chat.
 6. No des información de otros clientes ni datos privados.
 7. Mantené las respuestas cortas (1-3 oraciones) salvo que sea estrictamente necesario.
 8. NUNCA uses formato con negritas, cursivas ni markdown. Escribí todo en texto plano.
@@ -45,9 +46,18 @@ REGLAS IMPORTANTES:
 10. Si el cliente pide hablar con una persona, decí: "Te paso con un asesor, en breve te contacta."
 11. CLIENTES NO REGISTRADOS: Si el cliente no está registrado, ya le pedimos sus datos. Cuando te los pase (nombre, dirección, teléfono, CUIT/CUIL/DNI), usá la herramienta register_client para darlo de alta. Necesitás al menos nombre y teléfono. Después confirmale que ya está registrado y puede empezar a comprar en distrialma.com.ar.
 
+12. HORARIOS Y CHARLA: Si te preguntan la hora, el día, el clima, o cosas casuales, respondé con onda. Sos simpático, cercano y divertido. Para el clima decí algo general de Buenos Aires según la época del año, no inventes datos exactos. Si te piden un chiste, contá uno cortito y gracioso.
+13. CUANDO ESTÉN CERRADOS: Siempre aclará qué sucursales abren y a qué hora. Mencioná que pueden hacer pedidos por la web las 24 horas en distrialma.com.ar y que PedidosYa funciona con delivery.
+
 Información del negocio:
-- Web: https://distrialma.com.ar
-- Ubicación: Merlo, Buenos Aires`;
+- Web: https://distrialma.com.ar (pedidos online 24hs)
+- PedidosYa: delivery disponible
+- Ubicación: Merlo, Buenos Aires
+
+Sucursales y horarios:
+- Minorista (Merlo): Dom a Jue 7:00 a 22:30, Vie y Sab 8:00 a 23:30
+- Mayorista Merlo: Lun a Sab 8:00 a 18:00
+- Mayorista Pontevedra: Lun a Sab 9:00 a 17:00`;
 
 const NEW_CLIENT_MESSAGE = `Hola! Gracias por escribirnos.
 
@@ -139,7 +149,13 @@ async function callClaude(chatId, userMessage, clientInfo, phoneNumber) {
 
   console.log(`[CLAUDE] ${chatId}: msg="${userMessage.substring(0, 60)}" history=${history.length} client=${clientInfo?.nombre || "anon"}`);
 
-  let systemWithContext = SYSTEM_PROMPT;
+  // Add current date/time in Argentina
+  const now = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Argentina/Buenos_Aires" }));
+  const diasSemana = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
+  const meses = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+  const timeStr = `${diasSemana[now.getDay()]} ${now.getDate()} de ${meses[now.getMonth()]} de ${now.getFullYear()}, ${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+
+  let systemWithContext = SYSTEM_PROMPT + `\n\nFECHA Y HORA ACTUAL: ${timeStr}`;
   if (clientInfo) {
     systemWithContext += `\n\nESTÁS HABLANDO CON UN CLIENTE REGISTRADO:\n- Nombre: ${clientInfo.nombre}\n- CUIT: ${clientInfo.cuit || "(no cargado)"}\n- Saldo cuenta corriente: ${formatPrice(clientInfo.saldo)}`;
   } else {
@@ -363,16 +379,21 @@ client.on("message", async (msg) => {
       setTimeout(() => botReplying.delete(chatId), 2000);
     }
 
-    // Detect complaints and forward to reclamos handler
+    // Detect complaints and forward to reclamos handler (only during business hours 8-18)
     const isReclamo = /reclamo|queja|mal cobrad|me cobraron|faltante|mal estado|devol/i.test(msg.body);
     if (isReclamo) {
-      try {
-        const contactName = clientInfo?.nombre || phoneNumber;
-        const reclamosMsg = `RECLAMO BOT - Cliente: ${contactName} (${phoneNumber})\nMensaje: ${msg.body}`;
-        await client.sendMessage(`${RECLAMOS_PHONE}@c.us`, reclamosMsg);
-        console.log(`[RECLAMO] Derivado a ${RECLAMOS_PHONE}: ${contactName}`);
-      } catch (e) {
-        console.error("Error forwarding reclamo:", e.message);
+      const nowHour = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Argentina/Buenos_Aires" })).getHours();
+      if (nowHour >= 8 && nowHour < 18) {
+        try {
+          const contactName = clientInfo?.nombre || phoneNumber;
+          const reclamosMsg = `RECLAMO BOT - Cliente: ${contactName} (${phoneNumber})\nMensaje: ${msg.body}`;
+          await client.sendMessage(`${RECLAMOS_PHONE}@c.us`, reclamosMsg);
+          console.log(`[RECLAMO] Derivado a ${RECLAMOS_PHONE}: ${contactName}`);
+        } catch (e) {
+          console.error("Error forwarding reclamo:", e.message);
+        }
+      } else {
+        console.log(`[RECLAMO] Fuera de horario, no se deriva: ${phoneNumber}`);
       }
     }
   } catch (e) {

@@ -152,8 +152,10 @@ export async function findClientByPhone(phoneNumber) {
           LTRIM(RTRIM(ISNULL(Telclave3, ''))) AS tel3
         FROM [${dbClientes()}].dbo.Clientes
         WHERE (DeBaja = 0 OR DeBaja IS NULL)
-          AND (TelClave1 LIKE @p10 OR Telclave3 LIKE @p10
-            OR TelClave1 LIKE @p8 OR Telclave3 LIKE @p8)
+          AND (REPLACE(REPLACE(REPLACE(TelClave1, '-', ''), ' ', ''), '+', '') LIKE @p10
+            OR REPLACE(REPLACE(REPLACE(Telclave3, '-', ''), ' ', ''), '+', '') LIKE @p10
+            OR REPLACE(REPLACE(REPLACE(TelClave1, '-', ''), ' ', ''), '+', '') LIKE @p8
+            OR REPLACE(REPLACE(REPLACE(Telclave3, '-', ''), ' ', ''), '+', '') LIKE @p8)
       `);
     if (result.recordset.length === 0) return null;
     const c = result.recordset[0];

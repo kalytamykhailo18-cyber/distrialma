@@ -37,11 +37,12 @@ export async function GET(req: Request) {
           t.ListaPrecio AS lista,
           SUM(t.Cant) AS cantidad,
           SUM(t.Impo) AS totalVenta,
-          SUM(t.Cant * t.Costo) AS totalCosto,
-          SUM(t.Impo - (t.Cant * t.Costo)) AS ganancia,
+          SUM(CASE WHEN t.Costo >= 999999 THEN t.Cant * ISNULL(s.Costo, 0) ELSE t.Costo END) AS totalCosto,
+          SUM(t.Impo - CASE WHEN t.Costo >= 999999 THEN t.Cant * ISNULL(s.Costo, 0) ELSE t.Costo END) AS ganancia,
           COUNT(*) AS transacciones
         FROM [${dbTransas}].dbo.Transas t
         LEFT JOIN [${dbProd}].dbo.Productos pr ON pr.Cod = t.Producto
+        OUTER APPLY (SELECT TOP 1 s.Costo FROM [${dbProd}].dbo.Stock s WHERE s.CodProducto = t.Producto AND LTRIM(RTRIM(s.Deposito)) = '0' AND (s.TalleColor IS NULL OR LTRIM(RTRIM(s.TalleColor)) = '') AND s.Costo > 0) s
         LEFT JOIN [${dbProd}].dbo.Marcas m ON m.Cod = pr.Marca
         LEFT JOIN [${dbProd}].dbo.Rubros r ON r.Cod = pr.Rubro
         WHERE t.Tipo = 'I'
@@ -64,9 +65,10 @@ export async function GET(req: Request) {
           LTRIM(RTRIM(t.Sucursal)) AS sucursal,
           COUNT(DISTINCT CASE WHEN t.Tipo = 'V' THEN t.Boleta END) AS cantVentas,
           SUM(CASE WHEN t.Tipo = 'I' THEN t.Impo ELSE 0 END) AS totalVenta,
-          SUM(CASE WHEN t.Tipo = 'I' THEN t.Cant * t.Costo ELSE 0 END) AS totalCosto,
-          SUM(CASE WHEN t.Tipo = 'I' THEN t.Impo - (t.Cant * t.Costo) ELSE 0 END) AS ganancia
+          SUM(CASE WHEN t.Tipo = 'I' THEN CASE WHEN t.Costo >= 999999 THEN t.Cant * ISNULL(s.Costo, 0) ELSE t.Costo END ELSE 0 END) AS totalCosto,
+          SUM(CASE WHEN t.Tipo = 'I' THEN t.Impo - CASE WHEN t.Costo >= 999999 THEN t.Cant * ISNULL(s.Costo, 0) ELSE t.Costo END ELSE 0 END) AS ganancia
         FROM [${dbTransas}].dbo.Transas t
+        OUTER APPLY (SELECT TOP 1 s.Costo FROM [${dbProd}].dbo.Stock s WHERE s.CodProducto = t.Producto AND LTRIM(RTRIM(s.Deposito)) = '0' AND (s.TalleColor IS NULL OR LTRIM(RTRIM(s.TalleColor)) = '') AND s.Costo > 0) s
         WHERE LTRIM(RTRIM(t.Sucursal)) IN (${sucList})
           AND LTRIM(RTRIM(t.Fechora)) >= @desde
           AND LTRIM(RTRIM(t.Fechora)) < @hasta
@@ -83,9 +85,10 @@ export async function GET(req: Request) {
         SELECT TOP 15
           LTRIM(RTRIM(ISNULL(r.[Desc], 'Sin rubro'))) AS rubro,
           SUM(t.Impo) AS totalVenta,
-          SUM(t.Impo - (t.Cant * t.Costo)) AS ganancia
+          SUM(t.Impo - CASE WHEN t.Costo >= 999999 THEN t.Cant * ISNULL(s.Costo, 0) ELSE t.Costo END) AS ganancia
         FROM [${dbTransas}].dbo.Transas t
         LEFT JOIN [${dbProd}].dbo.Productos pr ON pr.Cod = t.Producto
+        OUTER APPLY (SELECT TOP 1 s.Costo FROM [${dbProd}].dbo.Stock s WHERE s.CodProducto = t.Producto AND LTRIM(RTRIM(s.Deposito)) = '0' AND (s.TalleColor IS NULL OR LTRIM(RTRIM(s.TalleColor)) = '') AND s.Costo > 0) s
         LEFT JOIN [${dbProd}].dbo.Rubros r ON r.Cod = pr.Rubro
         WHERE t.Tipo = 'I'
           AND LTRIM(RTRIM(t.Sucursal)) IN (${sucList})
@@ -105,9 +108,10 @@ export async function GET(req: Request) {
         SELECT TOP 15
           LTRIM(RTRIM(ISNULL(m.[Desc], 'Sin marca'))) AS marca,
           SUM(t.Impo) AS totalVenta,
-          SUM(t.Impo - (t.Cant * t.Costo)) AS ganancia
+          SUM(t.Impo - CASE WHEN t.Costo >= 999999 THEN t.Cant * ISNULL(s.Costo, 0) ELSE t.Costo END) AS ganancia
         FROM [${dbTransas}].dbo.Transas t
         LEFT JOIN [${dbProd}].dbo.Productos pr ON pr.Cod = t.Producto
+        OUTER APPLY (SELECT TOP 1 s.Costo FROM [${dbProd}].dbo.Stock s WHERE s.CodProducto = t.Producto AND LTRIM(RTRIM(s.Deposito)) = '0' AND (s.TalleColor IS NULL OR LTRIM(RTRIM(s.TalleColor)) = '') AND s.Costo > 0) s
         LEFT JOIN [${dbProd}].dbo.Marcas m ON m.Cod = pr.Marca
         WHERE t.Tipo = 'I'
           AND LTRIM(RTRIM(t.Sucursal)) IN (${sucList})

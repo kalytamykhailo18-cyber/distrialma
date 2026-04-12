@@ -89,8 +89,8 @@ export async function POST(req: NextRequest) {
       const nextCierre = (maxResult.recordset[0]?.maxCierre || 0) + 1;
 
       // 1. Write cierre record (Tipo = 'C')
-      // Clamp values to decimal(9,2) max = 9,999,999.99
-      const clamp92 = (n: number) => Math.min(9999999.99, Math.max(-9999999.99, Math.round(n * 100) / 100));
+      // Round to 2 decimals for decimal(12,2) columns
+      const clamp92 = (n: number) => Math.round(n * 100) / 100;
       const cierreCod = String(nextCodNum).padStart(9, " ");
       await pool.request()
         .input("cod", cierreCod)

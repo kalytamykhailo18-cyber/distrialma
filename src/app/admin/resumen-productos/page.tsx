@@ -21,7 +21,7 @@ export default function ResumenProductosPage() {
   const [mes, setMes] = useState(() => new Date().toISOString().slice(0, 7));
   const [sucursales, setSucursales] = useState(["1", "2", "6", "7"]);
   const [search, setSearch] = useState("");
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [expanded, setExpanded] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<"totalVenta" | "ganancia" | "cantidad" | "margen">("ganancia");
   const [limit, setLimit] = useState(50);
 
@@ -148,14 +148,16 @@ export default function ResumenProductosPage() {
               </select>
             </div>
             <div className="divide-y">
-              {filtered.map((p) => (
-                <div key={p.sku}>
-                  <button onClick={() => setExpanded((prev) => { const n = new Set(prev); if (n.has(p.sku)) n.delete(p.sku); else n.add(p.sku); return n; })}
-                    className="w-full px-4 py-2.5 flex items-center justify-between text-left hover:bg-gray-50">
+              {filtered.map((p) => {
+                const isOpen = expanded === p.sku;
+                return (
+                <div key={p.sku} className={isOpen ? "bg-brand-50 border-l-4 border-l-brand-500 rounded-lg shadow-md my-1" : ""}>
+                  <button onClick={() => setExpanded(isOpen ? null : p.sku)}
+                    className={`w-full px-4 py-2.5 flex items-center justify-between text-left ${isOpen ? "bg-brand-50" : "hover:bg-gray-50"}`}>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="text-xs text-gray-400 font-mono">{p.sku}</span>
-                        <span className="text-sm font-medium text-gray-900 truncate">{p.nombre}</span>
+                        <span className={`text-sm font-medium truncate ${isOpen ? "text-brand-700" : "text-gray-900"}`}>{p.nombre}</span>
                       </div>
                       <div className="text-xs text-gray-400">{p.marca} — {p.rubro}</div>
                     </div>
@@ -168,11 +170,11 @@ export default function ResumenProductosPage() {
                         <div className="text-sm font-bold text-green-600">{fmt(p.ganancia)}</div>
                         <div className="text-xs text-gray-400">{p.margen}%</div>
                       </div>
-                      <HiChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${expanded.has(p.sku) ? "rotate-180" : ""}`} />
+                      <HiChevronDown className={`w-4 h-4 transition-transform ${isOpen ? "rotate-180 text-brand-600" : "text-gray-400"}`} />
                     </div>
                   </button>
-                  {expanded.has(p.sku) && (
-                    <div className="px-4 py-2 bg-gray-50 border-t">
+                  {isOpen && (
+                    <div className="px-4 py-2 bg-brand-50/50 border-t border-brand-200">
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
                         <div><span className="text-gray-500">Cantidad:</span> <span className="font-medium">{p.cantidad.toLocaleString("es-AR", { maximumFractionDigits: 1 })}</span></div>
                         <div><span className="text-gray-500">Costo total:</span> <span className="font-medium">{fmt(p.totalCosto)}</span></div>
@@ -192,7 +194,8 @@ export default function ResumenProductosPage() {
                     </div>
                   )}
                 </div>
-              ))}
+                );
+              })}
             </div>
             {filtered.length >= limit && (
               <button onClick={() => setLimit((l) => l + 50)} className="w-full py-3 text-sm text-brand-600 hover:bg-brand-50 font-medium">

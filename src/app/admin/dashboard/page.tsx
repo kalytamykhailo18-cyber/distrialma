@@ -1,0 +1,297 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { formatPrice } from "@/lib/utils";
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from "recharts";
+import { HiTrendingUp, HiTrendingDown, HiChevronDown } from "react-icons/hi";
+
+const SUC_NAMES: Record<string, string> = { "1": "Minorista 435", "2": "Mayorista 387", "6": "May. Pontevedra", "7": "Distribuidora" };
+const DIAS_SEMANA = ["lunes", "martes", "miercoles", "jueves", "viernes", "sabado", "domingo"];
+const DIAS_LABEL = ["Lun", "Mar", "Mie", "Jue", "Vie", "Sab", "Dom"];
+
+const fmt = (n: number) => formatPrice(n);
+const fmtK = (n: number) => n >= 1000000 ? `${(n / 1000000).toFixed(1)}M` : n >= 1000 ? `${(n / 1000).toFixed(0)}K` : String(Math.round(n));
+const pct = (actual: number, anterior: number) => anterior > 0 ? (((actual - anterior) / anterior) * 100).toFixed(1) : "N/A";
+
+interface DashData {
+  ventasDiarias: Array<{ dia: string; total: number; cantidad: number; ticketPromedio: number }>;
+  ventasDiariasMesAnterior: Array<{ dia: string; total: number; cantidad: number }>;
+  topClientes: Array<{ clienteCod: string; nombre: string; total: number; cantCompras: number; ultimaCompra: string }>;
+  metodosPago: Array<{ nombre: string; total: number; cantidad: number }>;
+  empleados: Array<{ empleadoCod: string; nombre: string; totalVenta: number; cantTickets: number; ticketPromedio: number }>;
+  comparativo: {
+    mesActual: { ventas: number; ganancia: number; ticketPromedio: number; clientesUnicos: number };
+    mesAnterior: { ventas: number; ganancia: number; ticketPromedio: number; clientesUnicos: number };
+  };
+  horariosPico: Array<Record<string, number>>;
+}
+
+export default function DashboardPage() {
+  const [data, setData] = useState<DashData | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [mes, setMes] = useState(() => new Date().toISOString().slice(0, 7));
+  const [sucursales, setSucursales] = useState(["1", "2", "6", "7"]);
+  const [expandedCliente, setExpandedCliente] = useState<string | null>(null);
+  const [deadStock, setDeadStock] = useState<{ dias: number; cantProductos: number; totalInmovilizado: number; productos: Array<{ sku: string; nombre: string; marca: string; rubro: string; stock: number; costoUnit: number; costoInmovilizado: number; unidad: string }> } | null>(null);
+  const [deadDias, setDeadDias] = useState(30);
+  const [deadLimit, setDeadLimit] = useState(30);
+
+  async function loadDeadStock(d: number) {
+    try {
+      const res = await fetch(`/api/admin/productos-sin-movimiento?dias=${d}`);
+      const data = await res.json();
+      if (!data.error) setDeadStock(data);
+    } catch {}
+  }
+
+  useEffect(() => { loadDeadStock(deadDias); }, [deadDias]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function load() {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/admin/dashboard?mes=${mes}&sucursales=${sucursales.join(",")}`);
+      const d = await res.json();
+      if (d.error) throw new Error(d.error);
+      setData(d);
+    } catch { setData(null); }
+    setLoading(false);
+  }
+
+  useEffect(() => { load(); }, [mes, sucursales]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function toggleSuc(s: string) {
+    setSucursales((prev) => prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]);
+  }
+
+  // Merge daily data for chart
+  const dailyChart = data?.ventasDiarias.map((d) => {
+    const ant = data.ventasDiariasMesAnterior.find((a) => a.dia === d.dia);
+    return { dia: d.dia, actual: d.total, anterior: ant?.total || 0, tickets: d.cantidad };
+  }) || [];
+
+  const comp = data?.comparativo;
+  const ventasCambio = comp ? pct(comp.mesActual.ventas, comp.mesAnterior.ventas) : "0";
+  const gananciaCambio = comp ? pct(comp.mesActual.ganancia, comp.mesAnterior.ganancia) : "0";
+  const ticketCambio = comp ? pct(comp.mesActual.ticketPromedio, comp.mesAnterior.ticketPromedio) : "0";
+  const clientesCambio = comp ? pct(comp.mesActual.clientesUnicos, comp.mesAnterior.clientesUnicos) : "0";
+
+  // Heatmap max for color scale
+  const heatMax = data?.horariosPico.reduce((mx, row) => {
+    DIAS_SEMANA.forEach((d) => { if ((row[d] || 0) > mx) mx = row[d] || 0; });
+    return mx;
+  }, 0) || 1;
+
+  return (
+    <div className="max-w-6xl mx-auto px-4 py-6">
+      <h1 className="text-2xl font-bold text-gray-900 mb-2">Dashboard</h1>
+      <p className="text-sm text-gray-500 mb-4">Panel de control con indicadores clave del negocio.</p>
+
+      {/* Filters */}
+      <div className="flex flex-wrap gap-3 mb-6">
+        <input type="month" value={mes} onChange={(e) => setMes(e.target.value)} className="px-3 py-2 border border-brand-400 rounded-lg text-sm" />
+        <div className="flex gap-1">
+          {["1", "2", "6", "7"].map((s) => (
+            <button key={s} onClick={() => toggleSuc(s)}
+              className={`px-3 py-2 rounded-lg text-xs font-medium transition-colors ${sucursales.includes(s) ? "bg-brand-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
+              {SUC_NAMES[s]}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {loading ? <p className="text-gray-400">Cargando...</p> : !data ? <p className="text-gray-400">Sin datos</p> : (
+        <>
+          {/* Comparativo cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+            {[
+              { label: "Ventas", actual: comp?.mesActual.ventas || 0, cambio: ventasCambio, format: fmtK },
+              { label: "Ganancia", actual: comp?.mesActual.ganancia || 0, cambio: gananciaCambio, format: fmtK },
+              { label: "Ticket Promedio", actual: comp?.mesActual.ticketPromedio || 0, cambio: ticketCambio, format: fmt },
+              { label: "Clientes", actual: comp?.mesActual.clientesUnicos || 0, cambio: clientesCambio, format: (n: number) => String(n) },
+            ].map((card) => {
+              const isUp = parseFloat(card.cambio) > 0;
+              const isDown = parseFloat(card.cambio) < 0;
+              return (
+                <div key={card.label} className="bg-white border rounded-xl p-4">
+                  <div className="text-xs text-gray-500 mb-1">{card.label}</div>
+                  <div className="text-2xl font-bold text-gray-900">{card.format(card.actual)}</div>
+                  <div className={`flex items-center gap-1 text-xs mt-1 ${isUp ? "text-green-600" : isDown ? "text-red-500" : "text-gray-400"}`}>
+                    {isUp && <HiTrendingUp className="w-3.5 h-3.5" />}
+                    {isDown && <HiTrendingDown className="w-3.5 h-3.5" />}
+                    {card.cambio !== "N/A" ? `${isUp ? "+" : ""}${card.cambio}% vs mes ant.` : "Sin datos anteriores"}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Daily sales chart */}
+          <div className="bg-white border rounded-xl p-4 mb-6">
+            <h3 className="text-sm font-bold text-gray-700 mb-3">Ventas Diarias</h3>
+            <ResponsiveContainer width="100%" height={280}>
+              <LineChart data={dailyChart}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis dataKey="dia" tick={{ fontSize: 11 }} />
+                <YAxis tickFormatter={fmtK} tick={{ fontSize: 11 }} />
+                <Tooltip formatter={(v) => fmt(Number(v))} />
+                <Legend />
+                <Line type="monotone" dataKey="actual" name="Este mes" stroke="#f97316" strokeWidth={2} dot={false} />
+                <Line type="monotone" dataKey="anterior" name="Mes anterior" stroke="#d1d5db" strokeWidth={1.5} strokeDasharray="5 5" dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+            {/* Payment methods */}
+            <div className="bg-white border rounded-xl p-4">
+              <h3 className="text-sm font-bold text-gray-700 mb-3">Metodos de Pago</h3>
+              <ResponsiveContainer width="100%" height={280}>
+                <BarChart data={data.metodosPago.slice(0, 10)} layout="vertical" margin={{ left: 10, right: 10 }}>
+                  <XAxis type="number" tickFormatter={fmtK} tick={{ fontSize: 11 }} />
+                  <YAxis type="category" dataKey="nombre" width={130} tick={{ fontSize: 10 }} />
+                  <Tooltip formatter={(v) => fmt(Number(v))} />
+                  <Bar dataKey="total" fill="#3b82f6" radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Employee performance */}
+            <div className="bg-white border rounded-xl p-4">
+              <h3 className="text-sm font-bold text-gray-700 mb-3">Rendimiento por Empleado</h3>
+              <ResponsiveContainer width="100%" height={280}>
+                <BarChart data={data.empleados.slice(0, 10)} layout="vertical" margin={{ left: 10, right: 10 }}>
+                  <XAxis type="number" tickFormatter={fmtK} tick={{ fontSize: 11 }} />
+                  <YAxis type="category" dataKey="nombre" width={130} tick={{ fontSize: 10 }} />
+                  <Tooltip formatter={(v) => fmt(Number(v))} />
+                  <Bar dataKey="totalVenta" name="Ventas" fill="#22c55e" radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+              <div className="mt-2 space-y-1">
+                {data.empleados.slice(0, 10).map((e) => (
+                  <div key={e.empleadoCod} className="flex justify-between text-xs text-gray-500">
+                    <span>{e.nombre}</span>
+                    <span>{e.cantTickets} tickets — prom: {fmt(e.ticketPromedio)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Heatmap */}
+          <div className="bg-white border rounded-xl p-4 mb-6">
+            <h3 className="text-sm font-bold text-gray-700 mb-3">Horarios Pico</h3>
+            <div className="overflow-x-auto">
+              <table className="text-xs w-full">
+                <thead>
+                  <tr>
+                    <th className="p-1 text-gray-500 text-left">Hora</th>
+                    {DIAS_LABEL.map((d) => <th key={d} className="p-1 text-center text-gray-500">{d}</th>)}
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.horariosPico.map((row) => (
+                    <tr key={row.hora}>
+                      <td className="p-1 font-mono text-gray-600">{String(row.hora).padStart(2, "0")}:00</td>
+                      {DIAS_SEMANA.map((d) => {
+                        const val = row[d] || 0;
+                        const intensity = heatMax > 0 ? val / heatMax : 0;
+                        const bg = val === 0 ? "#f9fafb" : `rgba(249, 115, 22, ${0.15 + intensity * 0.7})`;
+                        return (
+                          <td key={d} className="p-1 text-center font-mono rounded" style={{ backgroundColor: bg, color: intensity > 0.5 ? "white" : "#374151" }}>
+                            {val > 0 ? val : ""}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Top clients */}
+          <div className="bg-white border rounded-xl overflow-hidden mb-6">
+            <div className="px-4 py-3 border-b">
+              <h3 className="text-sm font-bold text-gray-700">Top 20 Clientes</h3>
+            </div>
+            <div className="divide-y">
+              {data.topClientes.map((c) => {
+                const isOpen = expandedCliente === c.clienteCod;
+                return (
+                  <div key={c.clienteCod} className={isOpen ? "bg-brand-50 border-l-4 border-l-brand-500" : ""}>
+                    <button onClick={() => setExpandedCliente(isOpen ? null : c.clienteCod)}
+                      className={`w-full px-4 py-2.5 flex items-center justify-between text-left ${isOpen ? "" : "hover:bg-gray-50"}`}>
+                      <div className="flex-1 min-w-0">
+                        <span className={`text-sm font-medium truncate ${isOpen ? "text-brand-700" : "text-gray-900"}`}>{c.nombre || "Sin nombre"}</span>
+                      </div>
+                      <div className="flex items-center gap-4 shrink-0">
+                        <div className="text-right">
+                          <div className="text-sm font-bold text-gray-900">{fmt(c.total)}</div>
+                          <div className="text-xs text-gray-400">{c.cantCompras} compras</div>
+                        </div>
+                        <HiChevronDown className={`w-4 h-4 transition-transform ${isOpen ? "rotate-180 text-brand-600" : "text-gray-400"}`} />
+                      </div>
+                    </button>
+                    {isOpen && (
+                      <div className="px-4 py-2 bg-brand-50/50 border-t border-brand-200 text-xs text-gray-600">
+                        <span>Cod: {c.clienteCod}</span> — <span>Ultima compra: {c.ultimaCompra ? `${c.ultimaCompra.slice(6, 8)}/${c.ultimaCompra.slice(4, 6)}/${c.ultimaCompra.slice(0, 4)}` : "—"}</span> — <span>Promedio: {fmt(c.cantCompras > 0 ? c.total / c.cantCompras : 0)}</span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Dead stock */}
+          {deadStock && (
+            <div className="bg-white border rounded-xl overflow-hidden mb-6">
+              <div className="px-4 py-3 border-b flex flex-wrap items-center gap-3">
+                <h3 className="text-sm font-bold text-gray-700">Productos sin Movimiento</h3>
+                <div className="flex gap-1">
+                  {[30, 60, 90].map((d) => (
+                    <button key={d} onClick={() => { setDeadDias(d); setDeadLimit(30); }}
+                      className={`px-2 py-1 rounded text-xs font-medium ${deadDias === d ? "bg-red-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
+                      {d} dias
+                    </button>
+                  ))}
+                </div>
+                <div className="ml-auto text-xs text-gray-500">
+                  {deadStock.cantProductos} productos — <span className="text-red-600 font-bold">{fmtK(deadStock.totalInmovilizado)}</span> inmovilizado
+                </div>
+              </div>
+              <div className="divide-y">
+                {deadStock.productos.slice(0, deadLimit).map((p) => (
+                  <div key={p.sku} className="px-4 py-2 flex items-center justify-between hover:bg-red-50/50">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-gray-400 font-mono">{p.sku}</span>
+                        <span className="text-sm text-gray-900 truncate">{p.nombre}</span>
+                      </div>
+                      <div className="text-xs text-gray-400">{p.marca} — {p.rubro}</div>
+                    </div>
+                    <div className="flex items-center gap-4 shrink-0 text-right">
+                      <div>
+                        <div className="text-sm text-gray-700">{p.stock} {p.unidad === "KG" ? "kg" : "u"}</div>
+                        <div className="text-xs text-gray-400">stock</div>
+                      </div>
+                      <div>
+                        <div className="text-sm font-bold text-red-600">{fmt(p.costoInmovilizado)}</div>
+                        <div className="text-xs text-gray-400">inmovilizado</div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {deadStock.productos.length > deadLimit && (
+                <button onClick={() => setDeadLimit((l) => l + 30)} className="w-full py-3 text-sm text-red-600 hover:bg-red-50 font-medium">
+                  Ver mas ({deadStock.productos.length - deadLimit} restantes)
+                </button>
+              )}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
