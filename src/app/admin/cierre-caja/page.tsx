@@ -27,9 +27,10 @@ interface CierreData {
   };
   movimientos: MovCaja[];
   retiros: number;
+  retirosDetalle: Array<{ concepto: string; total: number }>;
   ingresos: number;
   pagos: number;
-  anuladas: { cantidad: number; total: number };
+  anuladas: { cantidad: number; total: number; detalle?: Array<{ boleta: string; cliente: string; total: number; fechora: string; usuario: string; empleado: string }> };
   totalEfectivoCaja: number;
   totalTarjeta: number;
   totalDeuda: number;
@@ -66,6 +67,7 @@ export default function CierreCajaPage() {
   const [success, setSuccess] = useState("");
   const [history, setHistory] = useState<CierreRecord[]>([]);
   const [nuevoInicio, setNuevoInicio] = useState("");
+  const [efectivoContado, setEfectivoContado] = useState("");
   const [fotos, setFotos] = useState<string[]>([]);
   const [empleados, setEmpleados] = useState<Array<{ cod: string; nombre: string }>>([]);
   const [selectedEmpleado, setSelectedEmpleado] = useState("");
@@ -196,6 +198,18 @@ export default function CierreCajaPage() {
     drawRow("Inicio de caja:", fmt(data.inicioCaja));
     drawRow("Ventas en efectivo:", fmt(data.ventas.efectivo));
     drawRow("Retiros:", fmt(data.retiros));
+    if (data.retirosDetalle && data.retirosDetalle.length > 1) {
+      doc.setFontSize(8);
+      for (const r of data.retirosDetalle) {
+        checkPage(7);
+        doc.setTextColor(120, 120, 120);
+        doc.text(`   ${r.concepto || "Sin concepto"}`, 18, y);
+        doc.text(fmt(r.total), w - 14, y, { align: "right" });
+        y += 5;
+      }
+      doc.setFontSize(9);
+      doc.setTextColor(50, 50, 50);
+    }
     drawRow("Ingresos:", fmt(data.ingresos));
     drawRow("Pagos proveedores:", fmt(data.pagos));
     drawRow("TOTAL EFECTIVO EN CAJA:", fmt(data.totalEfectivoCaja), true);
@@ -231,6 +245,22 @@ export default function CierreCajaPage() {
       drawRow(`Anuladas (${data.anuladas.cantidad}):`, fmt(data.anuladas.total));
     }
     drawRow("Transacciones:", `${data.ventas.nroDesde} — ${data.ventas.nroHasta}`);
+    if (nuevoInicio) {
+      y += 3;
+      const inicioSig = parseFloat(nuevoInicio) || 0;
+      const diferencia = inicioSig - data.totalEfectivoCaja;
+      checkPage(12);
+      const diffLabel = diferencia >= 0 ? "SOBRANTE" : "FALTANTE";
+      doc.setFillColor(diferencia >= 0 ? 220 : 254, diferencia >= 0 ? 252 : 226, diferencia >= 0 ? 231 : 226);
+      doc.rect(10, y - 2, w - 20, 10, "F");
+      doc.setTextColor(diferencia >= 0 ? 22 : 185, diferencia >= 0 ? 101 : 28, diferencia >= 0 ? 52 : 28);
+      doc.setFont("helvetica", "bold");
+      doc.text(diffLabel, 14, y + 5);
+      doc.text(`${diferencia >= 0 ? "+" : "-"}${fmt(Math.abs(diferencia))}`, w - 14, y + 5, { align: "right" });
+      y += 12;
+      doc.setTextColor(50, 50, 50);
+      doc.setFont("helvetica", "normal");
+    }
     y += 3;
     if (nuevoInicio) {
       checkPage(15);
@@ -337,6 +367,7 @@ export default function CierreCajaPage() {
       else msg += ` — Email no configurado`;
       setSuccess(msg);
       if (isAdmin) loadHistory();
+
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Error");
     } finally {
@@ -362,10 +393,10 @@ export default function CierreCajaPage() {
             onChange={(e) => { setSucursal(e.target.value); setData(null); }}
             className="px-3 py-2 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600"
           >
-            <option value="1">Sucursal 1</option>
-            <option value="2">Sucursal 2</option>
-            <option value="6">Sucursal 6</option>
-            <option value="7">Sucursal 7</option>
+            <option value="1">Minorista 435</option>
+            <option value="2">Mayorista 387</option>
+            <option value="6">Mayorista Pontevedra</option>
+            <option value="7">Distribuidora 387</option>
           </select>
         )}
       </div>
@@ -447,6 +478,12 @@ export default function CierreCajaPage() {
                 <div className="px-4 py-3 flex justify-between"><span className="text-sm text-gray-600">Inicio de caja</span><span className="text-sm font-medium">{fmt(data.inicioCaja)}</span></div>
                 <div className="px-4 py-3 flex justify-between"><span className="text-sm text-gray-600">Ventas efectivo</span><span className="text-sm font-medium text-green-600">{fmt(data.ventas.efectivo)}</span></div>
                 <div className="px-4 py-3 flex justify-between"><span className="text-sm text-gray-600">Retiros</span><span className="text-sm font-medium text-red-500">-{fmt(data.retiros)}</span></div>
+                {data.retirosDetalle && data.retirosDetalle.length > 1 && data.retirosDetalle.map((r) => (
+                  <div key={r.concepto} className="px-4 py-2 flex justify-between bg-red-50/50">
+                    <span className="text-xs text-gray-500 pl-4">{r.concepto || "Sin concepto"}</span>
+                    <span className="text-xs font-medium text-red-400">-{fmt(r.total)}</span>
+                  </div>
+                ))}
                 <div className="px-4 py-3 flex justify-between"><span className="text-sm text-gray-600">Ingresos</span><span className="text-sm font-medium text-green-600">+{fmt(data.ingresos)}</span></div>
                 <div className="px-4 py-3 flex justify-between"><span className="text-sm text-gray-600">Pagos proveedores</span><span className="text-sm font-medium text-red-500">-{fmt(data.pagos)}</span></div>
                 <div className="px-4 py-3 flex justify-between bg-gray-50"><span className="text-sm font-bold">TOTAL EFECTIVO EN CAJA</span><span className="text-sm font-bold">{fmt(data.totalEfectivoCaja)}</span></div>
@@ -463,9 +500,54 @@ export default function CierreCajaPage() {
                   <span className="text-sm font-bold text-brand-700">{fmt(data.totalEfectivoCaja + data.totalTarjeta + data.totalDeuda)}</span>
                 </div>
                 {data.anuladas.cantidad > 0 && (
+                  <>
                   <div className="px-4 py-3 flex justify-between"><span className="text-sm text-gray-600">Anuladas ({data.anuladas.cantidad})</span><span className="text-sm font-medium text-red-500">{fmt(data.anuladas.total)}</span></div>
+                  {data.anuladas.detalle && data.anuladas.detalle.map((a) => (
+                    <div key={a.boleta} className="px-4 py-2 flex justify-between bg-red-50/50">
+                      <span className="text-xs text-gray-500 pl-4">
+                        #{a.boleta} {a.cliente || "Sin nombre"} — {a.usuario} / {a.empleado} — {formatFechora(a.fechora)}
+                      </span>
+                      <span className="text-xs font-medium text-red-400">{fmt(a.total)}</span>
+                    </div>
+                  ))}
+                  </>
                 )}
                 <div className="px-4 py-3 flex justify-between"><span className="text-sm text-gray-600">Transacciones</span><span className="text-sm font-mono text-gray-500">{data.ventas.nroDesde} — {data.ventas.nroHasta}</span></div>
+              </div>
+
+              {/* Efectivo contado y diferencia */}
+              <div className="bg-white border rounded-xl divide-y mb-4">
+                <div className="px-4 py-3 flex items-center justify-between">
+                  <span className="text-sm font-medium text-gray-700">Efectivo contado</span>
+                  <div className="flex items-center gap-1">
+                    <span className="text-gray-500 text-sm">$</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={efectivoContado}
+                      onChange={(e) => setEfectivoContado(e.target.value)}
+                      placeholder="0.00"
+                      className="w-40 px-3 py-2 border border-brand-400 rounded-lg text-sm font-bold text-right focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
+                    />
+                  </div>
+                </div>
+                {efectivoContado !== "" && (() => {
+                  const contado = parseFloat(efectivoContado) || 0;
+                  const esperado = data.totalEfectivoCaja;
+                  const diferencia = contado - esperado;
+                  const isPositive = diferencia >= 0;
+                  return (
+                    <div className={`px-4 py-3 flex justify-between ${isPositive ? "bg-green-50" : "bg-red-50"}`}>
+                      <span className={`text-sm font-bold ${isPositive ? "text-green-700" : "text-red-700"}`}>
+                        {isPositive ? "SOBRANTE" : "FALTANTE"}
+                      </span>
+                      <span className={`text-sm font-bold ${isPositive ? "text-green-700" : "text-red-700"}`}>
+                        {isPositive ? "+" : "-"}{fmt(Math.abs(diferencia))}
+                      </span>
+                    </div>
+                  );
+                })()}
               </div>
 
               {data.movimientos.length > 0 && (

@@ -89,17 +89,20 @@ export async function POST(req: NextRequest) {
       const nextCierre = (maxResult.recordset[0]?.maxCierre || 0) + 1;
 
       // 1. Write cierre record (Tipo = 'C')
+      // Clamp values to decimal(9,2) max = 9,999,999.99
+      const clamp92 = (n: number) => Math.min(9999999.99, Math.max(-9999999.99, Math.round(n * 100) / 100));
       const cierreCod = String(nextCodNum).padStart(9, " ");
       await pool.request()
         .input("cod", cierreCod)
         .input("suc", suc)
         .input("fechora", fechora)
-        .input("inicio", nuevoInicioVal)
-        .input("efectivo", data.totalEfectivoCaja)
-        .input("tarjeta", data.ventas.tarjeta)
-        .input("deuda", data.ventas.deuda)
-        .input("retiros", data.retiros)
-        .input("impoCos", data.inicioCaja)
+        .input("inicio", clamp92(nuevoInicioVal))
+        .input("efectivo", clamp92(data.ventas.efectivo))
+        .input("tarjeta", clamp92(data.ventas.tarjeta))
+        .input("deuda", clamp92(data.ventas.deuda))
+        .input("retiros", clamp92(data.retiros))
+        .input("impoCos", clamp92(data.inicioCaja))
+        .input("totalVentas", clamp92(data.ventas.total))
         .input("nroCierre", nextCierre)
         .query(`
           INSERT INTO [${dbTransas}].dbo.Transas
@@ -114,8 +117,8 @@ export async function POST(req: NextRequest) {
              Filler1, Filler2, Filler3, FillerBit1, FillerBit2, FillerBit3, FillerBit4, FillerBit5)
           VALUES
             (@cod, @cod, '', 'C', '', @suc, '', 0, @fechora, '',
-             0, -@tarjeta, 0, @deuda, 0, @efectivo, @tarjeta, -@deuda, 0, @inicio,
-             @retiros, 0, 0, @impoCos, @inicio, @nroCierre, 0,
+             0, -@tarjeta, 0, @deuda, 0, @efectivo, @tarjeta, 0, 0, @inicio,
+             @retiros, 0, @totalVentas, @impoCos, @inicio, @nroCierre, 0,
              '', '', '', '', '', 0,
              '', '', '', '', '', '',
              '', '', '', '', '', '', '', '',
@@ -178,17 +181,40 @@ export async function POST(req: NextRequest) {
             from: process.env.RESEND_FROM || "Distrialma <onboarding@resend.dev>",
             to: emailTo,
             subject: `Cierre de Caja — Sucursal ${suc} — ${fecha}`,
-            html: `
+            html: (() => {
+              const f = (n: number) => "$" + n.toLocaleString("es-AR", { minimumFractionDigits: 2 });
+              const diferencia = nuevoInicioVal - data.totalEfectivoCaja;
+              const diffLabel = diferencia >= 0 ? "Sobrante" : "Faltante";
+              const diffColor = diferencia >= 0 ? "#16a34a" : "#dc2626";
+              let retirosHtml = "";
+              if (data.retirosDetalle && data.retirosDetalle.length > 0) {
+                retirosHtml = data.retirosDetalle.map((r: { concepto: string; total: number }) =>
+                  `<li>${r.concepto}: ${f(r.total)}</li>`
+                ).join("");
+                retirosHtml = `<ul style="margin:4px 0">${retirosHtml}</ul>`;
+              }
+              return `
               <h2>Cierre de Caja — Sucursal ${suc}</h2>
               <p><strong>Fecha:</strong> ${fecha}</p>
               <p><strong>Responsable:</strong> ${userName}</p>
-              <p><strong>Ventas:</strong> ${data.ventas.cantidad}</p>
-              <p><strong>Total:</strong> $${(data.ventas.total || 0).toLocaleString("es-AR", { minimumFractionDigits: 2 })}</p>
-              <p><strong>Inicio de caja siguiente:</strong> $${nuevoInicioVal.toLocaleString("es-AR", { minimumFractionDigits: 2 })}</p>
-              <p>Ver detalle en el PDF adjunto.</p>
+              <table style="border-collapse:collapse;width:100%;max-width:400px">
+                <tr><td>Ventas:</td><td style="text-align:right"><strong>${data.ventas.cantidad}</strong></td></tr>
+                <tr><td>Total ventas:</td><td style="text-align:right">${f(data.ventas.total)}</td></tr>
+                <tr><td>Efectivo:</td><td style="text-align:right">${f(data.ventas.efectivo)}</td></tr>
+                <tr><td>Tarjeta:</td><td style="text-align:right">${f(data.ventas.tarjeta)}</td></tr>
+                <tr><td>Retiros (efectivo):</td><td style="text-align:right"><strong>${f(data.retiros)}</strong></td></tr>
+              </table>
+              ${retirosHtml}
+              <hr>
+              <table style="border-collapse:collapse;width:100%;max-width:400px">
+                <tr><td>Total efectivo en caja:</td><td style="text-align:right">${f(data.totalEfectivoCaja)}</td></tr>
+                <tr><td>Inicio de caja siguiente:</td><td style="text-align:right">${f(nuevoInicioVal)}</td></tr>
+                <tr style="color:${diffColor}"><td><strong>${diffLabel}:</strong></td><td style="text-align:right"><strong>${f(Math.abs(diferencia))}</strong></td></tr>
+              </table>
+              <p>Ver detalle completo en el PDF adjunto.</p>
               <hr>
               <p style="color: #999; font-size: 12px;">Generado automáticamente por distrialma.com.ar</p>
-            `,
+            `})(),
             attachments: [
               {
                 filename,
@@ -280,6 +306,28 @@ async function getCajaData(sucursal: string) {
       AND LTRIM(RTRIM(Sucursal)) = @suc
       AND CAST(LTRIM(RTRIM(Cod)) AS BIGINT) > @cierreCod
       AND Anulado IS NOT NULL AND LTRIM(RTRIM(Anulado)) != '' AND Anulado != ' '
+      AND ISNULL(Total, 0) > 0
+  `);
+
+  // Voided transaction details with employee names
+  const dbEmpleados = getDbName("empleados");
+  const anuladasDetalle = await pool.request().input("suc", sucursal).input("cierreCod", parseInt(cierreCod) || 0).query(`
+    SELECT
+      LTRIM(RTRIM(t.Boleta)) AS boleta,
+      LTRIM(RTRIM(ISNULL(t.Nombre,''))) AS cliente,
+      t.Total AS total,
+      LTRIM(RTRIM(t.Fechora)) AS fechora,
+      LTRIM(RTRIM(ISNULL(eu.Nombre, t.Usuario))) AS usuario,
+      LTRIM(RTRIM(ISNULL(ee.Nombre, t.Empleado))) AS empleado
+    FROM [${dbTransas}].dbo.Transas t
+    LEFT JOIN [${dbEmpleados}].dbo.Empleados eu ON eu.Cod COLLATE Modern_Spanish_CI_AS = t.Usuario COLLATE Modern_Spanish_CI_AS
+    LEFT JOIN [${dbEmpleados}].dbo.Empleados ee ON ee.Cod COLLATE Modern_Spanish_CI_AS = t.Empleado COLLATE Modern_Spanish_CI_AS
+    WHERE t.Tipo = 'V'
+      AND LTRIM(RTRIM(t.Sucursal)) = @suc
+      AND CAST(LTRIM(RTRIM(t.Cod)) AS BIGINT) > @cierreCod
+      AND t.Anulado IS NOT NULL AND LTRIM(RTRIM(t.Anulado)) != '' AND t.Anulado != ' '
+      AND ISNULL(t.Total, 0) > 0
+    ORDER BY t.Fechora DESC
   `);
 
   // Card payment breakdown by type
@@ -299,9 +347,16 @@ async function getCajaData(sucursal: string) {
   `);
 
   const v = ventas.recordset[0];
-  const retiros = movimientos.recordset
-    .filter((m: { tipo: string }) => m.tipo === "R")
-    .reduce((s: number, m: { efectivo: number }) => s + m.efectivo, 0);
+  const retirosList = movimientos.recordset.filter((m: { tipo: string }) => m.tipo === "R");
+  const retiros = retirosList.reduce((s: number, m: { efectivo: number }) => s + m.efectivo, 0);
+  // Group retiros by concepto
+  const retirosMap = new Map<string, number>();
+  for (const m of retirosList) {
+    const key = ((m as { concepto: string }).concepto || "Sin concepto").toUpperCase();
+    retirosMap.set(key, (retirosMap.get(key) || 0) + (m as { efectivo: number }).efectivo);
+  }
+  const retirosDetalle = Array.from(retirosMap.entries()).map(([concepto, total]) => ({ concepto, total }));
+
   const ingresos = movimientos.recordset
     .filter((m: { tipo: string }) => m.tipo === "I")
     .reduce((s: number, m: { efectivo: number }) => s + m.efectivo, 0);
@@ -337,11 +392,20 @@ async function getCajaData(sucursal: string) {
       fechora: m.fechora,
     })),
     retiros,
+    retirosDetalle,
     ingresos,
     pagos,
     anuladas: {
       cantidad: anuladas.recordset[0]?.cnt || 0,
       total: anuladas.recordset[0]?.total || 0,
+      detalle: anuladasDetalle.recordset.map((a: { boleta: string; cliente: string; total: number; fechora: string; usuario: string; empleado: string }) => ({
+        boleta: a.boleta,
+        cliente: a.cliente,
+        total: a.total,
+        fechora: a.fechora,
+        usuario: a.usuario,
+        empleado: a.empleado,
+      })),
     },
     totalEfectivoCaja,
     totalTarjeta: v.tarjeta || 0,

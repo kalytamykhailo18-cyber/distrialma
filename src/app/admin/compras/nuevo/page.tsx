@@ -611,11 +611,12 @@ export default function NuevoIngresoPage() {
                   <td className="px-4 py-2">
                     <input
                       type="number"
-                      min={item.unit === "KG" ? "0.001" : "1"}
-                      step={item.unit === "KG" ? "0.001" : "1"}
+                      min={item.unit === "KG" || /\bKG\b/i.test(item.productName) ? "0.001" : "1"}
+                      step={item.unit === "KG" || /\bKG\b/i.test(item.productName) ? "0.001" : "1"}
                       value={item.cantidad}
                       onChange={(e) => {
-                        const val = item.unit === "KG" ? e.target.value : String(Math.round(parseFloat(e.target.value) || 0));
+                        const isPesable = item.unit === "KG" || /\bKG\b/i.test(item.productName);
+                        const val = isPesable ? e.target.value : String(Math.round(parseFloat(e.target.value) || 0));
                         updateCantidad(idx, val);
                       }}
                       className="w-full text-right px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"

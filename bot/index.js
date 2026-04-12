@@ -2,7 +2,20 @@ import pkg from "whatsapp-web.js";
 const { Client, LocalAuth } = pkg;
 import qrcode from "qrcode-terminal";
 import Anthropic from "@anthropic-ai/sdk";
-import { searchProducts, findClientByPhone, formatPrice } from "./products.js";
+import fs from "fs";
+import { searchProducts, searchByBrand, findClientByPhone, registerClient, formatPrice } from "./products.js";
+
+// Persist seen chat IDs to avoid re-sending registration message after restart
+const SEEN_FILE = "./session/seen-chats.json";
+let seenChats = new Set();
+try {
+  const data = JSON.parse(fs.readFileSync(SEEN_FILE, "utf-8"));
+  seenChats = new Set(data);
+} catch {}
+function markSeen(chatId) {
+  seenChats.add(chatId);
+  try { fs.writeFileSync(SEEN_FILE, JSON.stringify([...seenChats])); } catch {}
+}
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const MODEL = "claude-haiku-4-5-20251001";
@@ -23,17 +36,17 @@ REGLAS IMPORTANTES:
 1. Si te preguntan por productos, usá la herramienta search_products para buscar en la base real. Nunca inventes productos ni precios.
 2. Mostrá siempre el precio Mayorista. Si hay precio Caja Cerrada, también mencionalo. Siempre agregá al final: "Stock sujeto a disponibilidad de sucursal."
 3. Si el producto exacto no existe, ofrecé alternativas similares de la misma categoría.
-4. Si el cliente quiere hacer un pedido, decile que entre a https://distrialma.com.ar y arme el pedido desde ahí, o que un asesor lo va a contactar.
+4. Si el cliente quiere hacer un pedido, decile que entre a https://distrialma.com.ar y arme el pedido desde ahí. NO le des ningún número de teléfono para hacer pedidos.
 5. Si te preguntan algo que no sabés (descuentos especiales, plazos, etc.), decí que un asesor lo va a contactar y no inventes.
 6. No des información de otros clientes ni datos privados.
 7. Mantené las respuestas cortas (1-3 oraciones) salvo que sea estrictamente necesario.
 8. NUNCA uses formato con negritas, cursivas ni markdown. Escribí todo en texto plano.
 9. RECLAMOS: Si el cliente tiene un reclamo o queja (por precios mal cobrados, productos en mal estado, faltantes, etc.), NO intentes resolver el problema. Respondé: "Tomamos nota de tu reclamo. Ya le pasamos tu número a nuestra encargada para que se comunique con vos y lo resuelva." Internamente, el reclamo se deriva automáticamente.
 10. Si el cliente pide hablar con una persona, decí: "Te paso con un asesor, en breve te contacta."
+11. CLIENTES NO REGISTRADOS: Si el cliente no está registrado, ya le pedimos sus datos. Cuando te los pase (nombre, dirección, teléfono, CUIT/CUIL/DNI), usá la herramienta register_client para darlo de alta. Necesitás al menos nombre y teléfono. Después confirmale que ya está registrado y puede empezar a comprar en distrialma.com.ar.
 
 Información del negocio:
 - Web: https://distrialma.com.ar
-- WhatsApp Mayorista: +54 9 11 5413-7677
 - Ubicación: Merlo, Buenos Aires`;
 
 const NEW_CLIENT_MESSAGE = `Hola! Gracias por escribirnos.
@@ -70,23 +83,75 @@ const TOOLS = [
       required: ["query"],
     },
   },
+  {
+    name: "search_by_brand",
+    description: "Busca productos de una marca específica. Usalo cuando el cliente menciona un nombre de marca (ej: 'Antonativa', 'Punta de Agua', 'Pampa Greens'). Devuelve el link a la página de la marca y los productos.",
+    input_schema: {
+      type: "object",
+      properties: {
+        brand: {
+          type: "string",
+          description: "Nombre de la marca (ej: 'Antonativa', 'Punta de Agua')",
+        },
+        product_keywords: {
+          type: "string",
+          description: "Palabras opcionales para filtrar productos dentro de la marca (ej: 'cremoso', 'queso')",
+        },
+      },
+      required: ["brand"],
+    },
+  },
+  {
+    name: "register_client",
+    description: "Registra un cliente nuevo en la base de datos de Distrialma. Usalo cuando un cliente no registrado te pasa sus datos (nombre, dirección, teléfono, CUIT/CUIL/DNI). Necesitás al menos el nombre completo y el teléfono.",
+    input_schema: {
+      type: "object",
+      properties: {
+        nombre: {
+          type: "string",
+          description: "Nombre completo del cliente",
+        },
+        direccion: {
+          type: "string",
+          description: "Dirección del cliente (calle y número)",
+        },
+        telefono: {
+          type: "string",
+          description: "Número de teléfono del cliente",
+        },
+        cuit: {
+          type: "string",
+          description: "CUIT, CUIL o DNI del cliente",
+        },
+      },
+      required: ["nombre", "telefono"],
+    },
+  },
 ];
 
-async function callClaude(chatId, userMessage, clientInfo) {
+async function callClaude(chatId, userMessage, clientInfo, phoneNumber) {
   const history = conversations.get(chatId) || [];
+  // Save history length before modifying, so we can rollback on error
+  const historyLenBefore = history.length;
   history.push({ role: "user", content: userMessage });
   // Cap history at last 20 messages
   if (history.length > 20) history.splice(0, history.length - 20);
 
+  console.log(`[CLAUDE] ${chatId}: msg="${userMessage.substring(0, 60)}" history=${history.length} client=${clientInfo?.nombre || "anon"}`);
+
   let systemWithContext = SYSTEM_PROMPT;
   if (clientInfo) {
     systemWithContext += `\n\nESTÁS HABLANDO CON UN CLIENTE REGISTRADO:\n- Nombre: ${clientInfo.nombre}\n- CUIT: ${clientInfo.cuit || "(no cargado)"}\n- Saldo cuenta corriente: ${formatPrice(clientInfo.saldo)}`;
+  } else {
+    systemWithContext += `\n\nESTÁS HABLANDO CON UN CLIENTE NO REGISTRADO.\nSu número de teléfono es: ${phoneNumber}\nYa le pedimos sus datos para registrarse. Si te los pasa, usá register_client. Usá el teléfono ${phoneNumber} como teléfono si no te da otro.`;
   }
 
   // Loop until Claude is done with tool use
   let iteration = 0;
+  try {
   while (iteration < 5) {
     iteration++;
+    console.log(`[CLAUDE] ${chatId}: API call iter=${iteration} msgs=${history.length}`);
     const response = await anthropic.messages.create({
       model: MODEL,
       max_tokens: 1024,
@@ -109,6 +174,7 @@ async function callClaude(chatId, userMessage, clientInfo) {
     }
 
     // Execute tools
+    console.log(`[TOOL] ${chatId}: ${toolUses.map(t => t.name + "(" + JSON.stringify(t.input).substring(0, 60) + ")").join(", ")}`);
     const toolResults = [];
     for (const tu of toolUses) {
       let result;
@@ -133,6 +199,34 @@ async function callClaude(chatId, userMessage, clientInfo) {
               })),
             };
           }
+        } else if (tu.name === "search_by_brand") {
+          const data = await searchByBrand(tu.input.brand, tu.input.product_keywords || "");
+          if (!data.brand) {
+            result = { found: 0, message: "No se encontró esa marca." };
+          } else {
+            result = {
+              brand: data.brand.nombre,
+              brand_url: data.brand.url,
+              found: data.products.length,
+              products: data.products.map((p) => ({
+                nombre: p.name,
+                precio_mayorista: formatPrice(p.mayorista),
+                precio_caja_cerrada: p.cajaCerrada > 0 ? formatPrice(p.cajaCerrada) : null,
+                stock: p.stock,
+                disponible: p.disponible,
+                link: p.url,
+              })),
+            };
+          }
+        } else if (tu.name === "register_client") {
+          const reg = await registerClient({
+            nombre: tu.input.nombre,
+            direccion: tu.input.direccion || "",
+            telefono: tu.input.telefono,
+            cuit: tu.input.cuit || "",
+          });
+          console.log(`[REGISTER] ${chatId}: registered ${reg.nombre} as client ${reg.cod}`);
+          result = { success: true, clienteCod: reg.cod, nombre: reg.nombre, message: "Cliente registrado exitosamente." };
         } else {
           result = { error: "Herramienta desconocida" };
         }
@@ -150,6 +244,13 @@ async function callClaude(chatId, userMessage, clientInfo) {
 
   conversations.set(chatId, history);
   return "Disculpá, tuve un problema procesando tu consulta. ¿Podés intentar de nuevo?";
+  } catch (err) {
+    // Rollback history to avoid corrupted state (dangling tool_use without tool_result)
+    console.error(`[CLAUDE-ERR] ${chatId}: ${err.message} — rolling back history from ${history.length} to ${historyLenBefore}`);
+    history.splice(historyLenBefore);
+    conversations.set(chatId, history);
+    throw err;
+  }
 }
 
 // Initialize WhatsApp client
@@ -200,7 +301,8 @@ client.on("message", async (msg) => {
   // Check if a human took over recently
   const takeover = humanTakeover.get(chatId);
   if (takeover && Date.now() - takeover < HUMAN_SILENCE_MS) {
-    console.log(`  → silenced (human took over)`);
+    const minsLeft = Math.round((HUMAN_SILENCE_MS - (Date.now() - takeover)) / 60000);
+    console.log(`[SKIP] ${chatId}: silenced (human took over ${minsLeft}min left)`);
     return;
   }
 
@@ -224,29 +326,33 @@ client.on("message", async (msg) => {
     const phoneNumber = chatId.replace("@c.us", "").replace("@lid", "");
     const clientInfo = await findClientByPhone(phoneNumber);
 
-    // New client: no record in DB and no prior conversation → send registration message
-    const hasHistory = conversations.has(chatId);
-    if (!clientInfo && !hasHistory) {
-      console.log(`[NEW] ${chatId}: cliente nuevo, enviando mensaje de registro`);
-      botReplying.add(chatId);
-      try {
-        await msg.reply(NEW_CLIENT_MESSAGE);
-      } finally {
-        setTimeout(() => botReplying.delete(chatId), 2000);
+    // Unregistered client: not in DB → send registration message first time, then keep listening for data
+    markSeen(chatId);
+    if (!clientInfo) {
+      const alreadySentRegistration = conversations.has(chatId);
+      if (!alreadySentRegistration && !seenChats.has(chatId)) {
+        console.log(`[NEW] ${chatId}: no registrado, enviando mensaje de registro`);
+        botReplying.add(chatId);
+        try {
+          await msg.reply(NEW_CLIENT_MESSAGE);
+        } finally {
+          setTimeout(() => botReplying.delete(chatId), 2000);
+        }
+        conversations.set(chatId, [
+          { role: "user", content: msg.body },
+          { role: "assistant", content: NEW_CLIENT_MESSAGE },
+        ]);
+        return;
       }
-      // Still let Claude handle future messages in this session
-      conversations.set(chatId, [
-        { role: "user", content: msg.body },
-        { role: "assistant", content: NEW_CLIENT_MESSAGE },
-      ]);
-      return;
+      // Already sent registration — let Claude handle to collect data and register
+      console.log(`[UNREG] ${chatId}: no registrado, esperando datos`);
     }
 
     // Show typing indicator
     const chat = await msg.getChat();
     await chat.sendStateTyping();
 
-    const reply = await callClaude(chatId, msg.body, clientInfo);
+    const reply = await callClaude(chatId, msg.body, clientInfo, phoneNumber);
     // Strip any markdown formatting Claude might sneak in
     const cleanReply = reply.replace(/\*\*/g, "").replace(/\*/g, "").replace(/__/g, "").replace(/_/g, "");
     console.log(`[OUT] ${chatId}: ${cleanReply.substring(0, 100)}`);

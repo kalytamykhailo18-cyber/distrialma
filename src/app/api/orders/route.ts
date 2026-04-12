@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getPool, getDbName } from "@/lib/mssql";
+import { prisma } from "@/lib/prisma";
 import type { CartItem } from "@/types";
 
 const SUCURSAL = (process.env.PUNTOUCH_SUCURSAL || "7").padEnd(3, " ");
@@ -90,6 +91,7 @@ export async function POST(req: NextRequest) {
     // Expand combos into individual products for PunTouch
     interface ExpandedItem {
       sku: string;
+      name: string;
       cant: number;
       price: number;
       listaPrecio: number;
@@ -112,6 +114,7 @@ export async function POST(req: NextRequest) {
           const unitPrice = prodResult.recordset[0]?.precio || 0;
           expandedItems.push({
             sku: ci.sku,
+            name: ci.name || ci.sku,
             cant: ci.quantity * item.quantity,
             price: unitPrice,
             listaPrecio: 2,
@@ -122,6 +125,7 @@ export async function POST(req: NextRequest) {
         const unitAutoBox = item.mode === "unit" && item.precioCajaCerrada > 0 && item.cantidadPorCaja > 0 && item.quantity >= item.cantidadPorCaja;
         expandedItems.push({
           sku: item.sku,
+          name: item.name || item.sku,
           cant: isBox ? item.cantidadPorCaja * item.quantity : item.quantity,
           price: isBox ? item.precioCajaCerrada : unitAutoBox ? item.precioCajaCerrada : item.precioMayorista,
           listaPrecio: (isBox || unitAutoBox) ? 4 : 2,
@@ -272,6 +276,34 @@ export async function POST(req: NextRequest) {
       `);
 
       nextCod++;
+    }
+
+    // Save precarga snapshot to PostgreSQL for future comparison
+    try {
+      await prisma.archivedOrder.create({
+        data: {
+          boleta: boletaCod.trim(),
+          nroped: nextNroped,
+          fechora: fechora,
+          clienteCod: client.cod.padStart(7, " "),
+          clienteName: client.nombre,
+          totalCant: totalCant,
+          total: totalImpo,
+          notas: notes || "",
+          items: {
+            create: expandedItems.map((ei) => ({
+              sku: ei.sku.padStart(7, " "),
+              productName: ei.name.substring(0, 60),
+              cant: ei.cant,
+              precio: ei.price,
+              impo: ei.price * ei.cant,
+              listaPrecio: ei.listaPrecio,
+            })),
+          },
+        },
+      });
+    } catch (archiveErr) {
+      console.error("Error saving precarga snapshot:", archiveErr);
     }
 
     return NextResponse.json({

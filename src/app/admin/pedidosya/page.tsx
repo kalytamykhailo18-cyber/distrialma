@@ -1129,7 +1129,7 @@ export default function PedidosYaPage() {
                             <td className="p-3">
                               <input type="checkbox" checked={selected.has(c.peyaSku)} onChange={() => toggle(c.peyaSku, "prices")} className="rounded" />
                             </td>
-                            <td className="p-3"><span className="text-gray-400 text-xs font-mono mr-1.5">{c.peyaSku}</span><span className="font-medium">{c.peyaName}</span></td>
+                            <td className="p-3"><span className="text-gray-400 text-xs font-mono mr-1.5 cursor-pointer hover:text-gray-700 hover:underline" onClick={(e) => { navigator.clipboard.writeText(c.peyaSku.replace(/^0+/, "")); const el = e.currentTarget; el.dataset.orig = el.textContent || ""; el.textContent = "Copiado!"; el.classList.add("text-green-600"); setTimeout(() => { el.textContent = el.dataset.orig || ""; el.classList.remove("text-green-600"); }, 1000); }}>{c.peyaSku}</span><span className="font-medium">{c.peyaName}</span></td>
                             <td className="p-3 text-gray-500 font-mono text-xs">{c.barcode}</td>
                             <td className="p-3 text-right text-red-500">{fmt(c.currentPrice)}</td>
                             <td className="p-3 text-right text-green-600 font-semibold">{fmt(c.newPrice)}</td>
@@ -1182,7 +1182,7 @@ export default function PedidosYaPage() {
                           <td className="p-3">
                             <input type="checkbox" checked={selectedStock.has(c.peyaSku)} onChange={() => toggle(c.peyaSku, "stock")} className="rounded" />
                           </td>
-                          <td className="p-3"><span className="text-gray-400 text-xs font-mono mr-1.5">{c.peyaSku}</span><span className="font-medium">{c.peyaName}</span></td>
+                          <td className="p-3"><span className="text-gray-400 text-xs font-mono mr-1.5 cursor-pointer hover:text-gray-700 hover:underline" onClick={(e) => { navigator.clipboard.writeText(c.peyaSku.replace(/^0+/, "")); const el = e.currentTarget; el.dataset.orig = el.textContent || ""; el.textContent = "Copiado!"; el.classList.add("text-green-600"); setTimeout(() => { el.textContent = el.dataset.orig || ""; el.classList.remove("text-green-600"); }, 1000); }}>{c.peyaSku}</span><span className="font-medium">{c.peyaName}</span></td>
                           <td className="p-3 text-center">
                             <span className={`font-mono font-bold ${c.stock <= 0 ? "text-red-500" : "text-green-600"}`}>
                               {c.stock === -999 ? "Sin L5" : c.stock}

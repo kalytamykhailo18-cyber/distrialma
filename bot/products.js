@@ -25,6 +25,25 @@ const dbClientes = () => process.env.MSSQL_DB_CLIENTES;
  * Returns up to `limit` matches with mayorista price, caja cerrada price, stock.
  * Only returns products with Precio2 > 0 (visible in store).
  */
+// Common synonyms/abbreviations customers use
+const SYNONYMS = {
+  fetas: "feteado",
+  feta: "feteado",
+  muzza: "muzzarella",
+  muza: "muzzarella",
+  coca: "coca cola",
+  sprite: "sprite",
+  serenisima: "serenisima",
+  yogu: "yogur",
+  galletitas: "galletita",
+  fideos: "fideo",
+  papas: "papa",
+  salchi: "salchich",
+  morta: "mortadela",
+  jamon: "jamon",
+  cremoso: "cremoso",
+};
+
 export async function searchProducts(query, limit = 8) {
   const pool = await getPool();
   const words = query
@@ -33,7 +52,8 @@ export async function searchProducts(query, limit = 8) {
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9 ]/g, " ")
     .split(/\s+/)
-    .filter((w) => w.length >= 2);
+    .filter((w) => w.length >= 2)
+    .map((w) => SYNONYMS[w] || w);
 
   if (words.length === 0) return [];
 
@@ -147,6 +167,125 @@ export async function findClientByPhone(phoneNumber) {
     console.error("Error finding client:", e.message);
     return null;
   }
+}
+
+/**
+ * Search for a brand by name, return its code and web URL.
+ * If productKeywords given, filter products of that brand.
+ */
+export async function searchByBrand(brandName, productKeywords = "", limit = 8) {
+  const pool = await getPool();
+  const cleanBrand = brandName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9 ]/g, " ").trim();
+
+  // Find the brand
+  const brandResult = await pool.request()
+    .input("b", `%${cleanBrand}%`)
+    .query(`SELECT TOP 1 Cod, LTRIM(RTRIM([Desc])) AS nombre FROM [${dbProd()}].dbo.Marcas WHERE [Desc] LIKE @b`);
+
+  if (brandResult.recordset.length === 0) return { brand: null, products: [] };
+
+  const brand = brandResult.recordset[0];
+  const brandCod = brand.Cod;
+
+  // Get products of this brand
+  const req = pool.request().input("marca", brandCod);
+  let extraWhere = "";
+  if (productKeywords) {
+    const words = productKeywords.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9 ]/g, " ").split(/\s+/).filter(w => w.length >= 2);
+    words.forEach((w, i) => {
+      req.input(`pw${i}`, `%${w}%`);
+      extraWhere += ` AND p.Nombre LIKE @pw${i}`;
+    });
+  }
+
+  const result = await req.query(`
+    SELECT TOP ${limit}
+      LTRIM(RTRIM(p.Cod)) AS sku,
+      LTRIM(RTRIM(p.Nombre)) AS name,
+      LTRIM(RTRIM(ISNULL(r.[Desc], ''))) AS rubro,
+      ISNULL(s.Precio2, 0) AS mayorista,
+      ISNULL(s.Precio4, 0) AS cajaCerrada,
+      ISNULL(s.Stk, 0) AS stock
+    FROM [${dbProd()}].dbo.Productos p
+    JOIN [${dbProd()}].dbo.Stock s ON s.CodProducto = p.Cod AND LTRIM(RTRIM(s.Deposito)) = '0'
+    LEFT JOIN [${dbProd()}].dbo.Rubros r ON r.Cod = p.Rubro
+    WHERE (p.DeBaja = 0 OR p.DeBaja IS NULL)
+      AND s.Precio2 > 0
+      AND p.Marca = @marca
+      ${extraWhere}
+    ORDER BY p.Nombre
+  `);
+
+  return {
+    brand: {
+      nombre: brand.nombre,
+      cod: String(brandCod).trim(),
+      url: `https://distrialma.com.ar/marca/${String(brandCod).trim()}`,
+    },
+    products: result.recordset.map(p => {
+      const stock = Number(p.stock);
+      const isPesable = / KG$/i.test(p.name) || /X\s*KG$/i.test(p.name);
+      return {
+        sku: p.sku,
+        name: p.name,
+        rubro: p.rubro,
+        mayorista: Number(p.mayorista),
+        cajaCerrada: Number(p.cajaCerrada),
+        stock: isPesable ? `${stock.toFixed(1)} kg` : Math.floor(stock),
+        disponible: stock > 0,
+        url: `https://distrialma.com.ar/productos/${p.sku}`,
+      };
+    }),
+  };
+}
+
+/**
+ * Register a new client in PunTouch Clientes table.
+ * Returns the new client code.
+ */
+export async function registerClient({ nombre, direccion, telefono, cuit }) {
+  const pool = await getPool();
+  // Get next Cod
+  const maxResult = await pool.request().query(
+    `SELECT MAX(CAST(LTRIM(RTRIM(Cod)) AS INT)) AS maxCod FROM [${dbClientes()}].dbo.Clientes`
+  );
+  const nextCod = (maxResult.recordset[0]?.maxCod || 0) + 1;
+  const codPadded = String(nextCod).padStart(7, " ");
+
+  // Today as YYYYMMDD
+  const now = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Argentina/Buenos_Aires" }));
+  const fechaAlta = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
+
+  // Clean phone: keep only digits
+  const telClean = (telefono || "").replace(/[^0-9]/g, "").slice(-14).padEnd(14, " ");
+
+  await pool.request()
+    .input("cod", codPadded)
+    .input("nombre", (nombre || "").toUpperCase().substring(0, 60))
+    .input("calle", (direccion || "").toUpperCase().substring(0, 40))
+    .input("tel", telClean)
+    .input("cuit", (cuit || "").replace(/[^0-9]/g, "").substring(0, 14))
+    .input("fecha", fechaAlta)
+    .query(`
+      INSERT INTO [${dbClientes()}].dbo.Clientes
+        (Cod, Nombre, Calle, Nume, PisoDto, Entre1, Entre2, Localidad, Zona, CodPostal,
+         TelClave1, TelClave2, Telclave3, Observaciones, Email, FechaAlta, FechaUlt, FechaBaja,
+         DeBaja, MotivoBaja, TransaUlt, Saldo, IVA, CUIT, Cumple, Descuento, ListaPrecios,
+         Puntaje, TotalCompras, TotalVeces, Vendedor,
+         FillerNum1, FillerNum2, FillerNum3, FillerNum4, FillerNum5,
+         Filler1, Filler2, Filler3, Filler4,
+         FillerBit1, FillerBit2, FillerBit3, FillerBit4, FillerBit5)
+      VALUES
+        (@cod, @nombre, @calle, '', '', '', '', '    ', '    ', '',
+         @tel, '              ', '              ', 'ALMA2026', '', @fecha, @fecha, '        ',
+         0, '', '         ', 0, ' ', @cuit, '    ', 0, '2',
+         0, 0, 0, '       ',
+         0, 0, 0, 0, 0,
+         '', '', '', '',
+         0, 0, 0, 0, 0)
+    `);
+
+  return { cod: String(nextCod), nombre: (nombre || "").toUpperCase() };
 }
 
 export function formatPrice(n) {

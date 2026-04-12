@@ -271,19 +271,19 @@ export async function PUT(
           // Auto-recalculate maintaining margin ratio, but clamp result to safe max
           priceUpdates = `,
                 Precio = CASE WHEN ISNULL(Costo, 0) > 0 AND ISNULL(Precio, 0) > 0
-                  THEN CASE WHEN ROUND(@costo * Precio / Costo, 0) > 999999999 THEN 999999999 ELSE ROUND(@costo * Precio / Costo, 0) END
+                  THEN CASE WHEN ROUND(CAST(@costo AS FLOAT) * CAST(Precio AS FLOAT) / CAST(Costo AS FLOAT), 0) > 999999999 THEN 999999999 ELSE ROUND(CAST(@costo AS FLOAT) * CAST(Precio AS FLOAT) / CAST(Costo AS FLOAT), 0) END
                   ELSE Precio END,
                 Precio2 = CASE WHEN ISNULL(Costo, 0) > 0 AND ISNULL(Precio2, 0) > 0
-                  THEN CASE WHEN ROUND(@costo * Precio2 / Costo, 0) > 999999999 THEN 999999999 ELSE ROUND(@costo * Precio2 / Costo, 0) END
+                  THEN CASE WHEN ROUND(CAST(@costo AS FLOAT) * CAST(Precio2 AS FLOAT) / CAST(Costo AS FLOAT), 0) > 999999999 THEN 999999999 ELSE ROUND(CAST(@costo AS FLOAT) * CAST(Precio2 AS FLOAT) / CAST(Costo AS FLOAT), 0) END
                   ELSE Precio2 END,
                 Precio3 = CASE WHEN ISNULL(Costo, 0) > 0 AND ISNULL(Precio3, 0) > 0
-                  THEN CASE WHEN ROUND(@costo * Precio3 / Costo, 0) > 999999999 THEN 999999999 ELSE ROUND(@costo * Precio3 / Costo, 0) END
+                  THEN CASE WHEN ROUND(CAST(@costo AS FLOAT) * CAST(Precio3 AS FLOAT) / CAST(Costo AS FLOAT), 0) > 999999999 THEN 999999999 ELSE ROUND(CAST(@costo AS FLOAT) * CAST(Precio3 AS FLOAT) / CAST(Costo AS FLOAT), 0) END
                   ELSE Precio3 END,
                 Precio4 = CASE WHEN ISNULL(Costo, 0) > 0 AND ISNULL(Precio4, 0) > 0
-                  THEN CASE WHEN ROUND(@costo * Precio4 / Costo, 0) > 999999999 THEN 999999999 ELSE ROUND(@costo * Precio4 / Costo, 0) END
+                  THEN CASE WHEN ROUND(CAST(@costo AS FLOAT) * CAST(Precio4 AS FLOAT) / CAST(Costo AS FLOAT), 0) > 999999999 THEN 999999999 ELSE ROUND(CAST(@costo AS FLOAT) * CAST(Precio4 AS FLOAT) / CAST(Costo AS FLOAT), 0) END
                   ELSE Precio4 END,
                 Precio5 = CASE WHEN ISNULL(Costo, 0) > 0 AND ISNULL(Precio5, 0) > 0
-                  THEN CASE WHEN ROUND(@costo * Precio5 / Costo, 0) > 999999999 THEN 999999999 ELSE ROUND(@costo * Precio5 / Costo, 0) END
+                  THEN CASE WHEN ROUND(CAST(@costo AS FLOAT) * CAST(Precio5 AS FLOAT) / CAST(Costo AS FLOAT), 0) > 999999999 THEN 999999999 ELSE ROUND(CAST(@costo AS FLOAT) * CAST(Precio5 AS FLOAT) / CAST(Costo AS FLOAT), 0) END
                   ELSE Precio5 END`;
         }
 
