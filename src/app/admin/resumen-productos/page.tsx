@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { formatPrice } from "@/lib/utils";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { HiChevronDown, HiSearch } from "react-icons/hi";
@@ -106,26 +107,26 @@ export default function ResumenProductosPage() {
           {/* Charts */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
             {/* Top rubros bar chart */}
-            <div className="bg-white border rounded-xl p-4">
+            <div className="bg-white border rounded-xl p-4 overflow-hidden">
               <h3 className="text-sm font-bold text-gray-700 mb-3">Top Rubros — Ganancia</h3>
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={data.rubros.slice(0, 10)} layout="vertical" margin={{ left: 10, right: 10 }}>
                   <XAxis type="number" tickFormatter={fmtK} tick={{ fontSize: 11 }} />
                   <YAxis type="category" dataKey="rubro" width={120} tick={{ fontSize: 10 }} />
-                  <Tooltip formatter={(v) => fmt(Number(v))} />
+                  <Tooltip formatter={(v) => fmt(Number(v))} wrapperStyle={{ zIndex: 10, maxWidth: "90vw" }} />
                   <Bar dataKey="ganancia" fill="#22c55e" radius={[0, 4, 4, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
 
             {/* Top marcas pie chart */}
-            <div className="bg-white border rounded-xl p-4">
+            <div className="bg-white border rounded-xl p-4 overflow-hidden">
               <h3 className="text-sm font-bold text-gray-700 mb-3">Top Marcas — Ventas</h3>
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={data.marcas.slice(0, 10)} layout="vertical" margin={{ left: 10, right: 10 }}>
                   <XAxis type="number" tickFormatter={fmtK} tick={{ fontSize: 11 }} />
                   <YAxis type="category" dataKey="marca" width={120} tick={{ fontSize: 10 }} />
-                  <Tooltip formatter={(v) => fmt(Number(v))} />
+                  <Tooltip formatter={(v) => fmt(Number(v))} wrapperStyle={{ zIndex: 10, maxWidth: "90vw" }} />
                   <Bar dataKey="totalVenta" fill="#3b82f6" radius={[0, 4, 4, 0]} />
                 </BarChart>
               </ResponsiveContainer>
@@ -157,7 +158,7 @@ export default function ResumenProductosPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="text-xs text-gray-400 font-mono">{p.sku}</span>
-                        <span className={`text-sm font-medium truncate ${isOpen ? "text-brand-700" : "text-gray-900"}`}>{p.nombre}</span>
+                        <Link href={`/admin/dashboard/producto?sku=${p.sku}`} target="_blank" onClick={(e) => e.stopPropagation()} className={`text-sm font-medium truncate hover:underline ${isOpen ? "text-brand-700" : "text-gray-900"}`}>{p.nombre}</Link>
                       </div>
                       <div className="text-xs text-gray-400">{p.marca} — {p.rubro}</div>
                     </div>

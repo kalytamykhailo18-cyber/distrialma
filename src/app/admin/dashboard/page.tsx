@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { formatPrice } from "@/lib/utils";
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from "recharts";
-import { HiTrendingUp, HiTrendingDown, HiChevronDown } from "react-icons/hi";
+import { HiTrendingUp, HiTrendingDown, HiChevronDown, HiSearch } from "react-icons/hi";
+import Link from "next/link";
 
 const SUC_NAMES: Record<string, string> = { "1": "Minorista 435", "2": "Mayorista 387", "6": "May. Pontevedra", "7": "Distribuidora" };
 const DIAS_SEMANA = ["lunes", "martes", "miercoles", "jueves", "viernes", "sabado", "domingo"];
@@ -32,6 +33,7 @@ export default function DashboardPage() {
   const [mes, setMes] = useState(() => new Date().toISOString().slice(0, 7));
   const [sucursales, setSucursales] = useState(["1", "2", "6", "7"]);
   const [expandedCliente, setExpandedCliente] = useState<string | null>(null);
+  const [clientSearch, setClientSearch] = useState("");
   const [deadStock, setDeadStock] = useState<{ dias: number; cantProductos: number; totalInmovilizado: number; productos: Array<{ sku: string; nombre: string; marca: string; rubro: string; stock: number; costoUnit: number; costoInmovilizado: number; unidad: string }> } | null>(null);
   const [deadDias, setDeadDias] = useState(30);
   const [deadLimit, setDeadLimit] = useState(30);
@@ -126,14 +128,14 @@ export default function DashboardPage() {
           </div>
 
           {/* Daily sales chart */}
-          <div className="bg-white border rounded-xl p-4 mb-6">
+          <div className="bg-white border rounded-xl p-4 mb-6 overflow-hidden">
             <h3 className="text-sm font-bold text-gray-700 mb-3">Ventas Diarias</h3>
             <ResponsiveContainer width="100%" height={280}>
               <LineChart data={dailyChart}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis dataKey="dia" tick={{ fontSize: 11 }} />
                 <YAxis tickFormatter={fmtK} tick={{ fontSize: 11 }} />
-                <Tooltip formatter={(v) => fmt(Number(v))} />
+                <Tooltip formatter={(v) => fmt(Number(v))} wrapperStyle={{ zIndex: 10, maxWidth: "90vw" }} />
                 <Legend />
                 <Line type="monotone" dataKey="actual" name="Este mes" stroke="#f97316" strokeWidth={2} dot={false} />
                 <Line type="monotone" dataKey="anterior" name="Mes anterior" stroke="#d1d5db" strokeWidth={1.5} strokeDasharray="5 5" dot={false} />
@@ -143,26 +145,26 @@ export default function DashboardPage() {
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
             {/* Payment methods */}
-            <div className="bg-white border rounded-xl p-4">
+            <div className="bg-white border rounded-xl p-4 overflow-hidden">
               <h3 className="text-sm font-bold text-gray-700 mb-3">Metodos de Pago</h3>
               <ResponsiveContainer width="100%" height={280}>
                 <BarChart data={data.metodosPago.slice(0, 10)} layout="vertical" margin={{ left: 10, right: 10 }}>
                   <XAxis type="number" tickFormatter={fmtK} tick={{ fontSize: 11 }} />
                   <YAxis type="category" dataKey="nombre" width={130} tick={{ fontSize: 10 }} />
-                  <Tooltip formatter={(v) => fmt(Number(v))} />
+                  <Tooltip formatter={(v) => fmt(Number(v))} wrapperStyle={{ zIndex: 10, maxWidth: "90vw" }} />
                   <Bar dataKey="total" fill="#3b82f6" radius={[0, 4, 4, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
 
             {/* Employee performance */}
-            <div className="bg-white border rounded-xl p-4">
+            <div className="bg-white border rounded-xl p-4 overflow-hidden">
               <h3 className="text-sm font-bold text-gray-700 mb-3">Rendimiento por Empleado</h3>
               <ResponsiveContainer width="100%" height={280}>
                 <BarChart data={data.empleados.slice(0, 10)} layout="vertical" margin={{ left: 10, right: 10 }}>
                   <XAxis type="number" tickFormatter={fmtK} tick={{ fontSize: 11 }} />
                   <YAxis type="category" dataKey="nombre" width={130} tick={{ fontSize: 10 }} />
-                  <Tooltip formatter={(v) => fmt(Number(v))} />
+                  <Tooltip formatter={(v) => fmt(Number(v))} wrapperStyle={{ zIndex: 10, maxWidth: "90vw" }} />
                   <Bar dataKey="totalVenta" name="Ventas" fill="#22c55e" radius={[0, 4, 4, 0]} />
                 </BarChart>
               </ResponsiveContainer>
@@ -209,20 +211,29 @@ export default function DashboardPage() {
             </div>
           </div>
 
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
           {/* Top clients */}
-          <div className="bg-white border rounded-xl overflow-hidden mb-6">
-            <div className="px-4 py-3 border-b">
+          <div className="bg-white border rounded-xl overflow-hidden">
+            <div className="px-4 py-3 border-b flex flex-wrap items-center gap-3">
               <h3 className="text-sm font-bold text-gray-700">Top 20 Clientes</h3>
+              <div className="relative flex-1 min-w-[200px]">
+                <HiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <input type="text" value={clientSearch} onChange={(e) => setClientSearch(e.target.value)} placeholder="Buscar cliente..."
+                  className="w-full pl-9 pr-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-brand-500" />
+              </div>
             </div>
-            <div className="divide-y">
-              {data.topClientes.map((c) => {
+            <div className="divide-y max-h-[500px] overflow-y-auto">
+              {(clientSearch
+                ? data.topClientes.filter((c) => (c.nombre || "").toLowerCase().includes(clientSearch.toLowerCase()) || c.clienteCod.includes(clientSearch))
+                : data.topClientes
+              ).map((c) => {
                 const isOpen = expandedCliente === c.clienteCod;
                 return (
                   <div key={c.clienteCod} className={isOpen ? "bg-brand-50 border-l-4 border-l-brand-500" : ""}>
                     <button onClick={() => setExpandedCliente(isOpen ? null : c.clienteCod)}
                       className={`w-full px-4 py-2.5 flex items-center justify-between text-left ${isOpen ? "" : "hover:bg-gray-50"}`}>
                       <div className="flex-1 min-w-0">
-                        <span className={`text-sm font-medium truncate ${isOpen ? "text-brand-700" : "text-gray-900"}`}>{c.nombre || "Sin nombre"}</span>
+                        <Link href={`/admin/dashboard/cliente?cod=${c.clienteCod}`} target="_blank" onClick={(e) => e.stopPropagation()} className={`text-sm font-medium truncate hover:underline ${isOpen ? "text-brand-700" : "text-gray-900"}`}>{c.nombre || "Sin nombre"}</Link>
                       </div>
                       <div className="flex items-center gap-4 shrink-0">
                         <div className="text-right">
@@ -245,7 +256,7 @@ export default function DashboardPage() {
 
           {/* Dead stock */}
           {deadStock && (
-            <div className="bg-white border rounded-xl overflow-hidden mb-6">
+            <div className="bg-white border rounded-xl overflow-hidden">
               <div className="px-4 py-3 border-b flex flex-wrap items-center gap-3">
                 <h3 className="text-sm font-bold text-gray-700">Productos sin Movimiento</h3>
                 <div className="flex gap-1">
@@ -260,13 +271,13 @@ export default function DashboardPage() {
                   {deadStock.cantProductos} productos — <span className="text-red-600 font-bold">{fmtK(deadStock.totalInmovilizado)}</span> inmovilizado
                 </div>
               </div>
-              <div className="divide-y">
-                {deadStock.productos.slice(0, deadLimit).map((p) => (
-                  <div key={p.sku} className="px-4 py-2 flex items-center justify-between hover:bg-red-50/50">
+              <div className="divide-y max-h-[500px] overflow-y-auto">
+                {deadStock.productos.map((p) => (
+                  <Link key={p.sku} href={`/admin/dashboard/producto?sku=${p.sku}`} target="_blank" className="px-4 py-2 flex items-center justify-between hover:bg-red-50/50 block">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="text-xs text-gray-400 font-mono">{p.sku}</span>
-                        <span className="text-sm text-gray-900 truncate">{p.nombre}</span>
+                        <span className="text-sm text-gray-900 truncate hover:underline">{p.nombre}</span>
                       </div>
                       <div className="text-xs text-gray-400">{p.marca} — {p.rubro}</div>
                     </div>
@@ -280,7 +291,7 @@ export default function DashboardPage() {
                         <div className="text-xs text-gray-400">inmovilizado</div>
                       </div>
                     </div>
-                  </div>
+                  </Link>
                 ))}
               </div>
               {deadStock.productos.length > deadLimit && (
@@ -290,6 +301,7 @@ export default function DashboardPage() {
               )}
             </div>
           )}
+          </div>
         </>
       )}
     </div>

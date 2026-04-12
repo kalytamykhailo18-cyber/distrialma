@@ -23,8 +23,19 @@ export async function GET(req: NextRequest) {
     d.setDate(d.getDate() - dias);
     const cutoff = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}000000`;
 
-    // Products with stock > 0 that have NO sales in the last N days
-    const result = await pool.request().input("cutoff", cutoff).input("dep", deposito).query(`
+    // Step 1: Get SKUs that DID sell recently (fast query on Transas)
+    const soldSkus = await pool.request().input("cutoff", cutoff).query(`
+      SELECT DISTINCT t.Producto AS sku
+      FROM [${dbTransas}].dbo.Transas t
+      WHERE t.Tipo = 'I'
+        AND t.Fechora >= @cutoff
+        AND (t.Anulado IS NULL OR LTRIM(RTRIM(t.Anulado)) = '' OR t.Anulado = ' ')
+        AND t.Cant > 0
+    `);
+    const soldSet = new Set(soldSkus.recordset.map((r: { sku: string }) => r.sku.trim()));
+
+    // Step 2: Get all products with stock, then filter in JS
+    const result = await pool.request().input("dep", deposito).query(`
       SELECT
         LTRIM(RTRIM(s.CodProducto)) AS sku,
         LTRIM(RTRIM(ISNULL(p.Nombre, ''))) AS nombre,
@@ -44,18 +55,13 @@ export async function GET(req: NextRequest) {
         AND s.Stk > 0
         AND s.Precio2 > 0
         AND (p.DeBaja = 0 OR p.DeBaja IS NULL)
-        AND NOT EXISTS (
-          SELECT 1 FROM [${dbTransas}].dbo.Transas t
-          WHERE t.Tipo = 'I'
-            AND LTRIM(RTRIM(t.Producto)) = LTRIM(RTRIM(s.CodProducto))
-            AND t.Fechora >= @cutoff
-            AND (t.Anulado IS NULL OR LTRIM(RTRIM(t.Anulado)) = '' OR t.Anulado = ' ')
-            AND t.Cant > 0
-        )
-      ORDER BY s.Stk * s.Costo DESC
     `);
 
-    const productos = result.recordset.map((p: { sku: string; nombre: string; marca: string; rubro: string; stock: number; costoUnit: number; costoInmovilizado: number; precioMayorista: number; unidad: string }) => ({
+    // Filter out products that sold recently
+    const filtered = result.recordset.filter((p: { sku: string }) => !soldSet.has(p.sku.trim()));
+    filtered.sort((a: { costoInmovilizado: number }, b: { costoInmovilizado: number }) => Number(b.costoInmovilizado) - Number(a.costoInmovilizado));
+
+    const productos = filtered.map((p: { sku: string; nombre: string; marca: string; rubro: string; stock: number; costoUnit: number; costoInmovilizado: number; precioMayorista: number; unidad: string }) => ({
       sku: p.sku.trim(),
       nombre: p.nombre,
       marca: p.marca,
