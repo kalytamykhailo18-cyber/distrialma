@@ -346,3 +346,17 @@ model CierreCaja {
   @@index([createdAt])
   @@map("cierres_caja")
 }
+
+model ProductoProveedor {
+  id            Int      @id @default(autoincrement())
+  sku           String   @db.VarChar(7)
+  productName   String   @default("") @db.VarChar(60)
+  proveedorCod  String   @db.VarChar(7)
+  proveedorName String   @db.VarChar(60)
+  createdAt     DateTime @default(now())
+
+  @@unique([sku, proveedorCod])
+  @@index([proveedorCod])
+  @@index([sku])
+  @@map("producto_proveedor")
+}

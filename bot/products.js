@@ -143,7 +143,7 @@ export async function findClientByPhone(phoneNumber) {
       .input("p10", `%${last10}%`)
       .input("p8", `%${last8}%`)
       .query(`
-        SELECT TOP 1
+        SELECT TOP 5
           LTRIM(RTRIM(Cod)) AS cod,
           LTRIM(RTRIM(Nombre)) AS nombre,
           LTRIM(RTRIM(ISNULL(CUIT, ''))) AS cuit,
@@ -158,12 +158,19 @@ export async function findClientByPhone(phoneNumber) {
             OR REPLACE(REPLACE(REPLACE(Telclave3, '-', ''), ' ', ''), '+', '') LIKE @p8)
       `);
     if (result.recordset.length === 0) return null;
+    // Return first account as main, but include all accounts
     const c = result.recordset[0];
+    const accounts = result.recordset.map((r) => ({
+      cod: r.cod,
+      nombre: r.nombre,
+      saldo: Number(r.saldo),
+    }));
     return {
       cod: c.cod,
       nombre: c.nombre,
       cuit: c.cuit,
       saldo: Number(c.saldo),
+      accounts: accounts.length > 1 ? accounts : undefined,
     };
   } catch (e) {
     console.error("Error finding client:", e.message);

@@ -6,7 +6,7 @@ import { formatPrice } from "@/lib/utils";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { HiChevronDown, HiSearch } from "react-icons/hi";
 
-const SUC_NAMES: Record<string, string> = { "1": "Minorista 435", "2": "Mayorista 387", "6": "May. Pontevedra", "7": "Distribuidora" };
+const SUC_NAMES: Record<string, string> = { "1": "Minorista 435", "2": "Mayorista 387", "6": "May. Pontevedra", "7": "Distribuidora", "10": "Reventas" };
 interface ListaData { lista: number; listaName: string; cantidad: number; totalVenta: number; ganancia: number }
 interface Product { sku: string; nombre: string; marca: string; rubro: string; totalVenta: number; totalCosto: number; ganancia: number; cantidad: number; margen: string; listas: ListaData[] }
 interface SucTotal { sucursal: string; cantVentas: number; totalVenta: number; totalCosto: number; ganancia: number; margen: string }
@@ -20,7 +20,7 @@ export default function ResumenProductosPage() {
   const [data, setData] = useState<ResumenData | null>(null);
   const [loading, setLoading] = useState(false);
   const [mes, setMes] = useState(() => new Date().toISOString().slice(0, 7));
-  const [sucursales, setSucursales] = useState(["1", "2", "6", "7"]);
+  const [sucursales, setSucursales] = useState(["1", "2", "6", "7", "10"]);
   const [search, setSearch] = useState("");
   const [expanded, setExpanded] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<"totalVenta" | "ganancia" | "cantidad" | "margen">("ganancia");
@@ -62,7 +62,7 @@ export default function ResumenProductosPage() {
       <div className="flex flex-wrap gap-3 mb-6">
         <input type="month" value={mes} onChange={(e) => setMes(e.target.value)} className="px-3 py-2 border border-brand-400 rounded-lg text-sm" />
         <div className="flex gap-1">
-          {["1", "2", "6", "7"].map((s) => (
+          {["1", "2", "6", "7", "10"].map((s) => (
             <button key={s} onClick={() => toggleSuc(s)}
               className={`px-3 py-2 rounded-lg text-xs font-medium transition-colors ${sucursales.includes(s) ? "bg-brand-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
               {SUC_NAMES[s] || `Suc ${s}`}

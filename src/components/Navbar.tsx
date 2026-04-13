@@ -124,6 +124,7 @@ export default function Navbar() {
     { href: "/admin/pedidosya", label: "PedidosYa", perm: "costeo", iconKey: "pedidosya" },
     { href: "/admin/cierre-caja", label: "Cierre Caja", perm: "informes", iconKey: "informes" },
     { href: "/admin/dashboard", label: "Dashboard", perm: "informes", iconKey: "informes" },
+    { href: "/admin/proveedores-productos", label: "Reposicion", perm: "compras", iconKey: "proveedores" },
     { href: "/admin/resumen-productos", label: "Resumen Prod.", perm: "informes", iconKey: "informes" },
     { href: "/admin/usuarios", label: "Usuarios", perm: "usuarios", iconKey: "usuarios" },
     { href: "/admin/etiquetas", label: "Etiquetas", perm: "etiquetas", iconKey: "etiquetas" },

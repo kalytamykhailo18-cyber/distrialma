@@ -397,6 +397,7 @@ export default function CierreCajaPage() {
             <option value="2">Mayorista 387</option>
             <option value="6">Mayorista Pontevedra</option>
             <option value="7">Distribuidora 387</option>
+            <option value="10">Reventas</option>
           </select>
         )}
       </div>

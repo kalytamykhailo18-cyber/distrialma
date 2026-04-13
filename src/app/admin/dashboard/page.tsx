@@ -6,7 +6,7 @@ import { BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContai
 import { HiTrendingUp, HiTrendingDown, HiChevronDown, HiSearch } from "react-icons/hi";
 import Link from "next/link";
 
-const SUC_NAMES: Record<string, string> = { "1": "Minorista 435", "2": "Mayorista 387", "6": "May. Pontevedra", "7": "Distribuidora" };
+const SUC_NAMES: Record<string, string> = { "1": "Minorista 435", "2": "Mayorista 387", "6": "May. Pontevedra", "7": "Distribuidora", "10": "Reventas" };
 const DIAS_SEMANA = ["lunes", "martes", "miercoles", "jueves", "viernes", "sabado", "domingo"];
 const DIAS_LABEL = ["Lun", "Mar", "Mie", "Jue", "Vie", "Sab", "Dom"];
 
@@ -31,7 +31,7 @@ export default function DashboardPage() {
   const [data, setData] = useState<DashData | null>(null);
   const [loading, setLoading] = useState(false);
   const [mes, setMes] = useState(() => new Date().toISOString().slice(0, 7));
-  const [sucursales, setSucursales] = useState(["1", "2", "6", "7"]);
+  const [sucursales, setSucursales] = useState(["1", "2", "6", "7", "10"]);
   const [expandedCliente, setExpandedCliente] = useState<string | null>(null);
   const [clientSearch, setClientSearch] = useState("");
   const [deadStock, setDeadStock] = useState<{ dias: number; cantProductos: number; totalInmovilizado: number; productos: Array<{ sku: string; nombre: string; marca: string; rubro: string; stock: number; costoUnit: number; costoInmovilizado: number; unidad: string }> } | null>(null);
@@ -92,7 +92,7 @@ export default function DashboardPage() {
       <div className="flex flex-wrap gap-3 mb-6">
         <input type="month" value={mes} onChange={(e) => setMes(e.target.value)} className="px-3 py-2 border border-brand-400 rounded-lg text-sm" />
         <div className="flex gap-1">
-          {["1", "2", "6", "7"].map((s) => (
+          {["1", "2", "6", "7", "10"].map((s) => (
             <button key={s} onClick={() => toggleSuc(s)}
               className={`px-3 py-2 rounded-lg text-xs font-medium transition-colors ${sucursales.includes(s) ? "bg-brand-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
               {SUC_NAMES[s]}
@@ -267,8 +267,100 @@ export default function DashboardPage() {
                     </button>
                   ))}
                 </div>
-                <div className="ml-auto text-xs text-gray-500">
-                  {deadStock.cantProductos} productos — <span className="text-red-600 font-bold">{fmtK(deadStock.totalInmovilizado)}</span> inmovilizado
+                <div className="ml-auto flex items-center gap-2">
+                  <span className="text-xs text-gray-500">{deadStock.cantProductos} prod. — <span className="text-red-600 font-bold">{fmtK(deadStock.totalInmovilizado)}</span></span>
+                  <button onClick={async () => {
+                    const { default: jsPDF } = await import("jspdf");
+                    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+                    const w = doc.internal.pageSize.getWidth();
+                    const pageH = doc.internal.pageSize.getHeight();
+                    let y = 15;
+                    let pageNum = 1;
+
+                    // Load logo
+                    let logoImg: string | null = null;
+                    try {
+                      const resp = await fetch("/logo.png");
+                      const blob = await resp.blob();
+                      logoImg = await new Promise<string>((resolve) => {
+                        const reader = new FileReader();
+                        reader.onload = () => resolve(reader.result as string);
+                        reader.readAsDataURL(blob);
+                      });
+                    } catch {}
+
+                    const drawHeader = () => {
+                      doc.setFillColor(251, 154, 71);
+                      doc.rect(0, 0, w, 22, "F");
+                      if (logoImg) {
+                        try { doc.addImage(logoImg, "PNG", 10, 3, 16, 16); } catch {}
+                      }
+                      doc.setTextColor(255, 255, 255);
+                      doc.setFontSize(13);
+                      doc.setFont("helvetica", "bold");
+                      doc.text(`Productos sin Movimiento — ${deadDias} dias`, logoImg ? 30 : 14, 10);
+                      doc.setFontSize(8);
+                      doc.setFont("helvetica", "normal");
+                      doc.text(`${new Date().toLocaleDateString("es-AR")} — ${deadStock.cantProductos} productos — Inmovilizado: ${fmt(deadStock.totalInmovilizado)}`, logoImg ? 30 : 14, 16);
+                      doc.text(`Pag. ${pageNum}`, w - 14, 16, { align: "right" });
+                    };
+
+                    const drawTableHeader = () => {
+                      doc.setFillColor(240, 240, 240);
+                      doc.rect(10, y, w - 20, 8, "F");
+                      doc.setFontSize(7);
+                      doc.setFont("helvetica", "bold");
+                      doc.setTextColor(100, 100, 100);
+                      const ty = y + 5.5;
+                      doc.text("SKU", 14, ty);
+                      doc.text("Producto", 30, ty);
+                      doc.text("Marca", 108, ty);
+                      doc.text("Stock", 143, ty, { align: "right" });
+                      doc.text("Costo Unit.", 168, ty, { align: "right" });
+                      doc.text("Inmovilizado", w - 14, ty, { align: "right" });
+                      y += 12;
+                    };
+
+                    const checkPage = (n = 10) => {
+                      if (y + n > pageH - 15) {
+                        doc.addPage();
+                        pageNum++;
+                        y = 15;
+                        drawHeader();
+                        y = 28;
+                        drawTableHeader();
+                      }
+                    };
+
+                    drawHeader();
+                    y = 28;
+                    drawTableHeader();
+
+                    doc.setFont("helvetica", "normal");
+                    doc.setFontSize(7);
+                    doc.setTextColor(50, 50, 50);
+                    for (const p of deadStock.productos) {
+                      checkPage(5);
+                      doc.text(p.sku, 14, y);
+                      doc.text(p.nombre.substring(0, 42), 30, y);
+                      doc.text(p.marca.substring(0, 12), 108, y);
+                      doc.text(`${p.stock} ${p.unidad === "KG" ? "kg" : "u"}`, 143, y, { align: "right" });
+                      doc.text(fmt(p.costoUnit), 168, y, { align: "right" });
+                      doc.text(fmt(p.costoInmovilizado), w - 14, y, { align: "right" });
+                      doc.setDrawColor(230, 230, 230);
+                      doc.line(10, y + 1.5, w - 10, y + 1.5);
+                      y += 4.5;
+                    }
+
+                    // Footer
+                    doc.setFontSize(7);
+                    doc.setTextColor(150, 150, 150);
+                    doc.text("distrialma.com.ar", w / 2, pageH - 8, { align: "center" });
+
+                    doc.save(`sin-movimiento-${deadDias}dias-${new Date().toISOString().slice(0, 10)}.pdf`);
+                  }} className="px-2 py-1 bg-red-500 text-white rounded text-xs font-medium hover:bg-red-600">
+                    PDF
+                  </button>
                 </div>
               </div>
               <div className="divide-y max-h-[500px] overflow-y-auto">

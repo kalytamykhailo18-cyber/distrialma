@@ -157,7 +157,16 @@ async function callClaude(chatId, userMessage, clientInfo, phoneNumber) {
 
   let systemWithContext = SYSTEM_PROMPT + `\n\nFECHA Y HORA ACTUAL: ${timeStr}`;
   if (clientInfo) {
-    systemWithContext += `\n\nESTÁS HABLANDO CON UN CLIENTE REGISTRADO:\n- Nombre: ${clientInfo.nombre}\n- CUIT: ${clientInfo.cuit || "(no cargado)"}\n- Saldo cuenta corriente: ${formatPrice(clientInfo.saldo)}`;
+    if (clientInfo.accounts) {
+      systemWithContext += `\n\nESTÁS HABLANDO CON UN CLIENTE REGISTRADO QUE TIENE ${clientInfo.accounts.length} CUENTAS:`;
+      for (const a of clientInfo.accounts) {
+        systemWithContext += `\n- ${a.nombre} (Cod: ${a.cod}): Saldo ${formatPrice(a.saldo)}`;
+      }
+      systemWithContext += `\n- CUIT: ${clientInfo.cuit || "(no cargado)"}`;
+      systemWithContext += `\nMostrá el saldo de todas las cuentas cuando pregunte.`;
+    } else {
+      systemWithContext += `\n\nESTÁS HABLANDO CON UN CLIENTE REGISTRADO:\n- Nombre: ${clientInfo.nombre}\n- CUIT: ${clientInfo.cuit || "(no cargado)"}\n- Saldo cuenta corriente: ${formatPrice(clientInfo.saldo)}`;
+    }
   } else {
     systemWithContext += `\n\nESTÁS HABLANDO CON UN CLIENTE NO REGISTRADO.\nSu número de teléfono es: ${phoneNumber}\nYa le pedimos sus datos para registrarse. Si te los pasa, usá register_client. Usá el teléfono ${phoneNumber} como teléfono si no te da otro.`;
   }
@@ -406,6 +415,18 @@ client.on("message", async (msg) => {
   }
 });
 
+// Known auto-reply patterns to ignore
+const AUTO_REPLY_PATTERNS = [
+  /fuera de horario/i,
+  /horario de atenci[oó]n/i,
+  /no estamos disponibles/i,
+  /respuesta autom[aá]tica/i,
+  /mensaje autom[aá]tico/i,
+  /nuestro horario/i,
+  /volvemos a las/i,
+  /atendemos de/i,
+];
+
 // Detect when human sends message → silence bot in that chat
 client.on("message_create", async (msg) => {
   if (!msg.fromMe) return;
@@ -413,6 +434,12 @@ client.on("message_create", async (msg) => {
   if (!chatId || chatId.endsWith("@g.us") || chatId === "status@broadcast") return;
   // Skip messages sent by the bot (race-safe: check if bot is replying to this chat)
   if (botReplying.has(chatId)) return;
+  // Skip WhatsApp auto-replies (fuera de horario, etc.)
+  const body = msg.body || "";
+  if (AUTO_REPLY_PATTERNS.some((p) => p.test(body))) {
+    console.log(`[AUTO-REPLY] ${chatId}: ignorando respuesta automática de WhatsApp`);
+    return;
+  }
   // This is a manual reply from a human → silence the bot in this chat
   console.log(`[HUMAN] ${chatId}: tomó el control del chat, silenciando bot por 2hs`);
   humanTakeover.set(chatId, Date.now());
