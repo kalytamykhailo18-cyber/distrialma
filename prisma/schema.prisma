@@ -337,14 +337,45 @@ model CierreCaja {
   pagos       Decimal  @db.Decimal(14, 2)
   inicioCaja  Decimal  @db.Decimal(14, 2)
   totalCaja   Decimal  @db.Decimal(14, 2)
-  nuevoInicio Decimal  @default(0) @db.Decimal(14, 2)
-  emailSent   Boolean  @default(false)
-  emailTo     String?  @db.VarChar(255)
-  createdAt   DateTime @default(now())
+  nuevoInicio  Decimal  @default(0) @db.Decimal(14, 2)
+  diferencia   Decimal  @default(0) @db.Decimal(14, 2)
+  responsable  String   @default("") @db.VarChar(60)
+  emailSent    Boolean  @default(false)
+  emailTo      String?  @db.VarChar(255)
+  createdAt    DateTime @default(now())
 
   @@index([sucursal])
   @@index([createdAt])
+  @@index([responsable])
   @@map("cierres_caja")
+}
+
+model WhatsAppChat {
+  id          Int      @id @default(autoincrement())
+  chatId      String   @unique @db.VarChar(50)
+  contactName String   @default("") @db.VarChar(100)
+  contactPhone String  @default("") @db.VarChar(20)
+  lastMessage String   @default("") @db.Text
+  lastMessageAt DateTime @default(now())
+  unread      Int      @default(0)
+  messages    WhatsAppMessage[]
+
+  @@index([lastMessageAt])
+  @@map("whatsapp_chats")
+}
+
+model WhatsAppMessage {
+  id        Int      @id @default(autoincrement())
+  chatId    String   @db.VarChar(50)
+  direction String   @db.VarChar(3) // "in" or "out"
+  body      String   @db.Text
+  sender    String   @default("") @db.VarChar(50) // "bot", "human", or contact name
+  mediaType String?  @db.VarChar(20)
+  timestamp DateTime @default(now())
+  chat      WhatsAppChat @relation(fields: [chatId], references: [chatId], onDelete: Cascade)
+
+  @@index([chatId, timestamp])
+  @@map("whatsapp_messages")
 }
 
 model ProductoProveedor {

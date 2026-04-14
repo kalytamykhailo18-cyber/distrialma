@@ -3,7 +3,27 @@ const { Client, LocalAuth } = pkg;
 import qrcode from "qrcode-terminal";
 import Anthropic from "@anthropic-ai/sdk";
 import fs from "fs";
-import { searchProducts, searchByBrand, findClientByPhone, registerClient, formatPrice } from "./products.js";
+import { PrismaClient } from "@prisma/client";
+import { searchProducts, searchByBrand, searchCombos, findClientByPhone, registerClient, formatPrice } from "./products.js";
+
+const prisma = new PrismaClient();
+
+async function storeMessage(chatId, direction, body, sender = "") {
+  try {
+    let contactName = "";
+    let contactPhone = chatId.replace("@c.us", "").replace("@lid", "");
+    await prisma.whatsAppChat.upsert({
+      where: { chatId },
+      create: { chatId, contactName, contactPhone, lastMessage: body.substring(0, 200), lastMessageAt: new Date(), unread: direction === "in" ? 1 : 0 },
+      update: { lastMessage: body.substring(0, 200), lastMessageAt: new Date(), ...(direction === "in" ? { unread: { increment: 1 } } : {}) },
+    });
+    await prisma.whatsAppMessage.create({
+      data: { chatId, direction, body, sender },
+    });
+  } catch (e) {
+    console.error("[DB] Error storing message:", e.message);
+  }
+}
 
 // Persist seen chat IDs to avoid re-sending registration message after restart
 const SEEN_FILE = "./session/seen-chats.json";
@@ -36,9 +56,10 @@ REGLAS IMPORTANTES:
 1. Si te preguntan por productos, usá la herramienta search_products para buscar en la base real. Nunca inventes productos ni precios.
 2. Mostrá siempre el precio Mayorista. Si hay precio Caja Cerrada, también mencionalo. Siempre agregá al final: "Stock sujeto a disponibilidad de sucursal." NUNCA muestres la cantidad de stock exacta (no digas "9 unidades" ni "22.6 kg"). Solo decí si hay o no hay disponibilidad.
 3. Si el producto exacto no existe, ofrecé alternativas similares de la misma categoría.
-3b. Cuando busques por marca, siempre incluí el link a la página de la marca que te devuelve la herramienta (ej: "Podés ver todos los productos de Tonadita acá: https://distrialma.com.ar/marca/123").
+3b. Si preguntan por combos, promos, packs u ofertas, usá la herramienta search_combos. Mostrá el nombre, los productos que incluye y el precio.
+3c. Cuando busques por marca, siempre incluí el link a la página de la marca que te devuelve la herramienta (ej: "Podés ver todos los productos de Tonadita acá: https://distrialma.com.ar/marca/123").
 4. Si el cliente quiere hacer un pedido, decile que entre a https://distrialma.com.ar y arme el pedido desde ahí. NO le des ningún número de teléfono para hacer pedidos. Cuando mostrás un producto, incluí el link directo: https://distrialma.com.ar/productos/{sku} (reemplazá {sku} por el código del producto que te devuelve la herramienta).
-5. Si te preguntan algo que no sabés (descuentos especiales, plazos, etc.), decí que un asesor lo va a contactar y no inventes. EXCEPCIÓN: si el cliente está registrado y pregunta por su cuenta, saldo o estado de cuenta, SÍ podés darle la información que tenés (nombre, CUIT, saldo). Esa info te llega en el contexto del chat.
+5. Si te preguntan algo que no sabés (descuentos especiales, plazos, etc.), decí que un asesor lo va a contactar y no inventes. EXCEPCIÓN: si el cliente está registrado y pregunta por su cuenta o saldo, dale el saldo que tenés. Si pide el detalle de boletas o movimientos, decile que lo puede ver en distrialma.com.ar/mis-pedidos iniciando sesion con su usuario.
 6. No des información de otros clientes ni datos privados.
 7. Mantené las respuestas cortas (1-3 oraciones) salvo que sea estrictamente necesario.
 8. NUNCA uses formato con negritas, cursivas ni markdown. Escribí todo en texto plano.
@@ -109,6 +130,20 @@ const TOOLS = [
         },
       },
       required: ["brand"],
+    },
+  },
+  {
+    name: "search_combos",
+    description: "Busca combos/promociones disponibles en Distrialma. Un combo es un pack de productos a precio especial (ej: hamburguesa + pan, salchicha + pan). Usalo cuando el cliente pregunta por combos, promos, packs o ofertas.",
+    input_schema: {
+      type: "object",
+      properties: {
+        query: {
+          type: "string",
+          description: "Palabras clave del combo (ej: 'hamburguesa', 'salchicha', 'combo'). Si no sabe que buscar, dejalo vacio para ver todos.",
+        },
+      },
+      required: ["query"],
     },
   },
   {
@@ -243,6 +278,22 @@ async function callClaude(chatId, userMessage, clientInfo, phoneNumber) {
               })),
             };
           }
+        } else if (tu.name === "search_combos") {
+          const combos = await searchCombos(tu.input.query || "");
+          if (combos.length === 0) {
+            result = { found: 0, message: "No hay combos disponibles en este momento." };
+          } else {
+            result = {
+              found: combos.length,
+              combos: combos.map((c) => ({
+                nombre: c.name,
+                descripcion: c.description || "",
+                precio: c.price ? formatPrice(Number(c.price)) : "Consultar",
+                productos: c.items.map((i) => i.sku).join(", "),
+                link: `https://distrialma.com.ar/combos/${c.id}`,
+              })),
+            };
+          }
         } else if (tu.name === "register_client") {
           const reg = await registerClient({
             nombre: tu.input.nombre,
@@ -309,9 +360,32 @@ client.on("auth_failure", (msg) => {
   console.error("✗ Auth failure:", msg);
 });
 
-client.on("disconnected", (reason) => {
+client.on("disconnected", async (reason) => {
   console.log("Bot desconectado:", reason);
+  // Send alert email
+  try {
+    const { Resend } = await import("resend");
+    const resendKey = process.env.RESEND_API_KEY || "";
+    const emailTo = process.env.BOT_ALERT_EMAIL || "despensaalma2020@gmail.com";
+    if (resendKey) {
+      const resend = new Resend(resendKey);
+      await resend.emails.send({
+        from: process.env.RESEND_FROM || "Distrialma <onboarding@resend.dev>",
+        to: emailTo,
+        subject: "Bot WhatsApp desconectado",
+        html: `<p>El bot de WhatsApp se desconecto.</p><p>Razon: ${reason}</p><p>Fecha: ${new Date().toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires" })}</p><p>Necesita escanear el QR nuevamente.</p>`,
+      });
+      console.log("[ALERT] Email de desconexion enviado a", emailTo);
+    }
+  } catch (e) {
+    console.error("[ALERT] Error enviando email:", e.message);
+  }
 });
+
+// Recruitment flow state: chatId → { step, data }
+const recruitmentChats = new Map();
+const RECRUITMENT_KEYWORDS = /\b(cv|curriculum|trabajo|empleo|busco trabajo|puesto|vacante|contrat|necesitan personal|necesitan gente)\b/i;
+const RRHH_PHONE = process.env.RRHH_PHONE || "5491176003814";
 
 // Handle incoming messages
 client.on("message", async (msg) => {
@@ -322,6 +396,7 @@ client.on("message", async (msg) => {
 
   const chatId = msg.from;
   console.log(`[IN] ${chatId}: ${msg.body.substring(0, 100)}`);
+  if (msg.body) storeMessage(chatId, "in", msg.body, "contact");
 
   // Check if a human took over recently
   const takeover = humanTakeover.get(chatId);
@@ -331,7 +406,81 @@ client.on("message", async (msg) => {
     return;
   }
 
-  // Image messages → just acknowledge as transfer
+  // ── RECRUITMENT FLOW ──
+  const recruit = recruitmentChats.get(chatId);
+  if (recruit) {
+    botReplying.add(chatId);
+    try {
+      if (recruit.step === "nombre") {
+        recruit.data.nombre = msg.body.trim();
+        recruit.step = "edad";
+        await msg.reply("Gracias " + recruit.data.nombre + ". Cual es tu edad?");
+      } else if (recruit.step === "edad") {
+        recruit.data.edad = msg.body.trim();
+        recruit.step = "experiencia";
+        await msg.reply("Gracias. Contanos brevemente tu experiencia laboral.");
+      } else if (recruit.step === "experiencia") {
+        recruit.data.experiencia = msg.body.trim();
+        recruit.step = "referencias";
+        await msg.reply("Tenes referencias laborales comprobables? Pasanos nombre y telefono de contacto.");
+      } else if (recruit.step === "referencias") {
+        recruit.data.referencias = msg.body.trim();
+        recruit.step = "cv";
+        await msg.reply("Perfecto. Si tenes CV, mandalo como foto o archivo. Si no tenes, escribi 'no tengo'.");
+      } else if (recruit.step === "cv") {
+        let cvNote = "No envio CV";
+        if (msg.hasMedia) {
+          try {
+            const media = await msg.downloadMedia();
+            if (media) {
+              await client.sendMessage(`${RRHH_PHONE}@c.us`, media, { caption: `CV de ${recruit.data.nombre || chatId}` });
+              cvNote = "CV enviado";
+            } else {
+              cvNote = "Archivo no disponible";
+            }
+          } catch (e) { cvNote = "Error descargando: " + (e.message || "").substring(0, 50); }
+        } else if (msg.body.trim().toLowerCase().includes("no tengo")) {
+          cvNote = "No tiene CV";
+        } else {
+          cvNote = msg.body.trim();
+        }
+        recruit.data.cv = cvNote;
+
+        // Forward summary to RRHH
+        const summary = `POSTULANTE BOT\nNombre: ${recruit.data.nombre || "No indicado"}\nTelefono: ${recruit.data.telefono}\nEdad: ${recruit.data.edad}\nExperiencia: ${recruit.data.experiencia}\nReferencias: ${recruit.data.referencias}\nCV: ${cvNote}`;
+        await client.sendMessage(`${RRHH_PHONE}@c.us`, summary);
+        console.log(`[RECRUIT] Derivado a RRHH: ${chatId}`);
+
+        await msg.reply("Listo, recibimos tus datos. Te vamos a contactar si hay una vacante disponible. Gracias por escribirnos!");
+        recruitmentChats.delete(chatId);
+      }
+    } catch (e) {
+      console.error("[RECRUIT] Error:", e.message);
+    } finally {
+      setTimeout(() => botReplying.delete(chatId), 2000);
+    }
+    return;
+  }
+
+  // Detect recruitment intent
+  if (msg.body && RECRUITMENT_KEYWORDS.test(msg.body)) {
+    console.log(`[RECRUIT] ${chatId}: detected recruitment intent`);
+    let recruitPhone = chatId.replace("@c.us", "").replace("@lid", "");
+    try {
+      const contact = await msg.getContact();
+      recruitPhone = contact.number || contact.id?.user || recruitPhone;
+    } catch {}
+    recruitmentChats.set(chatId, { step: "nombre", data: { telefono: recruitPhone } });
+    botReplying.add(chatId);
+    try {
+      await msg.reply("Hola! Gracias por tu interes en trabajar con nosotros. Te vamos a hacer unas preguntas.\n\nComo te llamas?");
+    } finally {
+      setTimeout(() => botReplying.delete(chatId), 2000);
+    }
+    return;
+  }
+
+  // Image messages → acknowledge as transfer (only if not in recruitment)
   if (msg.hasMedia && msg.type === "image") {
     botReplying.add(chatId);
     try {
@@ -339,7 +488,7 @@ client.on("message", async (msg) => {
     } finally {
       setTimeout(() => botReplying.delete(chatId), 2000);
     }
-    humanTakeover.set(chatId, Date.now()); // Mark for human follow-up
+    humanTakeover.set(chatId, Date.now());
     return;
   }
 
@@ -381,6 +530,7 @@ client.on("message", async (msg) => {
     // Strip any markdown formatting Claude might sneak in
     const cleanReply = reply.replace(/\*\*/g, "").replace(/\*/g, "").replace(/__/g, "").replace(/_/g, "");
     console.log(`[OUT] ${chatId}: ${cleanReply.substring(0, 100)}`);
+    storeMessage(chatId, "out", cleanReply, "bot");
     botReplying.add(chatId);
     try {
       await msg.reply(cleanReply);
@@ -443,7 +593,33 @@ client.on("message_create", async (msg) => {
   // This is a manual reply from a human → silence the bot in this chat
   console.log(`[HUMAN] ${chatId}: tomó el control del chat, silenciando bot por 2hs`);
   humanTakeover.set(chatId, Date.now());
+  if (msg.body) storeMessage(chatId, "out", msg.body, "human");
 });
+
+// HTTP server for inbox API to send messages through the bot
+import http from "http";
+const httpServer = http.createServer(async (req, res) => {
+  if (req.method === "POST" && req.url === "/send") {
+    let body = "";
+    req.on("data", (c) => body += c);
+    req.on("end", async () => {
+      try {
+        const { chatId, message } = JSON.parse(body);
+        if (!chatId || !message) { res.writeHead(400); res.end('{"error":"chatId and message required"}'); return; }
+        await client.sendMessage(chatId, message);
+        storeMessage(chatId, "out", message, "human");
+        console.log(`[INBOX] ${chatId}: ${message.substring(0, 60)}`);
+        res.writeHead(200); res.end('{"ok":true}');
+      } catch (e) {
+        res.writeHead(500); res.end('{"error":"' + e.message + '"}');
+      }
+    });
+  } else {
+    res.writeHead(404); res.end("not found");
+  }
+});
+httpServer.on("error", (e) => console.error("Bot HTTP server error:", e.message));
+httpServer.listen(3099, "127.0.0.1", () => console.log("Bot HTTP server on :3099"));
 
 console.log("Iniciando bot de Distrialma...");
 client.initialize();

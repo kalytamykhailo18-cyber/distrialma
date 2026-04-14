@@ -297,6 +297,39 @@ export async function registerClient({ nombre, direccion, telefono, cuit }) {
   return { cod: String(nextCod), nombre: (nombre || "").toUpperCase() };
 }
 
+/**
+ * Search combos by name.
+ */
+export async function searchCombos(query) {
+  try {
+    const { PrismaClient } = await import("@prisma/client");
+    const prisma = new PrismaClient();
+    const combos = await prisma.combo.findMany({
+      where: {
+        active: true,
+        name: { contains: query, mode: "insensitive" },
+      },
+      include: { items: true },
+    });
+    await prisma.$disconnect();
+
+    if (combos.length === 0) {
+      // Try broader search — get all active combos
+      const prisma2 = new PrismaClient();
+      const all = await prisma2.combo.findMany({
+        where: { active: true },
+        include: { items: true },
+      });
+      await prisma2.$disconnect();
+      return all;
+    }
+    return combos;
+  } catch (e) {
+    console.error("Error searching combos:", e.message);
+    return [];
+  }
+}
+
 export function formatPrice(n) {
   return "$" + Number(n).toLocaleString("es-AR", { maximumFractionDigits: 0 });
 }

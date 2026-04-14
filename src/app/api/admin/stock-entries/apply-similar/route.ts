@@ -65,9 +65,9 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { sku, costo } = await req.json();
-    if (!sku || !costo || costo <= 0) {
-      return NextResponse.json({ error: "SKU y costo requeridos" }, { status: 400 });
+    const { sku, costo, mode, precios } = await req.json();
+    if (!sku) {
+      return NextResponse.json({ error: "SKU requerido" }, { status: 400 });
     }
 
     const pool = await getPool();
@@ -112,39 +112,60 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ updated: 0, products: [] });
     }
 
-    const newCosto = parseFloat(costo);
-    const updated: { sku: string; nombre: string; newCosto: number; precio: number; precio2: number; precio4: number }[] = [];
+    const updated: { sku: string; nombre: string }[] = [];
 
-    for (const prod of similar.recordset) {
-      const prodCod = prod.sku.padStart(7, " ");
-      const oldCosto = prod.oldCosto;
+    if (mode === "clone" && precios) {
+      // Clone mode: copy exact prices from source product to all similar
+      for (const prod of similar.recordset) {
+        const prodCod = prod.sku.padStart(7, " ");
+        const updateReq = pool.request()
+          .input("cod", prodCod)
+          .input("costo", parseFloat(precios.costo) || 0)
+          .input("p1", parseFloat(precios.precio) || 0)
+          .input("p2", parseFloat(precios.precio2) || 0)
+          .input("p3", parseFloat(precios.precio3) || 0)
+          .input("p4", parseFloat(precios.precio4) || 0)
+          .input("p5", parseFloat(precios.precio5) || 0);
 
-      // Calculate new prices before updating
-      const newPrecio = oldCosto > 0 && prod.precio > 0 ? Math.round(newCosto * prod.precio / oldCosto) : prod.precio;
-      const newPrecio2 = oldCosto > 0 && prod.precio2 > 0 ? Math.round(newCosto * prod.precio2 / oldCosto) : prod.precio2;
-      const newPrecio4 = oldCosto > 0 && prod.precio4 > 0 ? Math.round(newCosto * prod.precio4 / oldCosto) : prod.precio4;
-
-      const updateReq = pool.request()
-        .input("cod", prodCod)
-        .input("costo", newCosto);
-
-      let priceUpdates = "";
-      if (oldCosto > 0) {
-        priceUpdates = `,
-          Precio = CASE WHEN ISNULL(Precio, 0) > 0 THEN ROUND(@costo * Precio / Costo, 0) ELSE Precio END,
-          Precio2 = CASE WHEN ISNULL(Precio2, 0) > 0 THEN ROUND(@costo * Precio2 / Costo, 0) ELSE Precio2 END,
-          Precio3 = CASE WHEN ISNULL(Precio3, 0) > 0 THEN ROUND(@costo * Precio3 / Costo, 0) ELSE Precio3 END,
-          Precio4 = CASE WHEN ISNULL(Precio4, 0) > 0 THEN ROUND(@costo * Precio4 / Costo, 0) ELSE Precio4 END,
-          Precio5 = CASE WHEN ISNULL(Precio5, 0) > 0 THEN ROUND(@costo * Precio5 / Costo, 0) ELSE Precio5 END`;
+        await updateReq.query(`
+          UPDATE [${dbProd}].dbo.Stock
+          SET Costo = @costo, Precio = @p1, Precio2 = @p2, Precio3 = @p3, Precio4 = @p4, Precio5 = @p5
+          WHERE CodProducto = @cod AND LTRIM(RTRIM(Deposito)) = '0'
+        `);
+        updated.push({ sku: prod.sku, nombre: prod.nombre });
+      }
+    } else {
+      // Default: apply cost and recalculate prices keeping margins
+      const newCosto = parseFloat(costo);
+      if (!newCosto || newCosto <= 0) {
+        return NextResponse.json({ error: "Costo requerido" }, { status: 400 });
       }
 
-      await updateReq.query(`
-        UPDATE [${dbProd}].dbo.Stock
-        SET Costo = @costo${priceUpdates}
-        WHERE CodProducto = @cod AND LTRIM(RTRIM(Deposito)) = '0'
-      `);
+      for (const prod of similar.recordset) {
+        const prodCod = prod.sku.padStart(7, " ");
+        const oldCosto = prod.oldCosto;
 
-      updated.push({ sku: prod.sku, nombre: prod.nombre, newCosto, precio: newPrecio, precio2: newPrecio2, precio4: newPrecio4 });
+        const updateReq = pool.request()
+          .input("cod", prodCod)
+          .input("costo", newCosto);
+
+        let priceUpdates = "";
+        if (oldCosto > 0) {
+          priceUpdates = `,
+            Precio = CASE WHEN ISNULL(Precio, 0) > 0 THEN ROUND(@costo * Precio / Costo, 0) ELSE Precio END,
+            Precio2 = CASE WHEN ISNULL(Precio2, 0) > 0 THEN ROUND(@costo * Precio2 / Costo, 0) ELSE Precio2 END,
+            Precio3 = CASE WHEN ISNULL(Precio3, 0) > 0 THEN ROUND(@costo * Precio3 / Costo, 0) ELSE Precio3 END,
+            Precio4 = CASE WHEN ISNULL(Precio4, 0) > 0 THEN ROUND(@costo * Precio4 / Costo, 0) ELSE Precio4 END,
+            Precio5 = CASE WHEN ISNULL(Precio5, 0) > 0 THEN ROUND(@costo * Precio5 / Costo, 0) ELSE Precio5 END`;
+        }
+
+        await updateReq.query(`
+          UPDATE [${dbProd}].dbo.Stock
+          SET Costo = @costo${priceUpdates}
+          WHERE CodProducto = @cod AND LTRIM(RTRIM(Deposito)) = '0'
+        `);
+        updated.push({ sku: prod.sku, nombre: prod.nombre });
+      }
     }
 
     return NextResponse.json({

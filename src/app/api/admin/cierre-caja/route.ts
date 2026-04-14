@@ -66,6 +66,8 @@ export async function POST(req: NextRequest) {
         inicioCaja: data.inicioCaja,
         totalCaja: data.totalEfectivoCaja,
         nuevoInicio: nuevoInicioVal,
+        diferencia: nuevoInicioVal - data.totalEfectivoCaja,
+        responsable: userName,
         emailTo: emailTo || null,
       },
     });

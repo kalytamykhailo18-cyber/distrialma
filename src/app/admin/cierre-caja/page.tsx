@@ -153,17 +153,17 @@ export default function CierreCajaPage() {
     y = 30;
 
     // Summary cards
-    const drawCard = (label: string, value: string, x: number, cw: number, color: [number, number, number]) => {
+    const drawCard = (label: string, value: string, x: number, cardW: number, color: [number, number, number]) => {
       doc.setFillColor(...color);
-      doc.roundedRect(x, y, cw, 18, 2, 2, "F");
+      doc.roundedRect(x, y, cardW, 18, 2, 2, "F");
       doc.setTextColor(80, 80, 80);
       doc.setFontSize(8);
       doc.setFont("helvetica", "normal");
-      doc.text(label, x + cw / 2, y + 6, { align: "center" });
+      doc.text(label, x + cardW / 2, y + 6, { align: "center" });
       doc.setFontSize(12);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(30, 30, 30);
-      doc.text(value, x + cw / 2, y + 14, { align: "center" });
+      doc.text(value, x + cardW / 2, y + 14, { align: "center" });
     };
     const cw = (w - 30) / 4;
     drawCard("Ventas", String(data.ventas.cantidad), 10, cw, [220, 252, 231]);
@@ -180,55 +180,71 @@ export default function CierreCajaPage() {
     doc.setFont("helvetica", "bold");
     doc.text("TOTAL VENTAS", 14, y + 7);
     doc.text(fmt(data.ventas.total), w - 14, y + 7, { align: "right" });
-    y += 18;
+    y += 14;
 
-    // Detail rows
-    doc.setTextColor(50, 50, 50);
+    // TWO-COLUMN LAYOUT: Left = cash detail, Right = card detail
+    const colW = (w - 30) / 2;
+    const leftX = 10;
+    const rightX = 10 + colW + 10;
+    let leftY = y;
+    let rightY = y;
+
     doc.setFontSize(9);
-    const drawRow = (label: string, value: string, bold = false) => {
-      checkPage(10);
+    doc.setTextColor(50, 50, 50);
+
+    const drawRowAt = (x: number, rw: number, yPos: number, label: string, value: string, bold = false) => {
       if (bold) doc.setFont("helvetica", "bold");
       else doc.setFont("helvetica", "normal");
-      doc.text(label, 14, y);
-      doc.text(value, w - 14, y, { align: "right" });
+      doc.text(label, x + 4, yPos);
+      doc.text(value, x + rw - 4, yPos, { align: "right" });
       doc.setDrawColor(230, 230, 230);
-      doc.line(10, y + 2, w - 10, y + 2);
-      y += 7;
+      doc.line(x, yPos + 2, x + rw, yPos + 2);
     };
-    drawRow("Inicio de caja:", fmt(data.inicioCaja));
-    drawRow("Ventas en efectivo:", fmt(data.ventas.efectivo));
-    drawRow("Retiros:", fmt(data.retiros));
+
+    // LEFT COLUMN: Cash
+    drawRowAt(leftX, colW, leftY, "Inicio de caja:", fmt(data.inicioCaja)); leftY += 7;
+    drawRowAt(leftX, colW, leftY, "Ventas en efectivo:", fmt(data.ventas.efectivo)); leftY += 7;
+    drawRowAt(leftX, colW, leftY, "Retiros:", fmt(data.retiros)); leftY += 7;
     if (data.retirosDetalle && data.retirosDetalle.length > 1) {
       doc.setFontSize(8);
       for (const r of data.retirosDetalle) {
-        checkPage(7);
         doc.setTextColor(120, 120, 120);
-        doc.text(`   ${r.concepto || "Sin concepto"}`, 18, y);
-        doc.text(fmt(r.total), w - 14, y, { align: "right" });
-        y += 5;
+        doc.setFont("helvetica", "normal");
+        doc.text(`  ${r.concepto || "Sin concepto"}`, leftX + 4, leftY);
+        doc.text(fmt(r.total), leftX + colW - 4, leftY, { align: "right" });
+        leftY += 5;
       }
       doc.setFontSize(9);
       doc.setTextColor(50, 50, 50);
     }
-    drawRow("Ingresos:", fmt(data.ingresos));
-    drawRow("Pagos proveedores:", fmt(data.pagos));
-    drawRow("TOTAL EFECTIVO EN CAJA:", fmt(data.totalEfectivoCaja), true);
-    y += 3;
-    drawRow("Total tarjeta/otros:", fmt(data.totalTarjeta));
+    drawRowAt(leftX, colW, leftY, "Ingresos:", fmt(data.ingresos)); leftY += 7;
+    drawRowAt(leftX, colW, leftY, "Pagos proveedores:", fmt(data.pagos)); leftY += 7;
+    doc.setFont("helvetica", "bold");
+    drawRowAt(leftX, colW, leftY, "TOTAL EFECTIVO EN CAJA:", fmt(data.totalEfectivoCaja), true); leftY += 7;
+
+    // RIGHT COLUMN: Cards + deuda
+    drawRowAt(rightX, colW, rightY, "Total tarjeta/otros:", fmt(data.totalTarjeta)); rightY += 7;
     if (data.tarjetasDetalle && data.tarjetasDetalle.length > 0) {
       doc.setFontSize(8);
       for (const t of data.tarjetasDetalle) {
-        checkPage(7);
         doc.setTextColor(120, 120, 120);
-        doc.text(`   ${t.nombre} (${t.cantidad})`, 18, y);
-        doc.text(fmt(t.total), w - 14, y, { align: "right" });
-        y += 5;
+        doc.setFont("helvetica", "normal");
+        doc.text(`  ${t.nombre} (${t.cantidad})`, rightX + 4, rightY);
+        doc.text(fmt(t.total), rightX + colW - 4, rightY, { align: "right" });
+        rightY += 5;
       }
       doc.setFontSize(9);
       doc.setTextColor(50, 50, 50);
     }
-    drawRow("Total deuda:", fmt(data.totalDeuda));
-    y += 2;
+    drawRowAt(rightX, colW, rightY, "Total deuda:", fmt(data.totalDeuda)); rightY += 7;
+    if (data.anuladas.cantidad > 0) {
+      drawRowAt(rightX, colW, rightY, `Anuladas (${data.anuladas.cantidad}):`, fmt(data.anuladas.total)); rightY += 7;
+    }
+    drawRowAt(rightX, colW, rightY, "Transacciones:", `${data.ventas.nroDesde} — ${data.ventas.nroHasta}`); rightY += 7;
+
+    y = Math.max(leftY, rightY) + 4;
+
+    // TOTAL GENERAL bar
     checkPage(15);
     doc.setFillColor(251, 154, 71);
     doc.rect(10, y, w - 20, 10, "F");
@@ -238,15 +254,11 @@ export default function CierreCajaPage() {
     doc.text("TOTAL GENERAL", 14, y + 7);
     doc.text(fmt(data.totalEfectivoCaja + data.totalTarjeta + data.totalDeuda), w - 14, y + 7, { align: "right" });
     y += 14;
+
     doc.setTextColor(50, 50, 50);
     doc.setFontSize(9);
-    if (data.anuladas.cantidad > 0) {
-      y += 3;
-      drawRow(`Anuladas (${data.anuladas.cantidad}):`, fmt(data.anuladas.total));
-    }
-    drawRow("Transacciones:", `${data.ventas.nroDesde} — ${data.ventas.nroHasta}`);
+
     if (nuevoInicio) {
-      y += 3;
       const inicioSig = parseFloat(nuevoInicio) || 0;
       const diferencia = inicioSig - data.totalEfectivoCaja;
       checkPage(12);

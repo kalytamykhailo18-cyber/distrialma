@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { formatPrice } from "@/lib/utils";
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from "recharts";
-import { HiTrendingUp, HiTrendingDown, HiChevronDown, HiSearch } from "react-icons/hi";
+import { HiTrendingUp, HiTrendingDown, HiChevronDown, HiSearch, HiPencil } from "react-icons/hi";
 import Link from "next/link";
 
 const SUC_NAMES: Record<string, string> = { "1": "Minorista 435", "2": "Mayorista 387", "6": "May. Pontevedra", "7": "Distribuidora", "10": "Reventas" };
@@ -34,9 +34,16 @@ export default function DashboardPage() {
   const [sucursales, setSucursales] = useState(["1", "2", "6", "7", "10"]);
   const [expandedCliente, setExpandedCliente] = useState<string | null>(null);
   const [clientSearch, setClientSearch] = useState("");
+  const [diferencias, setDiferencias] = useState<{ empleados: Array<{ nombre: string; cierres: number; totalDiferencia: number; diferencias: Array<{ id: number; fecha: string; sucursal: string; diferencia: number; ventas: number }> }> } | null>(null);
+  const [difExpanded, setDifExpanded] = useState<string | null>(null);
+  const [editingDif, setEditingDif] = useState<number | null>(null);
+  const [editDifValue, setEditDifValue] = useState("");
+
   const [deadStock, setDeadStock] = useState<{ dias: number; cantProductos: number; totalInmovilizado: number; productos: Array<{ sku: string; nombre: string; marca: string; rubro: string; stock: number; costoUnit: number; costoInmovilizado: number; unidad: string }> } | null>(null);
   const [deadDias, setDeadDias] = useState(30);
-  const [deadLimit, setDeadLimit] = useState(30);
+  const [deadSearch, setDeadSearch] = useState("");
+  const [deadPage, setDeadPage] = useState(0);
+  const DEAD_PAGE_SIZE = 20;
 
   async function loadDeadStock(d: number) {
     try {
@@ -59,7 +66,15 @@ export default function DashboardPage() {
     setLoading(false);
   }
 
-  useEffect(() => { load(); }, [mes, sucursales]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); loadDiferencias(); }, [mes, sucursales]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function loadDiferencias() {
+    try {
+      const res = await fetch(`/api/admin/cierre-caja/diferencias?mes=${mes}`);
+      const d = await res.json();
+      if (!d.error) setDiferencias(d);
+    } catch {}
+  }
 
   function toggleSuc(s: string) {
     setSucursales((prev) => prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]);
@@ -91,10 +106,10 @@ export default function DashboardPage() {
       {/* Filters */}
       <div className="flex flex-wrap gap-3 mb-6">
         <input type="month" value={mes} onChange={(e) => setMes(e.target.value)} className="px-3 py-2 border border-brand-400 rounded-lg text-sm" />
-        <div className="flex gap-1">
+        <div className="flex flex-wrap gap-1">
           {["1", "2", "6", "7", "10"].map((s) => (
             <button key={s} onClick={() => toggleSuc(s)}
-              className={`px-3 py-2 rounded-lg text-xs font-medium transition-colors ${sucursales.includes(s) ? "bg-brand-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
+              className={`px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs font-medium transition-colors ${sucursales.includes(s) ? "bg-brand-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
               {SUC_NAMES[s]}
             </button>
           ))}
@@ -254,6 +269,71 @@ export default function DashboardPage() {
             </div>
           </div>
 
+          {/* Diferencias de caja */}
+          {diferencias && diferencias.empleados.length > 0 && (
+            <div className="bg-white border rounded-xl overflow-hidden">
+              <div className="px-4 py-3 border-b">
+                <h3 className="text-sm font-bold text-gray-700">Diferencias de Caja por Empleado</h3>
+              </div>
+              <div className="divide-y max-h-[400px] overflow-y-auto">
+                {diferencias.empleados.map((emp) => {
+                  const isOpen = difExpanded === emp.nombre;
+                  const isNeg = emp.totalDiferencia < 0;
+                  return (
+                    <div key={emp.nombre} className={isOpen ? "bg-brand-50 border-l-4 border-l-brand-500" : ""}>
+                      <button onClick={() => setDifExpanded(isOpen ? null : emp.nombre)}
+                        className={`w-full px-4 py-2.5 flex items-center justify-between text-left ${isOpen ? "" : "hover:bg-gray-50"}`}>
+                        <div>
+                          <span className={`text-sm font-medium ${isOpen ? "text-brand-700" : "text-gray-900"}`}>{emp.nombre}</span>
+                          <span className="text-xs text-gray-400 ml-2">{emp.cierres} cierres</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className={`text-sm font-bold ${isNeg ? "text-red-600" : "text-green-600"}`}>
+                            {isNeg ? "-" : "+"}{fmt(Math.abs(emp.totalDiferencia))}
+                          </span>
+                          <HiChevronDown className={`w-4 h-4 transition-transform ${isOpen ? "rotate-180 text-brand-600" : "text-gray-400"}`} />
+                        </div>
+                      </button>
+                      {isOpen && (
+                        <div className="px-4 py-2 bg-brand-50/50 border-t border-brand-200 space-y-1">
+                          {emp.diferencias.map((d) => (
+                            <div key={d.id} className="flex items-center justify-between text-xs gap-2">
+                              <span className="text-gray-500">Suc {d.sucursal} — {new Date(d.fecha).toLocaleDateString("es-AR")} — {d.ventas} ventas</span>
+                              <div className="flex items-center gap-1">
+                                {editingDif === d.id ? (
+                                  <>
+                                    <input type="number" value={editDifValue} onChange={(e) => setEditDifValue(e.target.value)}
+                                      className="w-24 px-2 py-1 border rounded text-xs text-right" autoFocus />
+                                    <button onClick={async () => {
+                                      await fetch("/api/admin/cierre-caja/diferencias", {
+                                        method: "PATCH",
+                                        headers: { "Content-Type": "application/json" },
+                                        body: JSON.stringify({ id: d.id, diferencia: editDifValue }),
+                                      });
+                                      setEditingDif(null);
+                                      loadDiferencias();
+                                    }} className="px-1.5 py-0.5 bg-green-500 text-white rounded text-xs">OK</button>
+                                    <button onClick={() => setEditingDif(null)} className="px-1.5 py-0.5 bg-gray-300 rounded text-xs">X</button>
+                                  </>
+                                ) : (
+                                  <>
+                                    <span className={d.diferencia < 0 ? "text-red-600 font-medium" : "text-green-600"}>{d.diferencia < 0 ? "-" : "+"}{fmt(Math.abs(d.diferencia))}</span>
+                                    <button onClick={() => { setEditingDif(d.id); setEditDifValue(String(d.diferencia)); }}
+                                      className="ml-1 !text-gray-400 hover:!text-gray-600" title="Corregir"><HiPencil className="w-3 h-3" /></button>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Dead stock */}
           {deadStock && (
             <div className="bg-white border rounded-xl overflow-hidden">
@@ -261,7 +341,7 @@ export default function DashboardPage() {
                 <h3 className="text-sm font-bold text-gray-700">Productos sin Movimiento</h3>
                 <div className="flex gap-1">
                   {[30, 60, 90].map((d) => (
-                    <button key={d} onClick={() => { setDeadDias(d); setDeadLimit(30); }}
+                    <button key={d} onClick={() => { setDeadDias(d); setDeadPage(0); setDeadSearch(""); }}
                       className={`px-2 py-1 rounded text-xs font-medium ${deadDias === d ? "bg-red-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
                       {d} dias
                     </button>
@@ -363,34 +443,59 @@ export default function DashboardPage() {
                   </button>
                 </div>
               </div>
-              <div className="divide-y max-h-[500px] overflow-y-auto">
-                {deadStock.productos.map((p) => (
-                  <Link key={p.sku} href={`/admin/dashboard/producto?sku=${p.sku}`} target="_blank" className="px-4 py-2 flex items-center justify-between hover:bg-red-50/50 block">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-gray-400 font-mono">{p.sku}</span>
-                        <span className="text-sm text-gray-900 truncate hover:underline">{p.nombre}</span>
-                      </div>
-                      <div className="text-xs text-gray-400">{p.marca} — {p.rubro}</div>
+              {(() => {
+                if (!deadStock) return null;
+                const filtered = deadSearch
+                  ? deadStock.productos.filter((p) => p.nombre.toLowerCase().includes(deadSearch.toLowerCase()) || p.marca.toLowerCase().includes(deadSearch.toLowerCase()) || p.sku.includes(deadSearch))
+                  : deadStock.productos;
+                const totalPages = Math.ceil(filtered.length / DEAD_PAGE_SIZE);
+                const paged = filtered.slice(deadPage * DEAD_PAGE_SIZE, (deadPage + 1) * DEAD_PAGE_SIZE);
+                return (
+                <>
+                <div className="px-4 py-2 border-b flex flex-wrap items-center gap-2">
+                  <div className="relative flex-1 min-w-[150px]">
+                    <HiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-3.5 h-3.5" />
+                    <input type="text" value={deadSearch} onChange={(e) => { setDeadSearch(e.target.value); setDeadPage(0); }}
+                      placeholder="Filtrar producto..."
+                      className="w-full pl-8 pr-3 py-1.5 border rounded-lg text-xs focus:outline-none focus:border-brand-500" />
+                  </div>
+                  <span className="text-xs text-gray-400">{filtered.length} productos</span>
+                  {totalPages > 1 && (
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => setDeadPage((p) => Math.max(0, p - 1))} disabled={deadPage === 0}
+                        className="px-2 py-1 rounded text-xs border disabled:opacity-30">←</button>
+                      <span className="text-xs text-gray-500">{deadPage + 1}/{totalPages}</span>
+                      <button onClick={() => setDeadPage((p) => Math.min(totalPages - 1, p + 1))} disabled={deadPage >= totalPages - 1}
+                        className="px-2 py-1 rounded text-xs border disabled:opacity-30">→</button>
                     </div>
-                    <div className="flex items-center gap-4 shrink-0 text-right">
-                      <div>
-                        <div className="text-sm text-gray-700">{p.stock} {p.unidad === "KG" ? "kg" : "u"}</div>
-                        <div className="text-xs text-gray-400">stock</div>
+                  )}
+                </div>
+                <div className="divide-y max-h-[400px] overflow-y-auto">
+                  {paged.map((p) => (
+                    <Link key={p.sku} href={`/admin/dashboard/producto?sku=${p.sku}`} target="_blank" className="px-4 py-2 flex items-center justify-between hover:bg-red-50/50 block">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-gray-400 font-mono">{p.sku}</span>
+                          <span className="text-sm text-gray-900 truncate hover:underline">{p.nombre}</span>
+                        </div>
+                        <div className="text-xs text-gray-400">{p.marca} — {p.rubro}</div>
                       </div>
-                      <div>
-                        <div className="text-sm font-bold text-red-600">{fmt(p.costoInmovilizado)}</div>
-                        <div className="text-xs text-gray-400">inmovilizado</div>
+                      <div className="flex items-center gap-4 shrink-0 text-right">
+                        <div>
+                          <div className="text-sm text-gray-700">{p.stock} {p.unidad === "KG" ? "kg" : "u"}</div>
+                          <div className="text-xs text-gray-400">stock</div>
+                        </div>
+                        <div>
+                          <div className="text-sm font-bold text-red-600">{fmt(p.costoInmovilizado)}</div>
+                          <div className="text-xs text-gray-400">inmovilizado</div>
+                        </div>
                       </div>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-              {deadStock.productos.length > deadLimit && (
-                <button onClick={() => setDeadLimit((l) => l + 30)} className="w-full py-3 text-sm text-red-600 hover:bg-red-50 font-medium">
-                  Ver mas ({deadStock.productos.length - deadLimit} restantes)
-                </button>
-              )}
+                    </Link>
+                  ))}
+                </div>
+                </>
+                );
+              })()}
             </div>
           )}
           </div>

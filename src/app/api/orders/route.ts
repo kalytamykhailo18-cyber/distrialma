@@ -153,6 +153,47 @@ export async function POST(req: NextRequest) {
     expandedItems.length = 0;
     expandedItems.push(...mergedItems);
 
+    // Load promotional config
+    const [promoItems, minSetting, shippingSetting, shippingSkuSetting, shippingPriceSetting] = await Promise.all([
+      prisma.articuloPromocional.findMany(),
+      prisma.setting.findUnique({ where: { key: "promo_min_subtotal" } }),
+      prisma.setting.findUnique({ where: { key: "shipping_threshold" } }),
+      prisma.setting.findUnique({ where: { key: "shipping_sku" } }),
+      prisma.setting.findUnique({ where: { key: "shipping_price" } }),
+    ]);
+    const promoSet = new Set(promoItems.map((p) => p.sku.trim()));
+    const minSubtotal = parseFloat(minSetting?.value || "60000");
+    const shippingThreshold = parseFloat(shippingSetting?.value || "200000");
+    const shippingSku = shippingSkuSetting?.value || "";
+    const shippingPrice = parseFloat(shippingPriceSetting?.value || "0");
+
+    // Calculate non-promotional subtotal
+    let nonPromoTotal = 0;
+    for (const ei of expandedItems) {
+      if (!promoSet.has(ei.sku.trim())) {
+        nonPromoTotal += ei.price * ei.cant;
+      }
+    }
+
+    // Validate minimum order
+    if (nonPromoTotal < minSubtotal) {
+      return NextResponse.json(
+        { error: `El subtotal de productos no promocionales debe ser al menos $${minSubtotal.toLocaleString("es-AR")}. Actual: $${nonPromoTotal.toLocaleString("es-AR")}` },
+        { status: 400 }
+      );
+    }
+
+    // Auto-add shipping if below threshold
+    if (nonPromoTotal < shippingThreshold && shippingSku && shippingPrice > 0) {
+      expandedItems.push({
+        sku: shippingSku,
+        name: "ENVIO REPARTO",
+        cant: 1,
+        price: shippingPrice,
+        listaPrecio: 2,
+      });
+    }
+
     // Calculate totals
     let totalCant = 0;
     let totalImpo = 0;

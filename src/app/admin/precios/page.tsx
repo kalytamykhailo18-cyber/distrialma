@@ -160,6 +160,44 @@ export default function PreciosPage() {
     }
   }
 
+  async function handleApplyCosto() {
+    if (!product) return;
+    const costo = parseFloat(form.costo);
+    if (!costo) return;
+    try {
+      const preview = await fetch("/api/admin/stock-entries/apply-similar?sku=" + product.sku).then(r => r.json());
+      if (!preview.products || preview.products.length === 0) { alert("No se encontraron productos similares"); return; }
+      const names = preview.products.map((p: {nombre: string}) => p.nombre).join("\n");
+      if (!window.confirm("Aplicar costo $" + costo + " a " + preview.products.length + " productos similares?\n\n" + names)) return;
+      const res = await fetch("/api/admin/stock-entries/apply-similar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sku: product.sku, costo }),
+      });
+      const data = await res.json();
+      if (data.updated > 0) setSuccess("Costo aplicado a " + data.updated + " productos similares");
+      else setError("No se actualizaron productos");
+    } catch { setError("Error al aplicar a similares"); }
+  }
+
+  async function handleCloneListas() {
+    if (!product) return;
+    try {
+      const preview = await fetch("/api/admin/stock-entries/apply-similar?sku=" + product.sku).then(r => r.json());
+      if (!preview.products || preview.products.length === 0) { alert("No se encontraron productos similares"); return; }
+      const names = preview.products.map((p: {nombre: string}) => p.nombre).join("\n");
+      if (!window.confirm("Clonar listas a " + preview.products.length + " productos similares?\n\n" + names)) return;
+      const res = await fetch("/api/admin/stock-entries/apply-similar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sku: product.sku, mode: "clone", precios: form }),
+      });
+      const data = await res.json();
+      if (data.updated > 0) setSuccess("Listas clonadas a " + data.updated + " productos similares");
+      else setError("No se actualizaron productos");
+    } catch { setError("Error al clonar listas"); }
+  }
+
   async function handleSave() {
     if (!product) return;
     setSaving(true);
@@ -292,6 +330,18 @@ export default function PreciosPage() {
           >
             {saving ? "Guardando..." : "Guardar precios"}
           </button>
+          {parseFloat(form.costo || "0") > 0 && (
+            <>
+              <button onClick={handleApplyCosto} disabled={saving}
+                className="mt-3 w-full py-2.5 text-sm font-semibold text-blue-700 bg-blue-50 border-2 border-blue-200 rounded-lg hover:bg-blue-100 disabled:opacity-50 transition-colors">
+                Aplicar costo a similares
+              </button>
+              <button onClick={handleCloneListas} disabled={saving}
+                className="mt-2 w-full py-2.5 text-sm font-semibold text-green-700 bg-green-50 border-2 border-green-200 rounded-lg hover:bg-green-100 disabled:opacity-50 transition-colors">
+                Clonar listas a similares
+              </button>
+            </>
+          )}
         </div>
       )}
     </div>

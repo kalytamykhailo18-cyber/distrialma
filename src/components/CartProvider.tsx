@@ -12,6 +12,14 @@ function itemKey(item: CartItem): string {
   return cartKey(item.sku, item.mode);
 }
 
+interface CartConfig {
+  promoSkus: string[];
+  minSubtotal: number;
+  shippingThreshold: number;
+  shippingSku: string;
+  shippingPrice: number;
+}
+
 interface CartContextType {
   items: CartItem[];
   addItem: (item: Omit<CartItem, "quantity" | "mode">, mode?: "unit" | "box") => void;
@@ -21,11 +29,16 @@ interface CartContextType {
   findItem: (sku: string, mode: "unit" | "box") => CartItem | undefined;
   totalItems: number;
   totalPrice: number;
+  nonPromoTotal: number;
+  cartConfig: CartConfig;
+  meetsMinimum: boolean;
+  freeShipping: boolean;
 }
 
 const CartContext = createContext<CartContextType | null>(null);
 
 const STORAGE_KEY = "distrialma_cart";
+const DEFAULT_CONFIG: CartConfig = { promoSkus: [], minSubtotal: 60000, shippingThreshold: 200000, shippingSku: "", shippingPrice: 0 };
 
 function loadCart(): CartItem[] {
   if (typeof window === "undefined") return [];
@@ -48,10 +61,12 @@ function saveCart(items: CartItem[]) {
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
   const [loaded, setLoaded] = useState(false);
+  const [cartConfig, setCartConfig] = useState<CartConfig>(DEFAULT_CONFIG);
 
   useEffect(() => {
     setItems(loadCart());
     setLoaded(true);
+    fetch("/api/cart-config").then((r) => r.json()).then((d) => setCartConfig(d)).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -118,6 +133,18 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     return sum + i.precioMayorista * i.quantity;
   }, 0);
 
+  const promoSet = new Set(cartConfig.promoSkus);
+
+  const nonPromoTotal = items.reduce((sum, i) => {
+    if (promoSet.has(i.sku)) return sum;
+    if (i.mode === "box" && i.precioCajaCerrada > 0) return sum + i.precioCajaCerrada * i.cantidadPorCaja * i.quantity;
+    if (i.mode === "unit" && i.precioCajaCerrada > 0 && (skusWithBox.has(i.sku) || (i.cantidadPorCaja > 0 && i.quantity >= i.cantidadPorCaja))) return sum + i.precioCajaCerrada * i.quantity;
+    return sum + i.precioMayorista * i.quantity;
+  }, 0);
+
+  const meetsMinimum = nonPromoTotal >= cartConfig.minSubtotal;
+  const freeShipping = nonPromoTotal >= cartConfig.shippingThreshold;
+
   return (
     <CartContext.Provider
       value={{
@@ -129,6 +156,10 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         findItem,
         totalItems,
         totalPrice,
+        nonPromoTotal,
+        cartConfig,
+        meetsMinimum,
+        freeShipping,
       }}
     >
       {children}

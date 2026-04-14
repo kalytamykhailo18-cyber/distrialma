@@ -117,12 +117,14 @@ export default function Navbar() {
     { href: "/admin/informes", label: "Informes", perm: "informes", iconKey: "informes" },
     { href: "/admin/compras", label: "Compras", perm: "compras", iconKey: "compras" },
     { href: "/admin/precios", label: "Precios", perm: "costeo", iconKey: "precios" },
+    { href: "/admin/precios-masivos", label: "Precios Masivos", perm: "costeo", iconKey: "precios" },
     { href: "/admin/proveedores", label: "Proveedores", perm: "compras", iconKey: "proveedores" },
     { href: "/admin/movimientos", label: "Movimientos", perm: "movimientos", iconKey: "compras" },
     { href: "/admin/vendedores", label: "Vendedores", perm: "vendedores", iconKey: "usuarios" },
     { href: "/vendedor", label: "Tomar Pedido", perm: "vendedor", iconKey: "pedidos" },
     { href: "/admin/pedidosya", label: "PedidosYa", perm: "costeo", iconKey: "pedidosya" },
     { href: "/admin/cierre-caja", label: "Cierre Caja", perm: "informes", iconKey: "informes" },
+    // { href: "/admin/inbox", label: "WhatsApp", perm: "informes", iconKey: "informes" },
     { href: "/admin/dashboard", label: "Dashboard", perm: "informes", iconKey: "informes" },
     { href: "/admin/proveedores-productos", label: "Reposicion", perm: "compras", iconKey: "proveedores" },
     { href: "/admin/resumen-productos", label: "Resumen Prod.", perm: "informes", iconKey: "informes" },
@@ -186,7 +188,7 @@ export default function Navbar() {
               </button>
 
               <div
-                className={`absolute right-0 mt-1 w-52 bg-white rounded-lg border shadow-lg py-1 z-50 origin-top transition-all duration-200 ease-out ${
+                className={`absolute right-0 mt-1 w-52 bg-white rounded-lg border shadow-lg py-1 z-50 origin-top transition-all duration-200 ease-out max-h-[calc(100vh-80px)] overflow-y-auto ${
                   dropdownOpen
                     ? "opacity-100 scale-100 translate-y-0"
                     : "opacity-0 scale-95 -translate-y-1 pointer-events-none"

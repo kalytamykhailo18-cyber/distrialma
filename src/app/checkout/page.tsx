@@ -19,7 +19,7 @@ interface ClientInfo {
 export default function CheckoutPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
-  const { items, totalPrice, clearCart } = useCart();
+  const { items, totalPrice, clearCart, nonPromoTotal, cartConfig, meetsMinimum, freeShipping } = useCart();
   const [clientInfo, setClientInfo] = useState<ClientInfo | null>(null);
   const [loadingClient, setLoadingClient] = useState(false);
   const [notes, setNotes] = useState("");
@@ -178,13 +178,24 @@ export default function CheckoutPage() {
 
       {/* Actions */}
       <div className="space-y-3">
+        {!meetsMinimum && items.length > 0 && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+            El subtotal de productos no promocionales debe ser al menos {formatPrice(cartConfig.minSubtotal)} para confirmar el pedido.
+            Te faltan {formatPrice(cartConfig.minSubtotal - nonPromoTotal)}.
+          </div>
+        )}
+        {meetsMinimum && !freeShipping && items.length > 0 && (
+          <div className="bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-3 rounded-lg text-sm">
+            Se agrega envio al pedido. Para envio gratis, el subtotal debe superar {formatPrice(cartConfig.shippingThreshold)}.
+          </div>
+        )}
         {clientInfo?.deliveryDay && (
           <button
             onClick={() => {
               setPendingAction("order");
               setShowDisclaimer(true);
             }}
-            disabled={sending}
+            disabled={sending || !meetsMinimum}
             className="w-full py-3 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors disabled:opacity-50"
           >
             {sending ? "Enviando..." : `Enviar pedido (entrega: ${clientInfo.deliveryDay})`}
