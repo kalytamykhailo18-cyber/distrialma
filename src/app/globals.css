@@ -59,6 +59,12 @@ body {
   background: #f97316;
 }
 
+/* Message bubble entrance */
+@keyframes fadeSlideUp {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 /* Infinite carousel */
 @keyframes carousel {
   0% { transform: translateX(0); }
@@ -71,6 +77,17 @@ body {
 
 .animate-carousel:hover {
   animation-play-state: paused;
+}
+
+@keyframes cardIn {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 /* Firefox */

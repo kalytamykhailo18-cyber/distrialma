@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { usePathname } from "next/navigation";
 import { FaWhatsapp } from "react-icons/fa";
 
 const CONTACTS = [
@@ -12,6 +13,7 @@ const CONTACTS = [
 export default function WhatsAppButton() {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const pathname = usePathname();
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -22,6 +24,8 @@ export default function WhatsAppButton() {
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
+
+  if (pathname === "/admin/inbox") return null;
 
   return (
     <div ref={ref} className="fixed bottom-4 right-4 z-50">

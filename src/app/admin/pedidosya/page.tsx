@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { HiOutlineDocumentDownload } from "react-icons/hi";
+import { PageTransition, Stagger, springBtn, hoverRow, LoadingCenter } from "@/components/AnimateIn";
 
 interface PriceChange {
   peyaSku: string;
@@ -207,7 +208,7 @@ function MappingRow({ mapping, onUpdate, onDelete }: {
   }
 
   return (
-    <tr className="border-b hover:bg-gray-50">
+    <tr className={`border-b ${hoverRow}`}>
       <td className="p-3 font-mono text-sm text-brand-600 font-bold">{mapping.peyaSku}</td>
       <td className="p-3">
         {editing ? (
@@ -316,7 +317,7 @@ function UnmatchedRow({ item }: { item: UnmatchedItem }) {
   const displaySku = item.peyaSku.replace(/^0+/, "");
 
   return (
-    <tr className={`border-b hover:bg-gray-50 ${saved ? "bg-green-50" : ""}`}>
+    <tr className={`border-b ${hoverRow} ${saved ? "bg-green-50" : ""}`}>
       <td className="p-3">
         <button
           onClick={() => { navigator.clipboard.writeText(displaySku); }}
@@ -897,7 +898,9 @@ export default function PedidosYaPage() {
   const currentTabLabel = tab === "prices" ? "precios" : "cambios de stock";
 
   return (
+    <PageTransition>
     <div className="max-w-5xl mx-auto p-4">
+      <Stagger delay={0} y={-8}>
       <div className="flex items-center justify-between mb-1">
         <h1 className="text-2xl font-bold">PedidosYa — Sync</h1>
         <div className="flex gap-2">
@@ -920,7 +923,9 @@ export default function PedidosYaPage() {
       <p className="text-gray-500 text-sm mb-4">
         Compara precios y stock de PunTouch con PedidosYa.
       </p>
+      </Stagger>
 
+      <Stagger delay={100}>
       {/* Image URL lookup */}
       <ImageLookup />
 
@@ -934,7 +939,7 @@ export default function PedidosYaPage() {
           {loginStep === "idle" && (
             <button
               onClick={startLogin}
-              className="bg-amber-500 text-white px-5 py-2 rounded-lg font-medium text-sm hover:bg-amber-600 disabled:opacity-50"
+              className={`bg-amber-500 text-white px-5 py-2 rounded-lg font-medium text-sm hover:bg-amber-600 disabled:opacity-50 ${springBtn}`}
             >
               Renovar sesión
             </button>
@@ -963,7 +968,7 @@ export default function PedidosYaPage() {
                 <button
                   onClick={verifyCode}
                   disabled={twoFaCode.length !== 6}
-                  className="bg-amber-500 text-white px-5 py-2 rounded-lg font-medium text-sm hover:bg-amber-600 disabled:opacity-50"
+                  className={`bg-amber-500 text-white px-5 py-2 rounded-lg font-medium text-sm hover:bg-amber-600 disabled:opacity-50 ${springBtn}`}
                 >
                   Verificar
                 </button>
@@ -980,7 +985,7 @@ export default function PedidosYaPage() {
       <button
         onClick={comparePrices}
         disabled={loading}
-        className="bg-brand-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-brand-700 disabled:opacity-50 transition-colors"
+        className={`bg-brand-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-brand-700 disabled:opacity-50 transition-colors ${springBtn}`}
       >
         {loading ? "Comparando..." : "Comparar"}
       </button>
@@ -989,7 +994,7 @@ export default function PedidosYaPage() {
         <button
           onClick={bulkSyncStock}
           disabled={bulkSyncing}
-          className="ml-3 bg-purple-600 text-white px-4 py-3 rounded-xl font-semibold hover:bg-purple-700 disabled:opacity-50 transition-colors text-sm"
+          className={`ml-3 bg-purple-600 text-white px-4 py-3 rounded-xl font-semibold hover:bg-purple-700 disabled:opacity-50 transition-colors text-sm ${springBtn}`}
         >
           {bulkSyncing ? "Sincronizando..." : `Sync Todo Stock (${result.allMatched.length})`}
         </button>
@@ -1013,28 +1018,30 @@ export default function PedidosYaPage() {
       {successMsg && (
         <div className="mt-4 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl">{successMsg}</div>
       )}
+      </Stagger>
 
       {result && (
+        <Stagger delay={150}>
         <div className="mt-6">
           {/* Stats */}
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-6">
-            <div className="bg-white border rounded-xl p-4 text-center">
+            <div className="bg-white border rounded-xl p-4 text-center shadow-sm">
               <div className="text-2xl font-bold text-brand-600">{result.peyaTotal}</div>
               <div className="text-xs text-gray-500">PedidosYa</div>
             </div>
-            <div className="bg-white border rounded-xl p-4 text-center">
+            <div className="bg-white border rounded-xl p-4 text-center shadow-sm">
               <div className="text-2xl font-bold text-brand-600">{result.puntouchTotal}</div>
               <div className="text-xs text-gray-500">Lista 5</div>
             </div>
-            <div className="bg-white border rounded-xl p-4 text-center">
+            <div className="bg-white border rounded-xl p-4 text-center shadow-sm">
               <div className="text-2xl font-bold text-green-600">{result.matched}</div>
               <div className="text-xs text-gray-500">Coincidencias</div>
             </div>
-            <div className="bg-white border rounded-xl p-4 text-center">
+            <div className="bg-white border rounded-xl p-4 text-center shadow-sm">
               <div className="text-2xl font-bold text-orange-500">{result.changes.length}</div>
               <div className="text-xs text-gray-500">Precios</div>
             </div>
-            <div className="bg-white border rounded-xl p-4 text-center">
+            <div className="bg-white border rounded-xl p-4 text-center shadow-sm">
               <div className="text-2xl font-bold text-purple-500">{result.stockChanges.length}</div>
               <div className="text-xs text-gray-500">Stock</div>
             </div>
@@ -1250,7 +1257,7 @@ export default function PedidosYaPage() {
                 </p>
               </div>
               {mappingsLoading ? (
-                <p className="p-4 text-gray-400">Cargando...</p>
+                <LoadingCenter />
               ) : mappings.length === 0 ? (
                 <p className="p-4 text-gray-400">No hay asociaciones manuales.</p>
               ) : (
@@ -1331,14 +1338,16 @@ export default function PedidosYaPage() {
               <button
                 onClick={applyUpdates}
                 disabled={updating}
-                className="bg-red-500 text-white px-6 py-3 rounded-xl font-semibold hover:bg-red-600 disabled:opacity-50 transition-colors"
+                className={`bg-red-500 text-white px-6 py-3 rounded-xl font-semibold hover:bg-red-600 disabled:opacity-50 transition-colors ${springBtn}`}
               >
                 {updating ? "Actualizando..." : `Aplicar ${currentTabCount} ${currentTabLabel} en PedidosYa`}
               </button>
             </div>
           )}
         </div>
+        </Stagger>
       )}
     </div>
+    </PageTransition>
   );
 }

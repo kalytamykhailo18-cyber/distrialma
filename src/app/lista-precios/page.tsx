@@ -5,6 +5,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import type { PriceListFormat } from "@/lib/price-list-pdf";
 import { FORMAT_LABELS } from "@/lib/price-list-pdf";
+import { PageTransition, Stagger, springBtn, LoadingCenter } from "@/components/AnimateIn";
 
 export default function ListaPreciosPage() {
   const { data: session, status } = useSession();
@@ -14,8 +15,8 @@ export default function ListaPreciosPage() {
 
   if (status === "loading") {
     return (
-      <div className="max-w-md mx-auto px-4 py-16 text-center">
-        <p className="text-gray-500">Cargando...</p>
+      <div className="max-w-md mx-auto px-4 py-16">
+        <LoadingCenter />
       </div>
     );
   }
@@ -57,15 +58,17 @@ export default function ListaPreciosPage() {
   }
 
   return (
-    <div className="max-w-md mx-auto px-4 py-8">
+    <PageTransition className="max-w-md mx-auto px-4 py-8">
 
+      <Stagger delay={0} y={-8}>
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">Lista de Precios</h1>
+        <p className="text-sm text-gray-500 mb-6">
+          Descargá la lista de precios actualizada en formato PDF con la fecha del día.
+        </p>
+      </Stagger>
 
-      <h1 className="text-2xl font-bold text-gray-900 mb-2">Lista de Precios</h1>
-      <p className="text-sm text-gray-500 mb-6">
-        Descargá la lista de precios actualizada en formato PDF con la fecha del día.
-      </p>
-
-      <div className="bg-white rounded-lg border p-6 space-y-4">
+      <Stagger delay={80}>
+      <div className="bg-white rounded-lg border shadow-sm p-6 space-y-4">
         <h2 className="text-sm font-medium text-gray-700">Formato</h2>
         <div className="space-y-2">
           {(Object.keys(FORMAT_LABELS) as PriceListFormat[]).map((f) => (
@@ -102,7 +105,7 @@ export default function ListaPreciosPage() {
         <button
           onClick={handleGenerate}
           disabled={generating}
-          className="w-full py-3 bg-brand-400 text-white rounded-lg text-sm font-medium hover:bg-brand-500 disabled:opacity-50 transition-colors"
+          className={`w-full py-3 bg-brand-400 text-white rounded-lg text-sm font-medium hover:bg-brand-500 disabled:opacity-50 ${springBtn}`}
         >
           {generating ? "Generando PDF..." : "Descargar PDF"}
         </button>
@@ -111,6 +114,7 @@ export default function ListaPreciosPage() {
           El PDF incluye la fecha de hoy para referencia de precios vigentes.
         </p>
       </div>
-    </div>
+      </Stagger>
+    </PageTransition>
   );
 }

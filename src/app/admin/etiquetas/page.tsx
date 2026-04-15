@@ -6,6 +6,7 @@ import type { Product } from "@/types";
 import type { LabelFormat, LabelProduct } from "@/lib/label-pdf";
 import ConfirmModal from "@/components/ConfirmModal";
 import { FORMAT_LABELS } from "@/lib/label-pdf";
+import { PageTransition, Stagger, staggerStyle, springBtn, hoverRow, LoadingCenter } from "@/components/AnimateIn";
 
 interface SelectedProduct {
   product: Product;
@@ -240,287 +241,302 @@ export default function EtiquetasPage() {
   const totalLabels = selected.reduce((sum, s) => sum + s.quantity, 0);
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-6">
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Etiquetas</h1>
+    <PageTransition className="max-w-4xl mx-auto px-4 py-6">
+      <Stagger delay={0} y={-8}>
+        <h1 className="text-2xl font-bold text-gray-900 mb-6">Etiquetas</h1>
+      </Stagger>
 
       {/* Price changes */}
-      <div className="bg-white rounded-lg border p-4 mb-4">
-        <div className="flex items-center justify-between mb-3">
-          <div>
-            <h2 className="text-sm font-medium text-gray-700">Cambios de precios</h2>
-            {lastScanDate && (
-              <p className="text-xs text-gray-400 mt-0.5">
-                Última actualización: {new Date(lastScanDate).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" })}
-              </p>
-            )}
-          </div>
-          <div className="flex gap-2">
-            {priceChanges.length > 0 && (
-              <button
-                onClick={() => setShowClearConfirm(true)}
-                className="px-4 py-2 rounded-lg text-sm font-medium bg-red-100 text-red-700 hover:bg-red-200"
-              >
-                Limpiar
-              </button>
-            )}
-            <button
-              onClick={runPriceScan}
-              disabled={scanning}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                scanning
-                  ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                  : "bg-green-600 text-white hover:bg-green-700"
-              }`}
-            >
-              {scanning ? "Escaneando..." : "Escanear precios"}
-            </button>
-          </div>
-        </div>
-
-        {scanResult && (
-          <div className={`text-sm p-3 rounded-lg mb-3 ${
-            scanResult.isFirstScan
-              ? "bg-brand-50 text-brand-600"
-              : scanResult.changes > 0
-              ? "bg-yellow-50 text-yellow-700"
-              : "bg-green-50 text-green-700"
-          }`}>
-            {scanResult.isFirstScan
-              ? `Primera captura realizada: ${scanResult.scanned} productos registrados. En el próximo escaneo se detectarán los cambios.`
-              : scanResult.changes > 0
-              ? `Se detectaron ${scanResult.changes} cambios de precio en ${scanResult.scanned} productos.`
-              : `Sin cambios. ${scanResult.scanned} productos verificados.`}
-          </div>
-        )}
-
-        {loadingChanges ? (
-          <p className="text-sm text-gray-400">Cargando...</p>
-        ) : priceChanges.length > 0 ? (
-          <>
-            <div className="max-h-60 overflow-y-auto border rounded-lg">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 sticky top-0">
-                  <tr>
-                    <th className="text-left px-3 py-2 font-medium text-gray-600">Producto</th>
-                    <th className="text-left px-3 py-2 font-medium text-gray-600">Lista</th>
-                    <th className="text-right px-3 py-2 font-medium text-gray-600">Anterior</th>
-                    <th className="text-right px-3 py-2 font-medium text-gray-600">Nuevo</th>
-                    <th className="text-right px-3 py-2 font-medium text-gray-600">Fecha</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {priceChanges.map((c) => (
-                    <tr key={c.id} className="hover:bg-gray-50">
-                      <td className="px-3 py-2">
-                        <div className="truncate max-w-[200px]">{c.name}</div>
-                        <div className="text-xs text-gray-400">{c.sku}</div>
-                      </td>
-                      <td className="px-3 py-2 text-gray-600">{FIELD_LABELS[c.field] || c.field}</td>
-                      <td className="px-3 py-2 text-right text-red-500 line-through">${Number(c.oldPrice).toFixed(2)}</td>
-                      <td className="px-3 py-2 text-right text-green-600 font-medium">${Number(c.newPrice).toFixed(2)}</td>
-                      <td className="px-3 py-2 text-right text-gray-400 text-xs">
-                        {new Date(c.detectedAt).toLocaleDateString("es-AR")}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+      <Stagger delay={50} y={10}>
+        <div className="bg-white rounded-xl border shadow-sm p-4 mb-4">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h2 className="text-sm font-medium text-gray-700">Cambios de precios</h2>
+              {lastScanDate && (
+                <p className="text-xs text-gray-400 mt-0.5">
+                  Última actualización: {new Date(lastScanDate).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" })}
+                </p>
+              )}
             </div>
-            <button
-              onClick={addChangedProducts}
-              className="mt-3 w-full py-2 bg-yellow-500 text-white rounded-lg text-sm font-medium hover:bg-yellow-600 transition-colors"
-            >
-              Agregar {Array.from(new Set(priceChanges.map((c) => c.sku))).length} productos con cambios a las etiquetas
-            </button>
-          </>
-        ) : (
-          <p className="text-sm text-gray-400">
-            No hay cambios de precios registrados. Presioná &quot;Escanear precios&quot; para iniciar el seguimiento.
-          </p>
-        )}
-      </div>
+            <div className="flex gap-2">
+              {priceChanges.length > 0 && (
+                <button
+                  onClick={() => setShowClearConfirm(true)}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium bg-red-100 text-red-700 hover:bg-red-200 ${springBtn}`}
+                >
+                  Limpiar
+                </button>
+              )}
+              <button
+                onClick={runPriceScan}
+                disabled={scanning}
+                className={`px-4 py-2 rounded-lg text-sm font-medium ${springBtn} ${
+                  scanning
+                    ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                    : "bg-green-600 text-white hover:bg-green-700"
+                }`}
+              >
+                {scanning ? "Escaneando..." : "Escanear precios"}
+              </button>
+            </div>
+          </div>
+
+          {scanResult && (
+            <div className={`text-sm p-3 rounded-lg mb-3 ${
+              scanResult.isFirstScan
+                ? "bg-brand-50 text-brand-600"
+                : scanResult.changes > 0
+                ? "bg-yellow-50 text-yellow-700"
+                : "bg-green-50 text-green-700"
+            }`}>
+              {scanResult.isFirstScan
+                ? `Primera captura realizada: ${scanResult.scanned} productos registrados. En el próximo escaneo se detectarán los cambios.`
+                : scanResult.changes > 0
+                ? `Se detectaron ${scanResult.changes} cambios de precio en ${scanResult.scanned} productos.`
+                : `Sin cambios. ${scanResult.scanned} productos verificados.`}
+            </div>
+          )}
+
+          {loadingChanges ? (
+            <LoadingCenter text="Cargando cambios..." />
+          ) : priceChanges.length > 0 ? (
+            <>
+              <div className="max-h-60 overflow-y-auto border rounded-xl">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 sticky top-0">
+                    <tr>
+                      <th className="text-left px-3 py-2 font-medium text-gray-600">Producto</th>
+                      <th className="text-left px-3 py-2 font-medium text-gray-600">Lista</th>
+                      <th className="text-right px-3 py-2 font-medium text-gray-600">Anterior</th>
+                      <th className="text-right px-3 py-2 font-medium text-gray-600">Nuevo</th>
+                      <th className="text-right px-3 py-2 font-medium text-gray-600">Fecha</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {priceChanges.map((c, i) => (
+                      <tr key={c.id} className={hoverRow} style={staggerStyle(true, i, 100, 20)}>
+                        <td className="px-3 py-2">
+                          <div className="truncate max-w-[200px]">{c.name}</div>
+                          <div className="text-xs text-gray-400">{c.sku}</div>
+                        </td>
+                        <td className="px-3 py-2 text-gray-600">{FIELD_LABELS[c.field] || c.field}</td>
+                        <td className="px-3 py-2 text-right text-red-500 line-through">${Number(c.oldPrice).toFixed(2)}</td>
+                        <td className="px-3 py-2 text-right text-green-600 font-medium">${Number(c.newPrice).toFixed(2)}</td>
+                        <td className="px-3 py-2 text-right text-gray-400 text-xs">
+                          {new Date(c.detectedAt).toLocaleDateString("es-AR")}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <button
+                onClick={addChangedProducts}
+                className={`mt-3 w-full py-2 bg-yellow-500 text-white rounded-lg text-sm font-medium hover:bg-yellow-600 ${springBtn}`}
+              >
+                Agregar {Array.from(new Set(priceChanges.map((c) => c.sku))).length} productos con cambios a las etiquetas
+              </button>
+            </>
+          ) : (
+            <p className="text-sm text-gray-400">
+              No hay cambios de precios registrados. Presioná &quot;Escanear precios&quot; para iniciar el seguimiento.
+            </p>
+          )}
+        </div>
+      </Stagger>
 
       {/* Format selector */}
-      <div className="bg-white rounded-lg border p-4 mb-4">
-        <h2 className="text-sm font-medium text-gray-700 mb-3">Formato de etiqueta</h2>
-        <div className="flex flex-wrap gap-3">
-          {(Object.keys(FORMAT_LABELS) as LabelFormat[]).map((f) => (
-            <button
-              key={f}
-              onClick={() => setFormat(f)}
-              className={`px-4 py-2 rounded-lg text-sm border transition-colors ${
-                format === f
-                  ? "bg-brand-400 text-white border-brand-400"
-                  : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-              }`}
-            >
-              {FORMAT_LABELS[f]}
-            </button>
-          ))}
+      <Stagger delay={100} y={10}>
+        <div className="bg-white rounded-xl border shadow-sm p-4 mb-4">
+          <h2 className="text-sm font-medium text-gray-700 mb-3">Formato de etiqueta</h2>
+          <div className="flex flex-wrap gap-3">
+            {(Object.keys(FORMAT_LABELS) as LabelFormat[]).map((f) => (
+              <button
+                key={f}
+                onClick={() => setFormat(f)}
+                className={`px-4 py-2 rounded-lg text-sm border ${springBtn} ${
+                  format === f
+                    ? "bg-brand-400 text-white border-brand-400"
+                    : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                }`}
+              >
+                {FORMAT_LABELS[f]}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      </Stagger>
 
       {/* Product search */}
-      <div className="bg-white rounded-lg border p-4 mb-4">
-        <h2 className="text-sm font-medium text-gray-700 mb-3">Agregar productos</h2>
+      <Stagger delay={150} y={10}>
+        <div className="bg-white rounded-xl border shadow-sm p-4 mb-4">
+          <h2 className="text-sm font-medium text-gray-700 mb-3">Agregar productos</h2>
 
-        {/* Barcode input */}
-        <div className="flex gap-2 mb-3">
-          <input
-            type="text"
-            value={barcode}
-            onChange={(e) => setBarcode(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter") handleBarcode(); }}
-            placeholder="Código de barras..."
-            className="flex-1 px-4 py-2 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
-          />
-          <button
-            onClick={handleBarcode}
-            disabled={barcodeLoading || !barcode.trim()}
-            className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50"
-          >
-            {barcodeLoading ? "..." : "Agregar"}
-          </button>
-        </div>
+          {/* Barcode input */}
+          <div className="flex gap-2 mb-3">
+            <input
+              type="text"
+              value={barcode}
+              onChange={(e) => setBarcode(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") handleBarcode(); }}
+              placeholder="Código de barras..."
+              className="flex-1 px-4 py-2 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
+            />
+            <button
+              onClick={handleBarcode}
+              disabled={barcodeLoading || !barcode.trim()}
+              className={`px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50 ${springBtn}`}
+            >
+              {barcodeLoading ? "..." : "Agregar"}
+            </button>
+          </div>
 
-        {/* Brand filter */}
-        <div className="mb-3">
-          <select
-            value={selectedBrand}
-            onChange={(e) => handleBrandFilter(e.target.value)}
-            className="w-full px-4 py-2 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 bg-white"
-          >
-            <option value="">Filtrar por marca...</option>
-            {brands.map((b) => (
-              <option key={b.id} value={b.id}>{b.name}</option>
-            ))}
-          </select>
-          {loadingBrand && <p className="text-xs text-gray-400 mt-1">Cargando productos...</p>}
-          {brandProducts.length > 0 && (
-            <div className="mt-2 max-h-40 overflow-y-auto border rounded-lg">
-              {brandProducts.map((p) => {
-                const alreadyAdded = selected.some((s) => s.product.sku === p.sku);
-                return (
-                  <button
-                    key={p.sku}
-                    onClick={() => !alreadyAdded && addProduct(p)}
-                    disabled={alreadyAdded}
-                    className={`w-full text-left px-3 py-1.5 text-sm border-b last:border-b-0 ${
-                      alreadyAdded ? "bg-gray-50 text-gray-400" : "hover:bg-brand-50"
-                    }`}
-                  >
-                    <span className="font-mono text-gray-500 mr-2">{p.sku}</span>
-                    {p.name}
-                    {alreadyAdded && <span className="ml-2 text-xs">(agregado)</span>}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
+          {/* Brand filter */}
+          <div className="mb-3">
+            <select
+              value={selectedBrand}
+              onChange={(e) => handleBrandFilter(e.target.value)}
+              className="w-full px-4 py-2 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 bg-white"
+            >
+              <option value="">Filtrar por marca...</option>
+              {brands.map((b) => (
+                <option key={b.id} value={b.id}>{b.name}</option>
+              ))}
+            </select>
+            {loadingBrand && <LoadingCenter text="Cargando productos..." />}
+            {brandProducts.length > 0 && (
+              <div className="mt-2 max-h-40 overflow-y-auto border rounded-xl">
+                {brandProducts.map((p, i) => {
+                  const alreadyAdded = selected.some((s) => s.product.sku === p.sku);
+                  return (
+                    <button
+                      key={p.sku}
+                      onClick={() => !alreadyAdded && addProduct(p)}
+                      disabled={alreadyAdded}
+                      style={staggerStyle(true, i, 50, 15)}
+                      className={`w-full text-left px-3 py-1.5 text-sm border-b last:border-b-0 ${hoverRow} ${
+                        alreadyAdded ? "bg-gray-50 text-gray-400" : "hover:bg-brand-50"
+                      }`}
+                    >
+                      <span className="font-mono text-gray-500 mr-2">{p.sku}</span>
+                      {p.name}
+                      {alreadyAdded && <span className="ml-2 text-xs">(agregado)</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
 
-        {/* Name/SKU search */}
-        <div className="relative">
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => handleSearch(e.target.value)}
-            placeholder="Buscar por nombre o SKU..."
-            className="w-full px-4 py-2 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
-          />
-          {searching && (
-            <div className="absolute right-3 top-2.5 text-gray-400 text-sm">Buscando...</div>
-          )}
-          {results.length > 0 && (
-            <div className="absolute z-10 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-60 overflow-y-auto">
-              {results.map((p) => {
-                const alreadyAdded = selected.some((s) => s.product.sku === p.sku);
-                return (
-                  <button
-                    key={p.sku}
-                    onClick={() => !alreadyAdded && addProduct(p)}
-                    disabled={alreadyAdded}
-                    className={`w-full text-left px-4 py-2 text-sm border-b last:border-b-0 ${
-                      alreadyAdded ? "bg-gray-50 text-gray-400" : "hover:bg-brand-50"
-                    }`}
-                  >
-                    <span className="font-mono text-gray-500 mr-2">{p.sku}</span>
-                    {p.name}
-                    {alreadyAdded && <span className="ml-2 text-xs">(agregado)</span>}
-                  </button>
-                );
-              })}
-            </div>
-          )}
+          {/* Name/SKU search */}
+          <div className="relative">
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => handleSearch(e.target.value)}
+              placeholder="Buscar por nombre o SKU..."
+              className="w-full px-4 py-2 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
+            />
+            {searching && (
+              <div className="absolute right-3 top-2.5 text-gray-400 text-sm">Buscando...</div>
+            )}
+            {results.length > 0 && (
+              <div className="absolute z-10 w-full mt-1 bg-white border rounded-xl shadow-lg max-h-60 overflow-y-auto">
+                {results.map((p, i) => {
+                  const alreadyAdded = selected.some((s) => s.product.sku === p.sku);
+                  return (
+                    <button
+                      key={p.sku}
+                      onClick={() => !alreadyAdded && addProduct(p)}
+                      disabled={alreadyAdded}
+                      style={staggerStyle(true, i, 50, 15)}
+                      className={`w-full text-left px-4 py-2 text-sm border-b last:border-b-0 ${hoverRow} ${
+                        alreadyAdded ? "bg-gray-50 text-gray-400" : "hover:bg-brand-50"
+                      }`}
+                    >
+                      <span className="font-mono text-gray-500 mr-2">{p.sku}</span>
+                      {p.name}
+                      {alreadyAdded && <span className="ml-2 text-xs">(agregado)</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      </Stagger>
 
       {/* Selected products */}
       {selected.length > 0 && (
-        <div className="bg-white rounded-lg border p-4 mb-4">
-          <h2 className="text-sm font-medium text-gray-700 mb-3">
-            Productos seleccionados ({selected.length})
-          </h2>
-          <div className="space-y-2">
-            {selected.map((s) => (
-              <div
-                key={s.product.sku}
-                className="flex items-center justify-between gap-3 py-2 border-b last:border-b-0"
-              >
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm truncate">{s.product.name}</div>
-                  <div className="text-xs text-gray-500">
-                    SKU: {s.product.sku} | {s.product.barcode || "Sin código"}
+        <Stagger delay={200} y={10}>
+          <div className="bg-white rounded-xl border shadow-sm p-4 mb-4">
+            <h2 className="text-sm font-medium text-gray-700 mb-3">
+              Productos seleccionados ({selected.length})
+            </h2>
+            <div className="space-y-2">
+              {selected.map((s, i) => (
+                <div
+                  key={s.product.sku}
+                  style={staggerStyle(true, i, 50, 25)}
+                  className={`flex items-center justify-between gap-3 py-2 border-b last:border-b-0 ${hoverRow}`}
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm truncate">{s.product.name}</div>
+                    <div className="text-xs text-gray-500">
+                      SKU: {s.product.sku} | {s.product.barcode || "Sin código"}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      onClick={() => updateQuantity(s.product.sku, s.quantity - 1)}
+                      className={`w-7 h-7 flex items-center justify-center rounded border text-gray-600 hover:bg-gray-100 ${springBtn}`}
+                    >
+                      -
+                    </button>
+                    <input
+                      type="number"
+                      value={s.quantity}
+                      onChange={(e) => updateQuantity(s.product.sku, parseInt(e.target.value) || 1)}
+                      className="w-12 text-center text-sm border rounded py-1"
+                      min={1}
+                      max={100}
+                    />
+                    <button
+                      onClick={() => updateQuantity(s.product.sku, s.quantity + 1)}
+                      className={`w-7 h-7 flex items-center justify-center rounded border text-gray-600 hover:bg-gray-100 ${springBtn}`}
+                    >
+                      +
+                    </button>
+                    <button
+                      onClick={() => removeProduct(s.product.sku)}
+                      className={`text-red-500 hover:text-red-700 text-sm ml-2 ${springBtn}`}
+                    >
+                      Quitar
+                    </button>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <button
-                    onClick={() => updateQuantity(s.product.sku, s.quantity - 1)}
-                    className="w-7 h-7 flex items-center justify-center rounded border text-gray-600 hover:bg-gray-100"
-                  >
-                    -
-                  </button>
-                  <input
-                    type="number"
-                    value={s.quantity}
-                    onChange={(e) => updateQuantity(s.product.sku, parseInt(e.target.value) || 1)}
-                    className="w-12 text-center text-sm border rounded py-1"
-                    min={1}
-                    max={100}
-                  />
-                  <button
-                    onClick={() => updateQuantity(s.product.sku, s.quantity + 1)}
-                    className="w-7 h-7 flex items-center justify-center rounded border text-gray-600 hover:bg-gray-100"
-                  >
-                    +
-                  </button>
-                  <button
-                    onClick={() => removeProduct(s.product.sku)}
-                    className="text-red-500 hover:text-red-700 text-sm ml-2"
-                  >
-                    Quitar
-                  </button>
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
+        </Stagger>
       )}
 
       {/* Generate button */}
-      <button
-        onClick={generatePdf}
-        disabled={selected.length === 0 || generating}
-        className={`w-full py-3 rounded-lg text-sm font-medium transition-colors ${
-          selected.length === 0 || generating
-            ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-            : "bg-brand-400 text-white hover:bg-brand-500"
-        }`}
-      >
-        {generating
-          ? "Generando PDF..."
-          : `Generar PDF — ${totalLabels} etiqueta${totalLabels !== 1 ? "s" : ""}`}
-      </button>
+      <Stagger delay={250} y={10}>
+        <button
+          onClick={generatePdf}
+          disabled={selected.length === 0 || generating}
+          className={`w-full py-3 rounded-lg text-sm font-medium ${springBtn} ${
+            selected.length === 0 || generating
+              ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+              : "bg-brand-400 text-white hover:bg-brand-500"
+          }`}
+        >
+          {generating
+            ? "Generando PDF..."
+            : `Generar PDF — ${totalLabels} etiqueta${totalLabels !== 1 ? "s" : ""}`}
+        </button>
+      </Stagger>
 
       <ConfirmModal
         open={showClearConfirm}
@@ -529,6 +545,6 @@ export default function EtiquetasPage() {
         onConfirm={clearPriceChanges}
         onCancel={() => setShowClearConfirm(false)}
       />
-    </div>
+    </PageTransition>
   );
 }

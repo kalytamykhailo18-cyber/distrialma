@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { HiOutlineArrowLeft, HiOutlineDocumentDownload } from "react-icons/hi";
+import { PageTransition, Stagger, springBtn } from "@/components/AnimateIn";
 
 interface Product {
   sku: string;
@@ -356,20 +357,23 @@ export default function CatalogoPage() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-6">
-      <div className="flex items-center gap-3 mb-6">
-        <Link href="/admin/vendedores" className="p-2 hover:bg-gray-100 rounded-lg">
-          <HiOutlineArrowLeft className="w-5 h-5" />
-        </Link>
-        <h1 className="text-2xl font-bold text-gray-900">Catálogo PDF para vendedores</h1>
-      </div>
+    <PageTransition className="max-w-6xl mx-auto px-4 py-6">
+      <Stagger delay={0} y={-8}>
+        <div className="flex items-center gap-3 mb-6">
+          <Link href="/admin/vendedores" className="p-2 hover:bg-gray-100 rounded-lg">
+            <HiOutlineArrowLeft className="w-5 h-5" />
+          </Link>
+          <h1 className="text-2xl font-bold text-gray-900">Catálogo PDF para vendedores</h1>
+        </div>
+      </Stagger>
 
-      <div className="bg-white border rounded-xl p-4 mb-4">
+      <Stagger delay={50} y={10}>
+      <div className="bg-white border rounded-xl shadow-sm p-4 mb-4">
         <label className="block text-sm font-medium text-gray-700 mb-2">Lista de precios</label>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
           <button
             onClick={() => setLista("vendedor")}
-            className={`px-3 py-2 text-sm rounded-lg border text-left transition-colors ${
+            className={`px-3 py-2 text-sm rounded-lg border text-left transition-colors ${springBtn} ${
               lista === "vendedor"
                 ? "border-brand-400 bg-brand-50 text-brand-600 font-medium"
                 : "border-gray-200 hover:border-gray-300 text-gray-700"
@@ -380,7 +384,7 @@ export default function CatalogoPage() {
           </button>
           <button
             onClick={() => setLista("mayorista")}
-            className={`px-3 py-2 text-sm rounded-lg border text-left transition-colors ${
+            className={`px-3 py-2 text-sm rounded-lg border text-left transition-colors ${springBtn} ${
               lista === "mayorista"
                 ? "border-brand-400 bg-brand-50 text-brand-600 font-medium"
                 : "border-gray-200 hover:border-gray-300 text-gray-700"
@@ -391,7 +395,7 @@ export default function CatalogoPage() {
           </button>
           <button
             onClick={() => setLista("especial")}
-            className={`px-3 py-2 text-sm rounded-lg border text-left transition-colors ${
+            className={`px-3 py-2 text-sm rounded-lg border text-left transition-colors ${springBtn} ${
               lista === "especial"
                 ? "border-brand-400 bg-brand-50 text-brand-600 font-medium"
                 : "border-gray-200 hover:border-gray-300 text-gray-700"
@@ -402,10 +406,12 @@ export default function CatalogoPage() {
           </button>
         </div>
       </div>
+      </Stagger>
 
       {/* Filters */}
+      <Stagger delay={100} y={10}>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-        <div className="bg-white border rounded-xl p-4">
+        <div className="bg-white border rounded-xl shadow-sm p-4">
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-sm font-medium text-gray-700">
               Rubros ({selectedRubros.size > 0 ? `${selectedRubros.size} seleccionados` : "todos"})
@@ -440,7 +446,7 @@ export default function CatalogoPage() {
           </div>
         </div>
 
-        <div className="bg-white border rounded-xl p-4">
+        <div className="bg-white border rounded-xl shadow-sm p-4">
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-sm font-medium text-gray-700">
               Marcas ({selectedMarcas.size > 0 ? `${selectedMarcas.size} seleccionadas` : "todas"})
@@ -475,9 +481,11 @@ export default function CatalogoPage() {
           </div>
         </div>
       </div>
+      </Stagger>
 
       {/* Disclaimer + options */}
-      <div className="bg-white border rounded-xl p-4 mb-4">
+      <Stagger delay={150} y={10}>
+      <div className="bg-white border rounded-xl shadow-sm p-4 mb-4">
         <label className="block text-sm font-medium text-gray-700 mb-2">
           Texto al final del catálogo
         </label>
@@ -517,7 +525,7 @@ export default function CatalogoPage() {
       </div>
 
       {/* Action */}
-      <div className="flex items-center justify-between bg-orange-50 border border-orange-200 rounded-xl p-4">
+      <div className="flex items-center justify-between bg-orange-50 border border-orange-200 rounded-xl shadow-sm p-4">
         <div>
           <p className="text-sm font-medium text-gray-700">
             {loading ? "Cargando..." : `${products.length} productos para incluir`}
@@ -531,12 +539,13 @@ export default function CatalogoPage() {
         <button
           onClick={generatePDF}
           disabled={loading || generating || products.length === 0}
-          className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-brand-400 rounded-lg hover:bg-brand-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-brand-400 rounded-lg hover:bg-brand-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors ${springBtn}`}
         >
           <HiOutlineDocumentDownload className="w-5 h-5" />
           {generating ? "Generando..." : "Generar PDF"}
         </button>
       </div>
-    </div>
+      </Stagger>
+    </PageTransition>
   );
 }

@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { formatPrice } from "@/lib/utils";
-import { HiOutlinePlus, HiOutlineCash, HiOutlineChevronDown, HiOutlineChevronRight, HiOutlineDocumentDownload } from "react-icons/hi";
+import { HiOutlinePlus, HiOutlineCash, HiOutlineChevronDown, HiOutlineDocumentDownload } from "react-icons/hi";
+import { PageTransition, Stagger, staggerStyle, springBtn, hoverRow, LoadingCenter, useDataReady, CollapsiblePanel } from "@/components/AnimateIn";
 
 interface Proveedor {
   cod: string;
@@ -65,6 +66,8 @@ export default function ProveedoresPage() {
     return d.toISOString().slice(0, 10);
   });
   const [filterHasta, setFilterHasta] = useState(() => new Date().toISOString().slice(0, 10));
+
+  const dataReady = useDataReady(!loading && proveedores);
 
   function loadData() {
     setLoading(true);
@@ -384,328 +387,336 @@ export default function ProveedoresPage() {
     : proveedores;
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-6">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Proveedores</h1>
-        <button
-          onClick={() => setShowAdd(!showAdd)}
-          className="flex items-center gap-1.5 px-4 py-2 text-sm text-white bg-brand-400 rounded-lg hover:bg-brand-500 transition-colors"
-        >
-          <HiOutlinePlus className="w-4 h-4" />
-          Nuevo proveedor
-        </button>
-      </div>
+    <PageTransition className="max-w-3xl mx-auto px-4 py-6">
+      <Stagger delay={0} y={-8}>
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-2xl font-bold text-gray-900">Proveedores</h1>
+          <button
+            onClick={() => setShowAdd(!showAdd)}
+            className={`flex items-center gap-1.5 px-4 py-2 text-sm text-white bg-brand-400 rounded-xl hover:bg-brand-500 transition-colors ${springBtn}`}
+          >
+            <HiOutlinePlus className="w-4 h-4" />
+            Nuevo proveedor
+          </button>
+        </div>
+      </Stagger>
 
       {/* Add form */}
       {showAdd && (
-        <div className="bg-gray-50 rounded-lg border p-4 mb-4">
-          <div className="flex gap-3 items-end">
-            <div className="flex-1">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Nombre
-              </label>
-              <input
-                type="text"
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                placeholder="Nombre del proveedor"
-                className="w-full px-3 py-2 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
-                onKeyDown={(e) => e.key === "Enter" && handleAdd()}
-              />
+        <Stagger delay={50} y={6}>
+          <div className="bg-gray-50 rounded-xl border shadow-sm p-4 mb-4">
+            <div className="flex gap-3 items-end">
+              <div className="flex-1">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Nombre
+                </label>
+                <input
+                  type="text"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  placeholder="Nombre del proveedor"
+                  className="w-full px-3 py-2 border border-brand-400 rounded-xl text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
+                  onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+                />
+              </div>
+              <button
+                onClick={handleAdd}
+                disabled={saving}
+                className={`px-4 py-2 text-sm text-white bg-brand-400 rounded-xl hover:bg-brand-500 disabled:opacity-50 transition-colors ${springBtn}`}
+              >
+                {saving ? "Guardando..." : "Guardar"}
+              </button>
+              <button
+                onClick={() => { setShowAdd(false); setNewName(""); setError(""); }}
+                disabled={saving}
+                className={`px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-50 transition-colors ${springBtn}`}
+              >
+                Cancelar
+              </button>
             </div>
-            <button
-              onClick={handleAdd}
-              disabled={saving}
-              className="px-4 py-2 text-sm text-white bg-brand-400 rounded-lg hover:bg-brand-500 disabled:opacity-50 transition-colors"
-            >
-              {saving ? "Guardando..." : "Guardar"}
-            </button>
-            <button
-              onClick={() => { setShowAdd(false); setNewName(""); setError(""); }}
-              disabled={saving}
-              className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors"
-            >
-              Cancelar
-            </button>
+            {error && <p className="text-sm text-red-600 mt-2">{error}</p>}
           </div>
-          {error && <p className="text-sm text-red-600 mt-2">{error}</p>}
-        </div>
+        </Stagger>
       )}
 
       {/* Payment form */}
       {payingProv && (
-        <div className="bg-green-50 rounded-lg border border-green-200 p-4 mb-4">
-          <h3 className="text-sm font-medium text-gray-900 mb-2">
-            Registrar pago a: <span className="text-green-700">{payingProv.nombre}</span>
-          </h3>
-          <p className="text-xs text-gray-500 mb-3">
-            Saldo actual: <span className="font-medium text-red-600">{formatPrice(payingProv.saldo)}</span>
-          </p>
-          <div className="flex gap-3 items-end flex-wrap">
-            <div className="flex-1 min-w-[120px]">
-              <label className="block text-xs text-gray-500 mb-1">Monto</label>
-              <input
-                type="text"
-                inputMode="decimal"
-                value={payMonto}
-                onChange={(e) => {
-                  // Accept digits, comma and dot
-                  const val = e.target.value.replace(/[^0-9.,]/g, "");
-                  setPayMonto(val);
-                }}
-                placeholder="0"
-                className="w-full px-3 py-2 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
-              />
-            </div>
-            <div className="flex-1 min-w-[150px]">
-              <label className="block text-xs text-gray-500 mb-1">Forma de pago</label>
-              <select
-                value={payConcepto}
-                onChange={(e) => setPayConcepto(e.target.value)}
-                className="w-full px-3 py-2 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 bg-white"
+        <Stagger delay={50} y={6}>
+          <div className="bg-green-50 rounded-xl border border-green-200 shadow-sm p-4 mb-4">
+            <h3 className="text-sm font-medium text-gray-900 mb-2">
+              Registrar pago a: <span className="text-green-700">{payingProv.nombre}</span>
+            </h3>
+            <p className="text-xs text-gray-500 mb-3">
+              Saldo actual: <span className="font-medium text-red-600">{formatPrice(payingProv.saldo)}</span>
+            </p>
+            <div className="flex gap-3 items-end flex-wrap">
+              <div className="flex-1 min-w-[120px]">
+                <label className="block text-xs text-gray-500 mb-1">Monto</label>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={payMonto}
+                  onChange={(e) => {
+                    // Accept digits, comma and dot
+                    const val = e.target.value.replace(/[^0-9.,]/g, "");
+                    setPayMonto(val);
+                  }}
+                  placeholder="0"
+                  className="w-full px-3 py-2 border border-brand-400 rounded-xl text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
+                />
+              </div>
+              <div className="flex-1 min-w-[150px]">
+                <label className="block text-xs text-gray-500 mb-1">Forma de pago</label>
+                <select
+                  value={payConcepto}
+                  onChange={(e) => setPayConcepto(e.target.value)}
+                  className="w-full px-3 py-2 border border-brand-400 rounded-xl text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 bg-white"
+                >
+                  <option value="">Seleccionar...</option>
+                  <option value="Efectivo">Efectivo</option>
+                  <option value="Transferencia">Transferencia</option>
+                  <option value="Cheque">Cheque</option>
+                </select>
+              </div>
+              <button
+                onClick={handlePayment}
+                disabled={payingSaving}
+                className={`px-4 py-2 text-sm text-white bg-green-600 rounded-xl hover:bg-green-700 disabled:opacity-50 transition-colors ${springBtn}`}
               >
-                <option value="">Seleccionar...</option>
-                <option value="Efectivo">Efectivo</option>
-                <option value="Transferencia">Transferencia</option>
-                <option value="Cheque">Cheque</option>
-              </select>
+                {payingSaving ? "Registrando..." : "Registrar pago"}
+              </button>
+              <button
+                onClick={() => { setPayingProv(null); setPayMonto(""); setPayConcepto(""); setPayError(""); }}
+                disabled={payingSaving}
+                className={`px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-50 transition-colors ${springBtn}`}
+              >
+                Cancelar
+              </button>
             </div>
-            <button
-              onClick={handlePayment}
-              disabled={payingSaving}
-              className="px-4 py-2 text-sm text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
-            >
-              {payingSaving ? "Registrando..." : "Registrar pago"}
-            </button>
-            <button
-              onClick={() => { setPayingProv(null); setPayMonto(""); setPayConcepto(""); setPayError(""); }}
-              disabled={payingSaving}
-              className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors"
-            >
-              Cancelar
-            </button>
+            {payError && <p className="text-sm text-red-600 mt-2">{payError}</p>}
           </div>
-          {payError && <p className="text-sm text-red-600 mt-2">{payError}</p>}
-        </div>
+        </Stagger>
       )}
 
       {/* Filter */}
-      <input
-        type="text"
-        value={filter}
-        onChange={(e) => setFilter(e.target.value)}
-        placeholder="Filtrar proveedores..."
-        className="w-full px-4 py-2 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 mb-4"
-      />
+      <Stagger delay={80} y={6}>
+        <input
+          type="text"
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          placeholder="Filtrar proveedores..."
+          className="w-full px-4 py-2 border border-brand-400 rounded-xl text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 mb-4"
+        />
+      </Stagger>
 
       {loading ? (
-        <p className="text-gray-400">Cargando proveedores...</p>
+        <LoadingCenter text="Cargando proveedores..." />
       ) : (
-        <div className="bg-white rounded-lg border divide-y max-h-[60vh] overflow-y-auto">
-          {filtered.map((p) => (
-            <div key={p.cod}>
-              <div className="flex items-center justify-between px-4 py-2.5 hover:bg-gray-50">
-                <button
-                  onClick={() => toggleProvEntries(p.cod)}
-                  className="flex items-center gap-1 text-left min-w-0"
-                >
-                  {expandedProv === p.cod ? (
-                    <HiOutlineChevronDown className="w-4 h-4 text-gray-400 shrink-0" />
-                  ) : (
-                    <HiOutlineChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
-                  )}
-                  <span className="text-sm text-gray-900">{p.nombre}</span>
-                  <span className="text-xs text-gray-400 ml-2">#{p.cod}</span>
-                </button>
-                <div className="flex items-center gap-3">
-                  {hasCosteo && (
-                    <>
-                      <span
-                        className={`text-sm font-medium ${
-                          p.saldo > 0 ? "text-red-600" : "text-gray-400"
-                        }`}
-                      >
-                        {p.saldo > 0 ? formatPrice(p.saldo) : "\u2014"}
-                      </span>
-                      {p.saldo > 0 && (
-                        <button
-                          onClick={() => { setPayingProv(p); setPayMonto(""); setPayConcepto(""); setPayError(""); }}
-                          className="flex items-center gap-1 px-2 py-1 text-xs text-green-600 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 transition-colors"
+        <Stagger delay={150} y={8}>
+          <div className="bg-white rounded-xl border shadow-sm divide-y max-h-[60vh] overflow-y-auto">
+            {filtered.map((p, idx) => (
+              <div key={p.cod} style={staggerStyle(dataReady, idx)}>
+                <div className={`flex items-center justify-between px-4 py-2.5 ${hoverRow}`}>
+                  <button
+                    onClick={() => toggleProvEntries(p.cod)}
+                    className="flex items-center gap-1 text-left min-w-0"
+                  >
+                    <HiOutlineChevronDown className={`w-4 h-4 text-gray-400 shrink-0 transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${expandedProv === p.cod ? "rotate-0" : "-rotate-90"}`} />
+                    <span className="text-sm text-gray-900">{p.nombre}</span>
+                    <span className="text-xs text-gray-400 ml-2">#{p.cod}</span>
+                  </button>
+                  <div className="flex items-center gap-3">
+                    {hasCosteo && (
+                      <>
+                        <span
+                          className={`text-sm font-medium ${
+                            p.saldo > 0 ? "text-red-600" : "text-gray-400"
+                          }`}
                         >
-                          <HiOutlineCash className="w-3.5 h-3.5" />
-                          Pagar
-                        </button>
-                      )}
-                    </>
-                  )}
-                </div>
-              </div>
-
-              {/* Supplier history (entries + payments) */}
-              {expandedProv === p.cod && (
-                <div className="bg-gray-50 px-4 py-2 border-t">
-                  {/* Date range filter */}
-                  <div className="flex items-center gap-2 mb-2 flex-wrap">
-                    <label className="text-xs text-gray-500">Desde:</label>
-                    <input
-                      type="date"
-                      value={filterDesde}
-                      onChange={(e) => setFilterDesde(e.target.value)}
-                      className="px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:border-brand-600"
-                    />
-                    <label className="text-xs text-gray-500">Hasta:</label>
-                    <input
-                      type="date"
-                      value={filterHasta}
-                      onChange={(e) => setFilterHasta(e.target.value)}
-                      className="px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:border-brand-600"
-                    />
-                    <button
-                      onClick={() => exportPDF(p)}
-                      className="flex items-center gap-1 px-2 py-1 text-xs text-red-600 bg-red-50 border border-red-200 rounded hover:bg-red-100"
-                    >
-                      <HiOutlineDocumentDownload className="w-3.5 h-3.5" />
-                      PDF
-                    </button>
-                    <button
-                      onClick={() => exportCSV(p)}
-                      className="flex items-center gap-1 px-2 py-1 text-xs text-green-600 bg-green-50 border border-green-200 rounded hover:bg-green-100"
-                    >
-                      <HiOutlineDocumentDownload className="w-3.5 h-3.5" />
-                      Excel
-                    </button>
+                          {p.saldo > 0 ? formatPrice(p.saldo) : "\u2014"}
+                        </span>
+                        {p.saldo > 0 && (
+                          <button
+                            onClick={() => { setPayingProv(p); setPayMonto(""); setPayConcepto(""); setPayError(""); }}
+                            className={`flex items-center gap-1 px-2 py-1 text-xs text-green-600 bg-green-50 border border-green-200 rounded-xl hover:bg-green-100 transition-colors ${springBtn}`}
+                          >
+                            <HiOutlineCash className="w-3.5 h-3.5" />
+                            Pagar
+                          </button>
+                        )}
+                      </>
+                    )}
                   </div>
-                  {loadingEntries ? (
-                    <p className="text-xs text-gray-400 py-1">Cargando movimientos...</p>
-                  ) : provEntries.length === 0 && provPayments.length === 0 ? (
-                    <p className="text-xs text-gray-400 py-1">Sin movimientos registrados</p>
-                  ) : (() => {
-                    // Merge, filter by date, sort desc
-                    const desdeDate = filterDesde ? new Date(filterDesde + "T00:00:00") : null;
-                    const hastaDate = filterHasta ? new Date(filterHasta + "T23:59:59") : null;
-                    const allMovements = [
-                      ...provEntries.map((e) => ({ type: "entry" as const, date: e.createdAt, data: e })),
-                      ...provPayments.map((pay) => ({ type: "payment" as const, date: pay.createdAt, data: pay })),
-                    ]
-                      .filter((item) => {
-                        const d = new Date(item.date);
-                        if (desdeDate && d < desdeDate) return false;
-                        if (hastaDate && d > hastaDate) return false;
-                        return true;
-                      })
-                      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
-                    // Calculate running balance going backwards from current saldo
-                    // Current saldo is after all movements. Going desc (newest first):
-                    // balance[0] = p.saldo (after newest movement)
-                    // For each movement going down: if entry (Compra +$), the balance BEFORE it was balance - total
-                    // if payment (Pago -$), the balance BEFORE it was balance + monto
-                    let runningBal = p.saldo;
-                    // We need all movements (not just filtered) to calculate correct balances
-                    const allMovsFull = [
-                      ...provEntries.map((e) => ({ type: "entry" as const, date: e.createdAt, data: e })),
-                      ...provPayments.map((pay) => ({ type: "payment" as const, date: pay.createdAt, data: pay })),
-                    ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
-                    const balanceMap = new Map<string, number>();
-                    for (const item of allMovsFull) {
-                      const key = `${item.type}-${(item.data as { id: number }).id}`;
-                      balanceMap.set(key, runningBal);
-                      if (item.type === "entry") {
-                        runningBal -= (item.data as ProvEntry).total;
-                      } else {
-                        runningBal += (item.data as ProvPayment).monto;
-                      }
-                    }
-
-                    if (allMovements.length === 0) {
-                      return <p className="text-xs text-gray-400 py-1">Sin movimientos en el rango seleccionado</p>;
-                    }
-
-                    return (
-                      <div className="space-y-1">
-                        {allMovements.map((item) => {
-                          const key = `${item.type}-${(item.data as { id: number }).id}`;
-                          const saldoAfter = balanceMap.get(key) ?? 0;
-
-                          if (item.type === "entry") {
-                            const entry = item.data as ProvEntry;
-                            return (
-                              <a
-                                key={`e-${entry.id}`}
-                                href={`/admin/compras/${entry.id}`}
-                                className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-gray-100 transition-colors"
-                              >
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <span className="text-xs text-gray-500">
-                                    {new Date(entry.createdAt).toLocaleDateString("es-AR")}
-                                  </span>
-                                  <span className="text-xs px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">Compra</span>
-                                  <span className="text-xs text-gray-600">
-                                    {entry.itemCount} {entry.itemCount === 1 ? "producto" : "productos"}
-                                  </span>
-                                  <span
-                                    className={`text-xs px-1.5 py-0.5 rounded ${
-                                      entry.estado === "pendiente"
-                                        ? "bg-yellow-100 text-yellow-700"
-                                        : "bg-green-100 text-green-700"
-                                    }`}
-                                  >
-                                    {entry.estado}
-                                  </span>
-                                  {entry.nroFactura && (
-                                    <span className="text-xs text-blue-600">Fact: {entry.nroFactura}</span>
-                                  )}
-                                </div>
-                                <div className="flex items-center gap-2 shrink-0">
-                                  {hasCosteo && entry.total > 0 && (
-                                    <span className="text-xs font-medium text-red-600">+ {formatPrice(entry.total)}</span>
-                                  )}
-                                  {hasCosteo && (
-                                    <span className="text-xs text-gray-400">Saldo: {formatPrice(saldoAfter)}</span>
-                                  )}
-                                </div>
-                              </a>
-                            );
-                          } else {
-                            const payment = item.data as ProvPayment;
-                            return (
-                              <div
-                                key={`p-${payment.id}`}
-                                className="flex items-center justify-between py-1.5 px-2 rounded"
-                              >
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <span className="text-xs text-gray-500">
-                                    {new Date(payment.createdAt).toLocaleDateString("es-AR")}
-                                  </span>
-                                  <span className="text-xs px-1.5 py-0.5 rounded bg-green-100 text-green-700">Pago</span>
-                                  {payment.concepto && (
-                                    <span className="text-xs text-gray-500">{payment.concepto}</span>
-                                  )}
-                                  <span className="text-xs text-gray-400">por {payment.usuario}</span>
-                                </div>
-                                <div className="flex items-center gap-2 shrink-0">
-                                  <span className="text-xs font-medium text-green-600">- {formatPrice(payment.monto)}</span>
-                                  {hasCosteo && (
-                                    <span className="text-xs text-gray-400">Saldo: {formatPrice(saldoAfter)}</span>
-                                  )}
-                                </div>
-                              </div>
-                            );
-                          }
-                        })}
-                      </div>
-                    );
-                  })()}
                 </div>
-              )}
-            </div>
-          ))}
-          {filtered.length === 0 && (
-            <p className="px-4 py-3 text-sm text-gray-400">Sin resultados</p>
-          )}
-        </div>
+
+                {/* Supplier history (entries + payments) */}
+                <CollapsiblePanel open={expandedProv === p.cod}>
+                  <div className="bg-gray-50 px-4 py-2 border-t">
+                    {/* Date range filter */}
+                    <div className="flex items-center gap-2 mb-2 flex-wrap">
+                      <label className="text-xs text-gray-500">Desde:</label>
+                      <input
+                        type="date"
+                        value={filterDesde}
+                        onChange={(e) => setFilterDesde(e.target.value)}
+                        className="px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:border-brand-600"
+                      />
+                      <label className="text-xs text-gray-500">Hasta:</label>
+                      <input
+                        type="date"
+                        value={filterHasta}
+                        onChange={(e) => setFilterHasta(e.target.value)}
+                        className="px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:border-brand-600"
+                      />
+                      <button
+                        onClick={() => exportPDF(p)}
+                        className={`flex items-center gap-1 px-2 py-1 text-xs text-red-600 bg-red-50 border border-red-200 rounded hover:bg-red-100 ${springBtn}`}
+                      >
+                        <HiOutlineDocumentDownload className="w-3.5 h-3.5" />
+                        PDF
+                      </button>
+                      <button
+                        onClick={() => exportCSV(p)}
+                        className={`flex items-center gap-1 px-2 py-1 text-xs text-green-600 bg-green-50 border border-green-200 rounded hover:bg-green-100 ${springBtn}`}
+                      >
+                        <HiOutlineDocumentDownload className="w-3.5 h-3.5" />
+                        Excel
+                      </button>
+                    </div>
+                    {loadingEntries ? (
+                      <LoadingCenter text="Cargando movimientos..." />
+                    ) : provEntries.length === 0 && provPayments.length === 0 ? (
+                      <p className="text-xs text-gray-400 py-1">Sin movimientos registrados</p>
+                    ) : (() => {
+                      // Merge, filter by date, sort desc
+                      const desdeDate = filterDesde ? new Date(filterDesde + "T00:00:00") : null;
+                      const hastaDate = filterHasta ? new Date(filterHasta + "T23:59:59") : null;
+                      const allMovements = [
+                        ...provEntries.map((e) => ({ type: "entry" as const, date: e.createdAt, data: e })),
+                        ...provPayments.map((pay) => ({ type: "payment" as const, date: pay.createdAt, data: pay })),
+                      ]
+                        .filter((item) => {
+                          const d = new Date(item.date);
+                          if (desdeDate && d < desdeDate) return false;
+                          if (hastaDate && d > hastaDate) return false;
+                          return true;
+                        })
+                        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+                      // Calculate running balance going backwards from current saldo
+                      // Current saldo is after all movements. Going desc (newest first):
+                      // balance[0] = p.saldo (after newest movement)
+                      // For each movement going down: if entry (Compra +$), the balance BEFORE it was balance - total
+                      // if payment (Pago -$), the balance BEFORE it was balance + monto
+                      let runningBal = p.saldo;
+                      // We need all movements (not just filtered) to calculate correct balances
+                      const allMovsFull = [
+                        ...provEntries.map((e) => ({ type: "entry" as const, date: e.createdAt, data: e })),
+                        ...provPayments.map((pay) => ({ type: "payment" as const, date: pay.createdAt, data: pay })),
+                      ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+                      const balanceMap = new Map<string, number>();
+                      for (const item of allMovsFull) {
+                        const key = `${item.type}-${(item.data as { id: number }).id}`;
+                        balanceMap.set(key, runningBal);
+                        if (item.type === "entry") {
+                          runningBal -= (item.data as ProvEntry).total;
+                        } else {
+                          runningBal += (item.data as ProvPayment).monto;
+                        }
+                      }
+
+                      if (allMovements.length === 0) {
+                        return <p className="text-xs text-gray-400 py-1">Sin movimientos en el rango seleccionado</p>;
+                      }
+
+                      return (
+                        <div className="space-y-1">
+                          {allMovements.map((item, movIdx) => {
+                            const key = `${item.type}-${(item.data as { id: number }).id}`;
+                            const saldoAfter = balanceMap.get(key) ?? 0;
+
+                            if (item.type === "entry") {
+                              const entry = item.data as ProvEntry;
+                              return (
+                                <a
+                                  key={`e-${entry.id}`}
+                                  href={`/admin/compras/${entry.id}`}
+                                  className={`flex items-center justify-between py-1.5 px-2 rounded hover:bg-gray-100 transition-colors`}
+                                  style={staggerStyle(true, movIdx, 50, 20)}
+                                >
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="text-xs text-gray-500">
+                                      {new Date(entry.createdAt).toLocaleDateString("es-AR")}
+                                    </span>
+                                    <span className="text-xs px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">Compra</span>
+                                    <span className="text-xs text-gray-600">
+                                      {entry.itemCount} {entry.itemCount === 1 ? "producto" : "productos"}
+                                    </span>
+                                    <span
+                                      className={`text-xs px-1.5 py-0.5 rounded ${
+                                        entry.estado === "pendiente"
+                                          ? "bg-yellow-100 text-yellow-700"
+                                          : "bg-green-100 text-green-700"
+                                      }`}
+                                    >
+                                      {entry.estado}
+                                    </span>
+                                    {entry.nroFactura && (
+                                      <span className="text-xs text-blue-600">Fact: {entry.nroFactura}</span>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-2 shrink-0">
+                                    {hasCosteo && entry.total > 0 && (
+                                      <span className="text-xs font-medium text-red-600">+ {formatPrice(entry.total)}</span>
+                                    )}
+                                    {hasCosteo && (
+                                      <span className="text-xs text-gray-400">Saldo: {formatPrice(saldoAfter)}</span>
+                                    )}
+                                  </div>
+                                </a>
+                              );
+                            } else {
+                              const payment = item.data as ProvPayment;
+                              return (
+                                <div
+                                  key={`p-${payment.id}`}
+                                  className="flex items-center justify-between py-1.5 px-2 rounded"
+                                  style={staggerStyle(true, movIdx, 50, 20)}
+                                >
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="text-xs text-gray-500">
+                                      {new Date(payment.createdAt).toLocaleDateString("es-AR")}
+                                    </span>
+                                    <span className="text-xs px-1.5 py-0.5 rounded bg-green-100 text-green-700">Pago</span>
+                                    {payment.concepto && (
+                                      <span className="text-xs text-gray-500">{payment.concepto}</span>
+                                    )}
+                                    <span className="text-xs text-gray-400">por {payment.usuario}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2 shrink-0">
+                                    <span className="text-xs font-medium text-green-600">- {formatPrice(payment.monto)}</span>
+                                    {hasCosteo && (
+                                      <span className="text-xs text-gray-400">Saldo: {formatPrice(saldoAfter)}</span>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            }
+                          })}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </CollapsiblePanel>
+              </div>
+            ))}
+            {filtered.length === 0 && (
+              <p className="px-4 py-3 text-sm text-gray-400">Sin resultados</p>
+            )}
+          </div>
+        </Stagger>
       )}
-    </div>
+    </PageTransition>
   );
 }

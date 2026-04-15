@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { formatPrice } from "@/lib/utils";
+import { PageTransition, Stagger, hoverRow, LoadingCenter, staggerStyle, useDataReady } from "@/components/AnimateIn";
 
 interface Transaction {
   type: string;
@@ -50,10 +51,12 @@ export default function EstadoCuentaPage() {
     }
   }, [status]);
 
+  const dataReady = useDataReady(data);
+
   if (status === "loading" || (status === "authenticated" && loading)) {
     return (
-      <div className="max-w-2xl mx-auto px-4 py-16 text-center">
-        <p className="text-gray-500">Cargando...</p>
+      <div className="max-w-2xl mx-auto px-4 py-16">
+        <LoadingCenter text="Cargando estado de cuenta..." />
       </div>
     );
   }
@@ -67,12 +70,15 @@ export default function EstadoCuentaPage() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-6">
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Estado de Cuenta</h1>
+    <PageTransition className="max-w-2xl mx-auto px-4 py-6">
+      <Stagger delay={0} y={-8}>
+        <h1 className="text-2xl font-bold text-gray-900 mb-6">Estado de Cuenta</h1>
+      </Stagger>
 
       {/* Summary cards */}
+      <Stagger delay={60}>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div className={`rounded-xl p-4 ${data.saldo > 0 ? "bg-red-50 border border-red-200" : "bg-green-50 border border-green-200"}`}>
+        <div className={`rounded-xl p-4 shadow-sm ${data.saldo > 0 ? "bg-red-50 border border-red-200" : "bg-green-50 border border-green-200"}`}>
           <p className="text-xs text-gray-500 mb-1">Saldo actual</p>
           <p className={`text-2xl font-bold ${data.saldo > 0 ? "text-red-600" : "text-green-600"}`}>
             {formatPrice(data.saldo)}
@@ -81,13 +87,13 @@ export default function EstadoCuentaPage() {
             {data.saldo > 0 ? "Deuda pendiente" : data.saldo === 0 ? "Sin deuda" : "A favor"}
           </p>
         </div>
-        <div className="bg-gray-50 rounded-xl p-4 border">
+        <div className="bg-gray-50 rounded-xl p-4 border shadow-sm">
           <p className="text-xs text-gray-500 mb-1">Compras del mes</p>
           <p className="text-2xl font-bold text-gray-900">
             {formatPrice(data.monthlyTotal)}
           </p>
         </div>
-        <div className="bg-gray-50 rounded-xl p-4 border">
+        <div className="bg-gray-50 rounded-xl p-4 border shadow-sm">
           <p className="text-xs text-gray-500 mb-1">Último pago</p>
           {data.lastPaymentDate ? (
             <>
@@ -101,9 +107,12 @@ export default function EstadoCuentaPage() {
           )}
         </div>
       </div>
+      </Stagger>
 
       {/* Transactions */}
-      <h2 className="text-lg font-semibold text-gray-900 mb-3">Movimientos recientes</h2>
+      <Stagger delay={120}>
+        <h2 className="text-lg font-semibold text-gray-900 mb-3">Movimientos recientes</h2>
+      </Stagger>
 
       {data.transactions.length === 0 ? (
         <p className="text-gray-400 text-sm">No hay movimientos registrados.</p>
@@ -112,7 +121,8 @@ export default function EstadoCuentaPage() {
           {data.transactions.map((t, i) => (
             <div
               key={i}
-              className={`bg-white rounded-lg border p-3 flex items-center justify-between ${
+              style={staggerStyle(dataReady, i, 150)}
+              className={`bg-white rounded-lg border shadow-sm p-3 flex items-center justify-between ${hoverRow} ${
                 t.isPago ? "border-l-4 border-l-green-500" : t.isDeuda ? "border-l-4 border-l-red-400" : ""
               }`}
             >
@@ -154,6 +164,6 @@ export default function EstadoCuentaPage() {
           ))}
         </div>
       )}
-    </div>
+    </PageTransition>
   );
 }

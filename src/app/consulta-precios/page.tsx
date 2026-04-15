@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { PageTransition, Stagger } from "@/components/AnimateIn";
 
 function BrandCarousel() {
   const [brands, setBrands] = useState<{ id: string; name: string; logo?: string }[]>([]);
@@ -128,19 +129,22 @@ export default function ConsultaPreciosPage() {
   const caja = parseInt(product?.cantidadPorCaja || "0") || 0;
 
   return (
-    <div className="min-h-screen bg-gray-900 flex flex-col">
+    <PageTransition className="min-h-screen bg-gray-900 flex flex-col">
       {/* Header */}
-      <div className="bg-brand-400 px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <img src="/logo.png" alt="Distrialma" className="h-8 sm:h-10" />
-          <h1 className="text-white text-base sm:text-xl font-bold">Consulta de Precios</h1>
+      <Stagger delay={0} y={-8}>
+        <div className="bg-brand-400 px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <img src="/logo.png" alt="Distrialma" className="h-8 sm:h-10" />
+            <h1 className="text-white text-base sm:text-xl font-bold">Consulta de Precios</h1>
+          </div>
+          <span className="text-white/70 text-xs sm:text-sm hidden sm:block">
+            {new Date().toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+          </span>
         </div>
-        <span className="text-white/70 text-xs sm:text-sm hidden sm:block">
-          {new Date().toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
-        </span>
-      </div>
+      </Stagger>
 
       {/* Search bar */}
+      <Stagger delay={60}>
       <div className="px-4 py-4 bg-gray-800">
         <input
           ref={inputRef}
@@ -159,8 +163,10 @@ export default function ConsultaPreciosPage() {
           className="w-full text-center text-base sm:text-xl py-3 px-4 rounded-xl border-2 border-brand-400 bg-gray-700 text-white placeholder-gray-400 focus:outline-none focus:border-brand-300 focus:ring-2 focus:ring-brand-400"
         />
       </div>
+      </Stagger>
 
       {/* Content */}
+      <Stagger delay={120}>
       <div className="flex-1 flex items-center justify-center px-4 py-4 sm:py-8">
         {loading && (
           <p className="text-xl sm:text-3xl text-gray-400 animate-pulse">Buscando...</p>
@@ -247,11 +253,12 @@ export default function ConsultaPreciosPage() {
           </div>
         )}
       </div>
+      </Stagger>
 
       {/* Footer */}
       <div className="bg-gray-800 px-4 py-2 text-center">
         <p className="text-gray-500 text-xs">Precios sujetos a cambio sin previo aviso</p>
       </div>
-    </div>
+    </PageTransition>
   );
 }

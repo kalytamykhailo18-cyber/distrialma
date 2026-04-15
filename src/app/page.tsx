@@ -5,6 +5,7 @@ import Link from "next/link";
 import { formatPrice } from "@/lib/utils";
 import { HiOutlineLocationMarker, HiOutlineClock, HiOutlineMail } from "react-icons/hi";
 import { FaWhatsapp, FaInstagram, FaFacebookF } from "react-icons/fa";
+import { PageTransition, Stagger, springBtn } from "@/components/AnimateIn";
 
 interface PriceNewsProduct {
   sku: string;
@@ -47,23 +48,27 @@ export default function Home() {
   }, []);
 
   return (
-    <div>
+    <PageTransition>
       {/* Hero */}
       <div className="bg-gradient-to-b from-brand-50 to-white">
         <div className="max-w-7xl mx-auto px-4 py-12 text-center">
-          <img src="/logo.png" alt="Alma" className="h-24 mx-auto mb-4" />
-          <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-3">
-            Distrialma
-          </h1>
-          <p className="text-lg text-gray-600 mb-8">
-            Distribuidora Mayorista — Bebidas, Alimentos, Limpieza y más
-          </p>
-          <Link
-            href="/productos"
-            className="bg-brand-400 text-white px-8 py-3 rounded-lg text-lg font-medium hover:bg-brand-500 transition-colors inline-block"
-          >
-            Ver Productos
-          </Link>
+          <Stagger delay={0} y={-8}>
+            <img src="/logo.png" alt="Alma" className="h-24 mx-auto mb-4" />
+            <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-3">
+              Distrialma
+            </h1>
+            <p className="text-lg text-gray-600 mb-8">
+              Distribuidora Mayorista — Bebidas, Alimentos, Limpieza y más
+            </p>
+          </Stagger>
+          <Stagger delay={100} y={6}>
+            <Link
+              href="/productos"
+              className={`bg-brand-400 text-white px-8 py-3 rounded-xl text-lg font-medium hover:bg-brand-500 shadow-sm transition-colors inline-block ${springBtn}`}
+            >
+              Ver Productos
+            </Link>
+          </Stagger>
         </div>
       </div>
 
@@ -71,46 +76,52 @@ export default function Home() {
       {news.length > 0 && (
         <div id="novedades" className="bg-white py-12 scroll-mt-16">
           <div className="max-w-7xl mx-auto px-4">
-            <h2 className="text-2xl font-bold text-gray-900 mb-2 text-center">
-              Novedades de precios
-            </h2>
-            <p className="text-gray-500 text-center mb-8">
-              Productos con actualizaciones recientes
-            </p>
+            <Stagger delay={50} y={-8}>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2 text-center">
+                Novedades de precios
+              </h2>
+              <p className="text-gray-500 text-center mb-8">
+                Productos con actualizaciones recientes
+              </p>
+            </Stagger>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {news.map((product) => (
-                <Link
-                  key={product.sku}
-                  href={`/productos/${product.sku}`}
-                  className="bg-white rounded-lg border hover:shadow-md transition-shadow p-4 flex flex-col"
-                >
-                  <div className="w-full h-32 bg-gray-100 rounded mb-3 flex items-center justify-center overflow-hidden">
-                    {product.image ? (
-                      <img
-                        src={product.image}
-                        alt={product.name}
-                        className="max-h-full max-w-full object-contain"
-                      />
-                    ) : (
-                      <span className="text-gray-400 text-xs">Sin imagen</span>
-                    )}
-                  </div>
-                  <h3 className="text-xs font-medium text-gray-900 mb-2 line-clamp-2">
-                    {product.name}
-                  </h3>
-                  <div className="mt-auto">
-                    {product.oldPrice && (
-                      <span className="text-xs text-gray-400 line-through mr-2">
-                        {formatPrice(product.oldPrice)}
+                {news.map((product, i) => (
+                  <Link
+                    key={product.sku}
+                    href={`/productos/${product.sku}`}
+                    className="bg-white rounded-xl border shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] p-4 flex flex-col"
+                    style={{
+                      opacity: 0,
+                      animation: `cardIn 400ms cubic-bezier(0.25,1,0.5,1) ${150 + i * 50}ms forwards`,
+                    }}
+                  >
+                    <div className="w-full h-32 bg-gray-100 rounded mb-3 flex items-center justify-center overflow-hidden">
+                      {product.image ? (
+                        <img
+                          src={product.image}
+                          alt={product.name}
+                          className="max-h-full max-w-full object-contain"
+                        />
+                      ) : (
+                        <span className="text-gray-400 text-xs">Sin imagen</span>
+                      )}
+                    </div>
+                    <h3 className="text-xs font-medium text-gray-900 mb-2 line-clamp-2">
+                      {product.name}
+                    </h3>
+                    <div className="mt-auto">
+                      {product.oldPrice && (
+                        <span className="text-xs text-gray-400 line-through mr-2">
+                          {formatPrice(product.oldPrice)}
+                        </span>
+                      )}
+                      <span className="text-sm font-bold text-green-700">
+                        {formatPrice(product.precioMayorista)}
                       </span>
-                    )}
-                    <span className="text-sm font-bold text-green-700">
-                      {formatPrice(product.precioMayorista)}
-                    </span>
-                  </div>
-                </Link>
-              ))}
-            </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
           </div>
         </div>
       )}
@@ -118,26 +129,33 @@ export default function Home() {
       {/* Module 2: Brand Logos */}
       <div id="marcas" className="bg-gray-50 py-12 scroll-mt-16">
         <div className="max-w-7xl mx-auto px-4">
-          <h2 className="text-2xl font-bold text-gray-900 mb-2 text-center">
-            Nuestras marcas
-          </h2>
-          <p className="text-gray-500 text-center mb-8">
-            Trabajamos con las mejores marcas del mercado
-          </p>
-          <BrandLogos />
+          <Stagger delay={100} y={-8}>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2 text-center">
+              Nuestras marcas
+            </h2>
+            <p className="text-gray-500 text-center mb-8">
+              Trabajamos con las mejores marcas del mercado
+            </p>
+          </Stagger>
+          <Stagger delay={200}>
+            <BrandLogos />
+          </Stagger>
         </div>
       </div>
 
       {/* Module 3: Stores & Contact */}
       <div id="locales" className="bg-white py-12 scroll-mt-16">
         <div className="max-w-7xl mx-auto px-4">
-          <h2 className="text-2xl font-bold text-gray-900 mb-2 text-center">
-            Nuestros locales
-          </h2>
-          <p className="text-gray-500 text-center mb-8">
-            Visitanos en cualquiera de nuestras sucursales
-          </p>
+          <Stagger delay={100} y={-8}>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2 text-center">
+              Nuestros locales
+            </h2>
+            <p className="text-gray-500 text-center mb-8">
+              Visitanos en cualquiera de nuestras sucursales
+            </p>
+          </Stagger>
 
+          <Stagger delay={200}>
           <div className="md:flex md:gap-6 mb-10">
             {/* Store cards */}
             <div className="md:w-1/3 space-y-3 mb-4 md:mb-0">
@@ -181,30 +199,33 @@ export default function Home() {
           </div>
 
           {/* Contact info */}
-          <div className="bg-gray-50 rounded-xl p-6 md:p-8">
-            <h3 className="font-semibold text-gray-900 mb-4 text-center">Contacto</h3>
-            <div className="flex flex-wrap justify-center gap-8 text-sm text-gray-600">
-              <a href="https://wa.me/5491154137677" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 hover:text-brand-600">
-                <FaWhatsapp className="w-5 h-5 text-green-500" />
-                +54 9 11 5413-7677
-              </a>
-              <a href="mailto:compras@distrialma.com.ar" className="flex items-center gap-2 hover:text-brand-600">
-                <HiOutlineMail className="w-5 h-5 text-brand-400" />
-                compras@distrialma.com.ar
-              </a>
-              <a href="https://www.instagram.com/distri.alma" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 hover:text-brand-600">
-                <FaInstagram className="w-5 h-5 text-brand-400" />
-                @distri.alma
-              </a>
-              <a href="https://www.facebook.com/distrialma2020" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 hover:text-brand-600">
-                <FaFacebookF className="w-5 h-5 text-brand-400" />
-                Distrialma
-              </a>
+          <Stagger delay={250}>
+            <div className="bg-gray-50 rounded-xl p-6 md:p-8 shadow-sm">
+              <h3 className="font-semibold text-gray-900 mb-4 text-center">Contacto</h3>
+              <div className="flex flex-wrap justify-center gap-8 text-sm text-gray-600">
+                <a href="https://wa.me/5491154137677" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 hover:text-brand-600">
+                  <FaWhatsapp className="w-5 h-5 text-green-500" />
+                  +54 9 11 5413-7677
+                </a>
+                <a href="mailto:compras@distrialma.com.ar" className="flex items-center gap-2 hover:text-brand-600">
+                  <HiOutlineMail className="w-5 h-5 text-brand-400" />
+                  compras@distrialma.com.ar
+                </a>
+                <a href="https://www.instagram.com/distri.alma" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 hover:text-brand-600">
+                  <FaInstagram className="w-5 h-5 text-brand-400" />
+                  @distri.alma
+                </a>
+                <a href="https://www.facebook.com/distrialma2020" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 hover:text-brand-600">
+                  <FaFacebookF className="w-5 h-5 text-brand-400" />
+                  Distrialma
+                </a>
+              </div>
             </div>
-          </div>
+          </Stagger>
+          </Stagger>
         </div>
       </div>
-    </div>
+    </PageTransition>
   );
 }
 

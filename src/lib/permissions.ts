@@ -47,12 +47,12 @@ export const PAGE_PERMISSION_MAP: Record<string, Permission> = {
   "/admin/proveedores": "compras",
   "/admin/movimientos": "movimientos",
   "/admin/vendedores": "vendedores",
-  "/vendedor": "vendedor",
+  "/admin/vendedor": "vendedor",
   "/admin/picking": "picking",
   "/admin/pedidosya": "costeo",
   "/admin/cierre-caja": "cierre-caja",
   "/admin/usuarios": "usuarios",
-  "/reparto": "reparto",
+  "/admin/reparto": "reparto",
 };
 
 export function hasPermission(

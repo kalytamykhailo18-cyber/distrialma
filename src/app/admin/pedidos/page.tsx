@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { formatPrice } from "@/lib/utils";
 import { HiChevronDown } from "react-icons/hi";
+import { PageTransition, Stagger, staggerStyle, springBtn, hoverRow, LoadingCenter, CollapsiblePanel } from "@/components/AnimateIn";
 
 interface OrderItem {
   sku: string;
@@ -95,20 +96,24 @@ export default function PedidosPage() {
   });
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-6">
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Pedidos</h1>
+    <PageTransition className="max-w-5xl mx-auto px-4 py-6">
+      <Stagger delay={0} y={-8}>
+        <h1 className="text-2xl font-bold text-gray-900 mb-6">Pedidos</h1>
+      </Stagger>
 
       {loading ? (
-        <p className="text-gray-400">Cargando pedidos...</p>
+        <LoadingCenter text="Cargando pedidos..." />
       ) : orders.length === 0 ? (
         <p className="text-gray-400">No hay pedidos.</p>
       ) : (
+        <Stagger delay={100}>
         <div className="space-y-8">
-          {sortedDays.map((day) => {
+          {sortedDays.map((day, dayIdx) => {
             const dayOrders = grouped.get(day)!;
             const dayTotal = dayOrders.reduce((sum, o) => sum + o.total, 0);
             return (
-              <div key={day}>
+              <Stagger key={day} delay={150 + dayIdx * 50}>
+              <div>
                 <div className="flex items-center justify-between mb-3">
                   <h2 className="text-lg font-semibold text-gray-800">
                     {day}
@@ -122,11 +127,11 @@ export default function PedidosPage() {
                 </div>
 
                 <div className="space-y-2">
-                  {dayOrders.map((order) => (
-                    <div key={order.boleta} className={`rounded-lg border ${expanded.has(order.boleta) ? "bg-white border-brand-400 shadow-md" : "bg-white"}`}>
+                  {dayOrders.map((order, i) => (
+                    <div key={order.boleta} className={`rounded-xl border shadow-sm ${hoverRow} ${expanded.has(order.boleta) ? "bg-white border-brand-400 shadow-md" : "bg-white"}`} style={staggerStyle(true, i)}>
                       <button
                         onClick={() => toggleExpand(order.boleta)}
-                        className="w-full px-3 sm:px-4 py-3 flex items-center justify-between text-left hover:bg-gray-50"
+                        className={`w-full px-3 sm:px-4 py-3 flex items-center justify-between text-left hover:bg-gray-50 ${springBtn}`}
                       >
                         <div className="flex-1 min-w-0">
                           <div className="flex flex-wrap items-center gap-1 sm:gap-3">
@@ -161,14 +166,14 @@ export default function PedidosPage() {
                             {formatPrice(order.total)}
                           </span>
                           <HiChevronDown
-                            className={`w-4 h-4 text-gray-400 transition-transform ${
+                            className={`w-4 h-4 text-gray-400 transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${
                               expanded.has(order.boleta) ? "rotate-180" : ""
                             }`}
                           />
                         </div>
                       </button>
 
-                      {expanded.has(order.boleta) && (
+                      <CollapsiblePanel open={expanded.has(order.boleta)}>
                         <div className="border-t bg-gray-50 px-2 sm:px-4 py-3">
                           {order.facturado && (
                             <div className="flex flex-wrap gap-1 mb-3">
@@ -197,7 +202,7 @@ export default function PedidosPage() {
                               </thead>
                               <tbody className="divide-y">
                                 {order.items.map((item, idx) => (
-                                  <tr key={idx}>
+                                  <tr key={idx} className={hoverRow} style={staggerStyle(true, idx)}>
                                     <td className="py-1.5 pl-2">
                                       <span className="text-gray-900 text-xs sm:text-sm">{item.name}</span>
                                       <span className="text-gray-400 text-xs ml-1">({item.sku})</span>
@@ -226,7 +231,7 @@ export default function PedidosPage() {
                               </thead>
                               <tbody className="divide-y">
                                 {order.facturado.items.map((f, idx) => (
-                                  <tr key={idx}>
+                                  <tr key={idx} className={hoverRow} style={staggerStyle(true, idx)}>
                                     <td className="py-1.5 pl-2 text-xs sm:text-sm text-gray-900">{f.name} <span className="text-gray-400 text-xs">({f.sku})</span></td>
                                     <td className="text-right py-1.5 px-2 text-gray-700">{f.cant}</td>
                                     <td className="text-right py-1.5 px-2 text-gray-700">{formatPrice(f.precio)}</td>
@@ -255,7 +260,7 @@ export default function PedidosPage() {
                                   const isPesaje = cantChanged && !precioChanged;
 
                                   return (
-                                    <div key={sku} className={`rounded-lg border px-3 py-2 ${
+                                    <div key={sku} className={`rounded-xl border shadow-sm px-3 py-2 ${
                                       isAdded ? "bg-green-50 border-green-300" :
                                       isRemoved ? "bg-red-50 border-red-300" :
                                       isPesaje ? "bg-blue-50 border-blue-300" :
@@ -290,15 +295,17 @@ export default function PedidosPage() {
                             );
                           })()}
                         </div>
-                      )}
+                      </CollapsiblePanel>
                     </div>
                   ))}
                 </div>
               </div>
+              </Stagger>
             );
           })}
         </div>
+        </Stagger>
       )}
-    </div>
+    </PageTransition>
   );
 }

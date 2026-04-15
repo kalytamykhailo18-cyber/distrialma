@@ -2,7 +2,7 @@ import Link from "next/link";
 import { formatPrice } from "@/lib/utils";
 import type { Product } from "@/types";
 
-export default function ProductCard({ product }: { product: Product }) {
+export default function ProductCard({ product, index = 0 }: { product: Product; index?: number }) {
   const isKg = product.unit === "KG";
   const priceLabel = isKg ? "/KG" : "";
 
@@ -13,7 +13,11 @@ export default function ProductCard({ product }: { product: Product }) {
         sessionStorage.setItem("productListScrollY", String(window.scrollY));
         sessionStorage.setItem("productListPath", window.location.pathname + window.location.search);
       }}
-      className="bg-white rounded-lg border hover:shadow-md transition-shadow p-4 flex flex-col"
+      className="bg-white rounded-xl border shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] p-4 flex flex-col"
+      style={{
+        opacity: 0,
+        animation: `cardIn 400ms cubic-bezier(0.25,1,0.5,1) ${index * 40}ms forwards`,
+      }}
     >
       <div className="w-full h-40 bg-gray-100 rounded mb-3 flex items-center justify-center overflow-hidden">
         {product.images.length > 0 ? (

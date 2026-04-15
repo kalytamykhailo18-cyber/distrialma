@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { HiOutlineCog, HiOutlineGift, HiOutlineSearch, HiOutlineUser } from "react-icons/hi";
+import { PageTransition, Stagger, staggerStyle, springBtn, hoverRow, LoadingCenter } from "@/components/AnimateIn";
 
 interface Vendedor {
   cod: string;
@@ -113,67 +114,73 @@ export default function AdminVendedoresPage() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-6">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Vendedores</h1>
-        <div className="flex gap-2">
-          <Link
-            href="/admin/vendedores/catalogo"
-            className="px-4 py-2 text-sm text-brand-600 bg-brand-50 border border-brand-200 rounded-lg hover:bg-brand-100 transition-colors"
-          >
-            Catálogo PDF
-          </Link>
-          <Link
-            href="/admin/vendedores/reporte"
-            className="px-4 py-2 text-sm text-white bg-brand-400 rounded-lg hover:bg-brand-500 transition-colors"
-          >
-            Reporte de comisiones
-          </Link>
+    <PageTransition className="max-w-6xl mx-auto px-4 py-6">
+      <Stagger delay={0} y={-8}>
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-2xl font-bold text-gray-900">Vendedores</h1>
+          <div className="flex gap-2">
+            <Link
+              href="/admin/vendedores/catalogo"
+              className={`px-4 py-2 text-sm text-brand-600 bg-brand-50 border border-brand-200 rounded-lg hover:bg-brand-100 transition-colors ${springBtn}`}
+            >
+              Catálogo PDF
+            </Link>
+            <Link
+              href="/admin/vendedores/reporte"
+              className={`px-4 py-2 text-sm text-white bg-brand-400 rounded-lg hover:bg-brand-500 transition-colors ${springBtn}`}
+            >
+              Reporte de comisiones
+            </Link>
+          </div>
         </div>
-      </div>
+      </Stagger>
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit mb-4">
-        <button
-          onClick={() => setTab("vendedores")}
-          className={`px-4 py-1.5 text-sm rounded-md ${tab === "vendedores" ? "bg-white text-gray-900 shadow-sm font-medium" : "text-gray-500"}`}
-        >
-          <HiOutlineUser className="inline w-4 h-4 mr-1" />
-          Comisiones por rubro
-        </button>
-        <button
-          onClick={() => setTab("promocionales")}
-          className={`px-4 py-1.5 text-sm rounded-md ${tab === "promocionales" ? "bg-white text-gray-900 shadow-sm font-medium" : "text-gray-500"}`}
-        >
-          <HiOutlineGift className="inline w-4 h-4 mr-1" />
-          Promocionales
-        </button>
-        <button
-          onClick={() => setTab("settings")}
-          className={`px-4 py-1.5 text-sm rounded-md ${tab === "settings" ? "bg-white text-gray-900 shadow-sm font-medium" : "text-gray-500"}`}
-        >
-          <HiOutlineCog className="inline w-4 h-4 mr-1" />
-          Configuración
-        </button>
-      </div>
+      <Stagger delay={50} y={10}>
+        <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit mb-4">
+          <button
+            onClick={() => setTab("vendedores")}
+            className={`px-4 py-1.5 text-sm rounded-md ${springBtn} ${tab === "vendedores" ? "bg-white text-gray-900 shadow-sm font-medium" : "text-gray-500"}`}
+          >
+            <HiOutlineUser className="inline w-4 h-4 mr-1" />
+            Comisiones por rubro
+          </button>
+          <button
+            onClick={() => setTab("promocionales")}
+            className={`px-4 py-1.5 text-sm rounded-md ${springBtn} ${tab === "promocionales" ? "bg-white text-gray-900 shadow-sm font-medium" : "text-gray-500"}`}
+          >
+            <HiOutlineGift className="inline w-4 h-4 mr-1" />
+            Promocionales
+          </button>
+          <button
+            onClick={() => setTab("settings")}
+            className={`px-4 py-1.5 text-sm rounded-md ${springBtn} ${tab === "settings" ? "bg-white text-gray-900 shadow-sm font-medium" : "text-gray-500"}`}
+          >
+            <HiOutlineCog className="inline w-4 h-4 mr-1" />
+            Configuración
+          </button>
+        </div>
+      </Stagger>
 
-      {loading && <p className="text-gray-400">Cargando...</p>}
+      {loading && <LoadingCenter />}
 
       {/* Comisiones tab */}
       {!loading && tab === "vendedores" && (
+        <Stagger delay={150} y={10}>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* Vendedor list */}
-          <div className="bg-white border rounded-xl p-2 max-h-[600px] overflow-y-auto">
+          <div className="bg-white border rounded-xl shadow-sm p-2 max-h-[600px] overflow-y-auto">
             {vendedores.length === 0 ? (
               <p className="text-sm text-gray-400 p-4">No hay vendedores cargados en PunTouch (Empleados con flag Vendedor)</p>
-            ) : vendedores.map((v) => (
+            ) : vendedores.map((v, i) => (
               <button
                 key={v.cod}
                 onClick={() => setSelectedVendedor(v)}
-                className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
+                style={staggerStyle(true, i)}
+                className={`w-full text-left px-3 py-2 rounded-lg text-sm ${hoverRow} ${
                   selectedVendedor?.cod === v.cod
                     ? "bg-brand-50 text-brand-700 font-medium"
-                    : "hover:bg-gray-50 text-gray-700"
+                    : "text-gray-700"
                 }`}
               >
                 {v.nombre}
@@ -182,7 +189,7 @@ export default function AdminVendedoresPage() {
           </div>
 
           {/* Comisiones por rubro */}
-          <div className="md:col-span-2 bg-white border rounded-xl p-4">
+          <div className="md:col-span-2 bg-white border rounded-xl shadow-sm p-4">
             {!selectedVendedor ? (
               <p className="text-sm text-gray-400">Seleccioná un vendedor para ver/editar sus comisiones por rubro.</p>
             ) : (
@@ -213,11 +220,13 @@ export default function AdminVendedoresPage() {
             )}
           </div>
         </div>
+        </Stagger>
       )}
 
       {/* Promocionales tab */}
       {!loading && tab === "promocionales" && (
-        <div className="bg-white border rounded-xl p-4">
+        <Stagger delay={150} y={10}>
+        <div className="bg-white border rounded-xl shadow-sm p-4">
           <p className="text-sm text-gray-500 mb-3">
             Los productos marcados como promocionales no generan comisión al vendedor y no cuentan para el monto mínimo de pedido.
           </p>
@@ -235,15 +244,15 @@ export default function AdminVendedoresPage() {
 
           {searchProdResults.length > 0 && (
             <div className="border rounded-lg max-h-60 overflow-y-auto mb-4">
-              {searchProdResults.map((p) => (
-                <div key={p.sku} className="flex items-center justify-between px-3 py-2 border-b last:border-b-0 hover:bg-gray-50">
+              {searchProdResults.map((p, i) => (
+                <div key={p.sku} className={`flex items-center justify-between px-3 py-2 border-b last:border-b-0 ${hoverRow}`} style={staggerStyle(true, i)}>
                   <div>
                     <span className="text-sm font-medium text-gray-800">{p.name}</span>
                     <span className="text-xs text-gray-400 ml-2">SKU: {p.sku}</span>
                   </div>
                   <button
                     onClick={() => togglePromocional(p.sku)}
-                    className={`text-xs px-3 py-1 rounded-full font-medium ${
+                    className={`text-xs px-3 py-1 rounded-full font-medium ${springBtn} ${
                       promocionales.includes(p.sku)
                         ? "bg-purple-100 text-purple-700"
                         : "bg-gray-100 text-gray-600 hover:bg-gray-200"
@@ -279,11 +288,13 @@ export default function AdminVendedoresPage() {
             )}
           </div>
         </div>
+        </Stagger>
       )}
 
       {/* Settings tab */}
       {!loading && tab === "settings" && (
-        <div className="bg-white border rounded-xl p-4 max-w-xl">
+        <Stagger delay={150} y={10}>
+        <div className="bg-white border rounded-xl shadow-sm p-4 max-w-xl">
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -338,12 +349,13 @@ export default function AdminVendedoresPage() {
 
             <button
               onClick={saveSettings}
-              className="px-4 py-2 text-sm text-white bg-brand-400 rounded-lg hover:bg-brand-500"
+              className={`px-4 py-2 text-sm text-white bg-brand-400 rounded-lg hover:bg-brand-500 ${springBtn}`}
             >
               Guardar configuración
             </button>
           </div>
         </div>
+        </Stagger>
       )}
 
       {savedToast && (
@@ -351,6 +363,6 @@ export default function AdminVendedoresPage() {
           {savedToast}
         </div>
       )}
-    </div>
+    </PageTransition>
   );
 }

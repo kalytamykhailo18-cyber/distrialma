@@ -6,6 +6,7 @@ import { useSession } from "next-auth/react";
 import { formatPrice } from "@/lib/utils";
 import { useCart } from "@/components/CartProvider";
 import type { Product } from "@/types";
+import { PageTransition, Stagger, springBtn, LoadingCenter } from "@/components/AnimateIn";
 
 interface ComboItem {
   sku: string;
@@ -209,10 +210,8 @@ export default function ComboDetailPage() {
 
   if (loading) {
     return (
-      <div className="max-w-4xl mx-auto px-4 py-8 animate-pulse">
-        <div className="h-64 bg-gray-200 rounded mb-4" />
-        <div className="h-8 bg-gray-200 rounded w-1/2 mb-2" />
-        <div className="h-6 bg-gray-200 rounded w-1/3" />
+      <div className="max-w-4xl mx-auto px-4 py-8">
+        <LoadingCenter text="Cargando combo..." />
       </div>
     );
   }
@@ -236,14 +235,15 @@ export default function ComboDetailPage() {
     : 0;
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8">
+    <PageTransition className="max-w-4xl mx-auto px-4 py-8">
       {message && (
         <div className="bg-brand-50 text-brand-600 px-4 py-2 rounded-lg text-sm mb-4">
           {message}
         </div>
       )}
 
-      <div className="bg-white rounded-lg border p-6 flex flex-col md:flex-row gap-8">
+      <Stagger delay={0} y={-8}>
+      <div className="bg-white rounded-lg border shadow-sm p-6 flex flex-col md:flex-row gap-8">
         {/* Left: Images */}
         <div className="md:w-1/2">
           <div className="w-full h-72 bg-gray-100 rounded flex items-center justify-center overflow-hidden">
@@ -437,7 +437,7 @@ export default function ComboDetailPage() {
               ) : (
                 <button
                   onClick={handleAddToCart}
-                  className="w-full py-3 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors"
+                  className={`w-full py-3 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 ${springBtn}`}
                 >
                   Agregar al carrito
                 </button>
@@ -472,13 +472,14 @@ export default function ComboDetailPage() {
             <button
               onClick={handleSaveAll}
               disabled={saving || uploading || deleting}
-              className="mt-4 w-full py-3 bg-brand-400 text-white rounded-lg text-sm font-medium hover:bg-brand-500 disabled:opacity-50"
+              className={`mt-4 w-full py-3 bg-brand-400 text-white rounded-lg text-sm font-medium hover:bg-brand-500 disabled:opacity-50 ${springBtn}`}
             >
               {saving ? "Guardando..." : "Guardar cambios"}
             </button>
           )}
         </div>
       </div>
-    </div>
+      </Stagger>
+    </PageTransition>
   );
 }

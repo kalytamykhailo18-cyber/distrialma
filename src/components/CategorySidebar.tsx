@@ -109,7 +109,7 @@ export default function CategorySidebar({
       <div className="flex border-b mb-4">
         <button
           onClick={() => setTab("categorias")}
-          className={`flex-1 py-2 text-sm font-medium border-b-2 transition-colors ${
+          className={`flex-1 py-2 text-sm font-medium border-b-2 transition-all duration-200 ${
             tab === "categorias"
               ? "border-brand-500 text-brand-600"
               : "border-transparent text-gray-500 hover:text-gray-700"
@@ -119,7 +119,7 @@ export default function CategorySidebar({
         </button>
         <button
           onClick={() => setTab("marcas")}
-          className={`flex-1 py-2 text-sm font-medium border-b-2 transition-colors ${
+          className={`flex-1 py-2 text-sm font-medium border-b-2 transition-all duration-200 ${
             tab === "marcas"
               ? "border-brand-500 text-brand-600"
               : "border-transparent text-gray-500 hover:text-gray-700"
@@ -145,10 +145,10 @@ export default function CategorySidebar({
                 scroll={false}
                 href="/productos"
                 onClick={() => { saveScrollPositions(); setOpen(false); }}
-                className={`block px-3 py-2 text-sm rounded-lg ${
+                className={`block px-3 py-2 text-sm rounded-lg transition-all duration-200 ${
                   !activeId && !activeBrandId
-                    ? "bg-brand-50 text-brand-600 font-medium"
-                    : "text-gray-600 hover:bg-gray-50"
+                    ? "bg-brand-100 text-brand-700 font-semibold shadow-sm"
+                    : "text-gray-600 hover:bg-brand-50 hover:text-brand-600 hover:translate-x-1 hover:font-medium"
                 }`}
               >
                 Todas
@@ -160,10 +160,10 @@ export default function CategorySidebar({
                   scroll={false}
                   href={`/categoria/${cat.id}`}
                   onClick={() => { saveScrollPositions(); setOpen(false); }}
-                  className={`block px-3 py-2 text-sm rounded-lg ${
+                  className={`block px-3 py-2 text-sm rounded-lg transition-all duration-200 ${
                     activeId === cat.id
-                      ? "bg-brand-50 text-brand-600 font-medium"
-                      : "text-gray-600 hover:bg-gray-50"
+                      ? "bg-brand-100 text-brand-700 font-semibold shadow-sm"
+                      : "text-gray-600 hover:bg-brand-50 hover:text-brand-600 hover:translate-x-1 hover:font-medium"
                   }`}
                 >
                   {cat.name}
@@ -194,10 +194,10 @@ export default function CategorySidebar({
                   scroll={false}
                   href={`/marca/${brand.id}`}
                   onClick={() => { saveScrollPositions(); setOpen(false); }}
-                  className={`block px-3 py-2 text-sm rounded-lg ${
+                  className={`block px-3 py-2 text-sm rounded-lg transition-all duration-200 ${
                     activeBrandId === brand.id
-                      ? "bg-brand-50 text-brand-600 font-medium"
-                      : "text-gray-600 hover:bg-gray-50"
+                      ? "bg-brand-100 text-brand-700 font-semibold shadow-sm"
+                      : "text-gray-600 hover:bg-brand-50 hover:text-brand-600 hover:translate-x-1 hover:font-medium"
                   }`}
                 >
                   {brand.name}

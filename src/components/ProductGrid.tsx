@@ -132,8 +132,8 @@ export default function ProductGrid({
         </div>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {products.map((product) => (
-            <ProductCard key={product.sku} product={product} />
+          {products.map((product, i) => (
+            <ProductCard key={product.sku} product={product} index={i} />
           ))}
         </div>
       )}

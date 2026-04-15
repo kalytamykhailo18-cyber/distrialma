@@ -8,6 +8,7 @@ import Link from "next/link";
 import { formatPrice } from "@/lib/utils";
 import ConfirmModal from "@/components/ConfirmModal";
 import { useCart } from "@/components/CartProvider";
+import { PageTransition, Stagger, springBtn, LoadingCenter } from "@/components/AnimateIn";
 import type { Product } from "@/types";
 
 export default function ProductDetailPage() {
@@ -130,10 +131,8 @@ export default function ProductDetailPage() {
 
   if (loading) {
     return (
-      <div className="max-w-4xl mx-auto px-4 py-8 animate-pulse">
-        <div className="h-64 bg-gray-200 rounded mb-4" />
-        <div className="h-8 bg-gray-200 rounded w-1/2 mb-2" />
-        <div className="h-6 bg-gray-200 rounded w-1/3" />
+      <div className="max-w-4xl mx-auto px-4 py-8">
+        <LoadingCenter />
       </div>
     );
   }
@@ -147,28 +146,31 @@ export default function ProductDetailPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8">
-      <button
-        onClick={() => {
-          const savedPath = sessionStorage.getItem("productListPath");
-          if (savedPath) {
-            router.push(savedPath);
-          } else {
-            router.back();
-          }
-        }}
-        className="flex items-center gap-1 text-sm text-brand-600 hover:text-brand-700 mb-4"
-      >
-        <HiArrowLeft className="w-4 h-4" />
-        Volver a productos
-      </button>
+    <PageTransition className="max-w-4xl mx-auto px-4 py-8">
+      <Stagger delay={0} y={-8}>
+        <button
+          onClick={() => {
+            const savedPath = sessionStorage.getItem("productListPath");
+            if (savedPath) {
+              router.push(savedPath);
+            } else {
+              router.back();
+            }
+          }}
+          className={`flex items-center gap-1 text-sm text-brand-600 hover:text-brand-700 mb-4 ${springBtn}`}
+        >
+          <HiArrowLeft className="w-4 h-4" />
+          Volver a productos
+        </button>
+      </Stagger>
       {message && (
-        <div className="bg-brand-50 text-brand-600 px-4 py-2 rounded-lg text-sm mb-4">
+        <div className="bg-brand-50 text-brand-600 px-4 py-2 rounded-xl text-sm mb-4 shadow-sm">
           {message}
         </div>
       )}
 
-      <div className="bg-white rounded-lg border p-6 flex flex-col md:flex-row gap-8">
+      <Stagger delay={50}>
+      <div className="bg-white rounded-xl border shadow-sm p-6 flex flex-col md:flex-row gap-8">
         {/* Left: Images */}
         <div className="md:w-1/2">
           <div className="w-full h-72 bg-gray-100 rounded flex items-center justify-center overflow-hidden">
@@ -380,7 +382,7 @@ export default function ProductDetailPage() {
                   ) : (
                     <button
                       onClick={() => { addItem(itemData, "unit"); setAddedUnit(true); setTimeout(() => setAddedUnit(false), 2000); }}
-                      className="flex-1 py-3 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors"
+                      className={`flex-1 py-3 bg-green-600 text-white rounded-xl text-sm font-medium hover:bg-green-700 shadow-sm transition-colors ${springBtn}`}
                     >
                       {addedUnit ? "Agregado!" : `Agregar por ${product.unit === "KG" ? "KG" : "unidad"}`}
                     </button>
@@ -468,6 +470,8 @@ export default function ProductDetailPage() {
         </div>
       </div>
 
+      </Stagger>
+
       <ConfirmModal
         open={deleteImageId !== null}
         message="¿Eliminar esta imagen?"
@@ -477,6 +481,6 @@ export default function ProductDetailPage() {
         }}
         onCancel={() => setDeleteImageId(null)}
       />
-    </div>
+    </PageTransition>
   );
 }

@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { HiOutlineArrowLeft, HiOutlineDocumentDownload } from "react-icons/hi";
+import { PageTransition, Stagger, staggerStyle, springBtn, hoverRow, LoadingCenter } from "@/components/AnimateIn";
 
 interface Order {
   id: number;
@@ -159,16 +160,19 @@ export default function ReporteVendedoresPage() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-6">
-      <div className="flex items-center gap-3 mb-6">
-        <Link href="/admin/vendedores" className="p-2 hover:bg-gray-100 rounded-lg">
-          <HiOutlineArrowLeft className="w-5 h-5" />
-        </Link>
-        <h1 className="text-2xl font-bold text-gray-900">Reporte de Comisiones</h1>
-      </div>
+    <PageTransition className="max-w-5xl mx-auto px-4 py-6">
+      <Stagger delay={0} y={-8}>
+        <div className="flex items-center gap-3 mb-6">
+          <Link href="/admin/vendedores" className="p-2 hover:bg-gray-100 rounded-lg">
+            <HiOutlineArrowLeft className="w-5 h-5" />
+          </Link>
+          <h1 className="text-2xl font-bold text-gray-900">Reporte de Comisiones</h1>
+        </div>
+      </Stagger>
 
       {/* Filters */}
-      <div className="bg-white border rounded-xl p-4 mb-4 flex flex-wrap items-end gap-3">
+      <Stagger delay={50} y={10}>
+      <div className="bg-white border rounded-xl shadow-sm p-4 mb-4 flex flex-wrap items-end gap-3">
         <div>
           <label className="block text-xs text-gray-500 mb-1">Desde</label>
           <input type="date" value={desde} onChange={(e) => setDesde(e.target.value)} className="border border-brand-400 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600" />
@@ -177,31 +181,35 @@ export default function ReporteVendedoresPage() {
           <label className="block text-xs text-gray-500 mb-1">Hasta</label>
           <input type="date" value={hasta} onChange={(e) => setHasta(e.target.value)} className="border border-brand-400 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600" />
         </div>
-        <button onClick={() => { setDesde(fifteenDaysAgo()); setHasta(todayISO()); }} className="px-3 py-2 text-xs text-gray-600 border rounded-lg hover:bg-gray-50">
-          Última quincena
+        <button onClick={() => { setDesde(fifteenDaysAgo()); setHasta(todayISO()); }} className={`px-3 py-2 text-xs text-gray-600 border rounded-lg hover:bg-gray-50 ${springBtn}`}>
+          Ultima quincena
         </button>
         {orders.length > 0 && (
-          <button onClick={exportPDF} className="ml-auto flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100">
+          <button onClick={exportPDF} className={`ml-auto flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 ${springBtn}`}>
             <HiOutlineDocumentDownload className="w-4 h-4" />
             PDF
           </button>
         )}
       </div>
+      </Stagger>
 
       {/* Total general */}
-      <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-4">
+      <Stagger delay={100} y={10}>
+      <div className="bg-green-50 border border-green-200 rounded-xl shadow-sm p-4 mb-4">
         <p className="text-xs text-green-700 font-medium">TOTAL A PAGAR (TODOS LOS VENDEDORES)</p>
         <p className="text-3xl font-bold text-green-700 mt-1">{formatPrice(totalGeneral)}</p>
       </div>
+      </Stagger>
 
       {loading ? (
-        <p className="text-gray-400">Cargando...</p>
+        <LoadingCenter />
       ) : Object.keys(grouped).length === 0 ? (
-        <p className="text-gray-400 text-center py-8">No hay pedidos en este período.</p>
+        <p className="text-gray-400 text-center py-8">No hay pedidos en este periodo.</p>
       ) : (
+        <Stagger delay={150} y={10}>
         <div className="space-y-4">
-          {Object.entries(grouped).map(([cod, data]) => (
-            <div key={cod} className="bg-white border rounded-xl overflow-hidden">
+          {Object.entries(grouped).map(([cod, data], gi) => (
+            <div key={cod} className="bg-white border rounded-xl shadow-sm overflow-hidden" style={staggerStyle(true, gi)}>
               <div className="bg-gray-50 px-4 py-3 border-b flex items-center justify-between">
                 <div>
                   <p className="font-bold text-gray-800">{data.vendedorName}</p>
@@ -213,8 +221,8 @@ export default function ReporteVendedoresPage() {
                 </div>
               </div>
               <div className="divide-y">
-                {data.orders.map((o) => (
-                  <div key={o.id} className="px-4 py-2 flex items-center justify-between text-sm">
+                {data.orders.map((o, oi) => (
+                  <div key={o.id} className={`px-4 py-2 flex items-center justify-between text-sm ${hoverRow}`} style={staggerStyle(true, oi)}>
                     <div>
                       <span className="font-medium">#{o.id}</span>
                       <span className="text-gray-400 ml-2">{new Date(o.createdAt).toLocaleDateString("es-AR")}</span>
@@ -230,7 +238,8 @@ export default function ReporteVendedoresPage() {
             </div>
           ))}
         </div>
+        </Stagger>
       )}
-    </div>
+    </PageTransition>
   );
 }

@@ -4,6 +4,7 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { HiOutlineTrash, HiOutlinePlus, HiOutlineSearch, HiOutlineCamera, HiOutlineX } from "react-icons/hi";
+import { PageTransition, Stagger, springBtn, hoverRow } from "@/components/AnimateIn";
 
 interface Proveedor {
   cod: string;
@@ -387,21 +388,24 @@ export default function NuevoIngresoPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-6">
+    <PageTransition className="max-w-4xl mx-auto px-4 py-6">
+      <Stagger delay={0} y={-8}>
       <div className="flex items-center gap-3 mb-6">
         <button
           onClick={() => {
             if (items.length > 0 && !confirm("Tenés productos cargados. ¿Salir? Los datos quedan guardados.")) return;
             router.push("/admin/compras");
           }}
-          className="text-gray-400 hover:text-gray-600"
+          className={`text-gray-400 hover:text-gray-600 ${springBtn}`}
         >
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
         </button>
         <h1 className="text-2xl font-bold text-gray-900">{isDevolucion ? "Pre-nota de Crédito" : "Nuevo Ingreso de Stock"}</h1>
       </div>
+      </Stagger>
 
       {/* Supplier selector */}
+      <Stagger delay={50}>
       <div className="mb-4">
         <label className="block text-sm font-medium text-gray-700 mb-1">
           Proveedor
@@ -413,7 +417,7 @@ export default function NuevoIngresoPage() {
             const prov = proveedores.find((p) => p.cod === e.target.value);
             setSelectedProvName(prov?.nombre || "");
           }}
-          className="w-full px-4 py-2 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
+          className="w-full px-4 py-2 border border-brand-400 rounded-xl text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
         >
           <option value="">Seleccionar proveedor...</option>
           {proveedores.map((p) => (
@@ -423,8 +427,10 @@ export default function NuevoIngresoPage() {
           ))}
         </select>
       </div>
+      </Stagger>
 
       {/* Product search */}
+      <Stagger delay={100}>
       <div className="mb-4" ref={searchRef}>
         <label className="block text-sm font-medium text-gray-700 mb-1">
           Buscar producto
@@ -452,7 +458,7 @@ export default function NuevoIngresoPage() {
                 }
               }}
               placeholder="Buscar por nombre, codigo o codigo de barras..."
-              className="w-full pl-9 pr-4 py-2 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
+              className="w-full pl-9 pr-4 py-2 border border-brand-400 rounded-xl text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
             />
             {searching && (
               <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">
@@ -464,7 +470,7 @@ export default function NuevoIngresoPage() {
             type="button"
             onClick={startScanner}
             disabled={scanning}
-            className="flex items-center gap-1.5 px-3 py-2 text-sm text-white bg-brand-400 rounded-lg hover:bg-brand-500 disabled:opacity-50 transition-colors shrink-0"
+            className={`flex items-center gap-1.5 px-3 py-2 text-sm text-white bg-brand-400 rounded-xl hover:bg-brand-500 disabled:opacity-50 transition-colors shrink-0 ${springBtn}`}
             title="Escanear con camara"
           >
             <HiOutlineCamera className="w-4 h-4" />
@@ -501,14 +507,14 @@ export default function NuevoIngresoPage() {
         )}
 
         {showResults && searchResults.length > 0 && (
-          <div className="absolute z-30 bg-white border rounded-lg shadow-lg mt-1 max-h-60 overflow-y-auto w-full max-w-4xl">
+          <div className="absolute z-30 bg-white border rounded-xl shadow-lg mt-1 max-h-60 overflow-y-auto w-full max-w-4xl">
             {searchResults.map((p, idx) => (
               <button
                 key={p.sku}
                 ref={(el) => { if (idx === selectedIdx && el) el.scrollIntoView({ block: "nearest" }); }}
                 onClick={() => { addProduct(p); setSelectedIdx(-1); }}
-                className={`w-full text-left px-4 py-2 text-sm flex items-center justify-between ${
-                  idx === selectedIdx ? "bg-brand-50 text-brand-700" : "hover:bg-gray-50"
+                className={`w-full text-left px-4 py-2 text-sm flex items-center justify-between ${hoverRow} ${
+                  idx === selectedIdx ? "bg-brand-50 text-brand-700" : ""
                 }`}
               >
                 <div>
@@ -528,11 +534,13 @@ export default function NuevoIngresoPage() {
           </div>
         )}
       </div>
+      </Stagger>
 
       {/* New product button */}
+      <Stagger delay={150}>
       <div className="mb-6">
         {showNewProduct ? (
-          <div className="bg-gray-50 rounded-lg border p-4 space-y-3">
+          <div className="bg-gray-50 rounded-xl border shadow-sm p-4 space-y-3">
             <h3 className="text-sm font-medium text-gray-700">Producto nuevo</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <input
@@ -540,27 +548,27 @@ export default function NuevoIngresoPage() {
                 value={newBarcode}
                 onChange={(e) => setNewBarcode(e.target.value)}
                 placeholder="Código de barras (opcional)"
-                className="px-3 py-2 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
+                className="px-3 py-2 border border-brand-400 rounded-xl text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
               />
               <input
                 type="text"
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
                 placeholder="Nombre del producto"
-                className="px-3 py-2 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
+                className="px-3 py-2 border border-brand-400 rounded-xl text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
               />
             </div>
             <div className="flex gap-2">
               <button
                 onClick={addNewProduct}
                 disabled={!newName.trim()}
-                className="px-3 py-1.5 text-sm text-white bg-brand-400 rounded-lg hover:bg-brand-500 disabled:opacity-50 transition-colors"
+                className={`px-3 py-1.5 text-sm text-white bg-brand-400 rounded-xl hover:bg-brand-500 disabled:opacity-50 transition-colors ${springBtn}`}
               >
                 Agregar
               </button>
               <button
                 onClick={() => setShowNewProduct(false)}
-                className="px-3 py-1.5 text-sm text-gray-600 border border-brand-400 rounded-lg hover:bg-gray-50 transition-colors"
+                className={`px-3 py-1.5 text-sm text-gray-600 border border-brand-400 rounded-xl hover:bg-gray-50 transition-colors ${springBtn}`}
               >
                 Cancelar
               </button>
@@ -576,10 +584,12 @@ export default function NuevoIngresoPage() {
           </button>
         )}
       </div>
+      </Stagger>
 
       {/* Items table */}
+      <Stagger delay={200}>
       {items.length > 0 && (
-        <div className="bg-white rounded-lg border mb-6 overflow-x-auto">
+        <div className="bg-white rounded-xl border shadow-sm mb-6 overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-gray-500 text-xs border-b">
@@ -591,7 +601,7 @@ export default function NuevoIngresoPage() {
             </thead>
             <tbody className="divide-y">
               {items.map((item, idx) => (
-                <tr key={idx}>
+                <tr key={idx} className={hoverRow}>
                   <td className="px-4 py-2">
                     <span className="text-gray-900">{item.productName}</span>
                     {item.isNewProduct && (
@@ -636,8 +646,10 @@ export default function NuevoIngresoPage() {
           </table>
         </div>
       )}
+      </Stagger>
 
       {/* Photo + Notes + Invoice number */}
+      <Stagger delay={250}>
       <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
         {/* Factura photos (multiple) */}
         <div className="sm:col-span-2">
@@ -661,7 +673,7 @@ export default function NuevoIngresoPage() {
             </div>
           )}
           <div className="flex items-center gap-3">
-            <label className="cursor-pointer px-4 py-2 text-sm font-medium text-brand-600 bg-brand-50 border border-brand-200 rounded-lg hover:bg-brand-100 transition-colors">
+            <label className={`cursor-pointer px-4 py-2 text-sm font-medium text-brand-600 bg-brand-50 border border-brand-200 rounded-xl hover:bg-brand-100 transition-colors ${springBtn}`}>
               {facturaPreviews.length > 0 ? "Agregar otra foto" : "Sacar foto / Elegir archivo"}
               <input
                 type="file"
@@ -681,6 +693,8 @@ export default function NuevoIngresoPage() {
           </div>
         </div>
       </div>
+      </Stagger>
+      <Stagger delay={300}>
       <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -691,7 +705,7 @@ export default function NuevoIngresoPage() {
             onChange={(e) => setNotas(e.target.value)}
             rows={2}
             placeholder="Observaciones sobre el ingreso..."
-            className="w-full px-4 py-2 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 resize-none"
+            className="w-full px-4 py-2 border border-brand-400 rounded-xl text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 resize-none"
           />
         </div>
         <div>
@@ -704,14 +718,15 @@ export default function NuevoIngresoPage() {
             onChange={(e) => setNroFactura(e.target.value)}
             maxLength={30}
             placeholder="Ej: 0001-00012345"
-            className="w-full px-4 py-2 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
+            className="w-full px-4 py-2 border border-brand-400 rounded-xl text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
           />
         </div>
       </div>
+      </Stagger>
 
       {/* Error */}
       {successMsg && (
-        <div className="mb-4 p-4 bg-green-50 border-2 border-green-300 rounded-lg text-center">
+        <div className="mb-4 p-4 bg-green-50 border-2 border-green-300 rounded-xl text-center">
           <p className="text-lg font-bold text-green-700">{successMsg}</p>
         </div>
       )}
@@ -720,22 +735,24 @@ export default function NuevoIngresoPage() {
       )}
 
       {/* Submit */}
+      <Stagger delay={350}>
       <div className="flex gap-3">
         <button
           onClick={handleSubmit}
           disabled={saving}
-          className="px-6 py-2 text-sm text-white bg-brand-400 rounded-lg hover:bg-brand-500 disabled:opacity-50 transition-colors"
+          className={`px-6 py-2 text-sm text-white bg-brand-400 rounded-xl hover:bg-brand-500 disabled:opacity-50 transition-colors ${springBtn}`}
         >
           {saving ? "Guardando..." : isDevolucion ? "Confirmar devolución" : "Confirmar ingreso"}
         </button>
         <button
           onClick={() => router.push("/admin/compras")}
           disabled={saving}
-          className="px-4 py-2 text-sm text-gray-600 border border-brand-400 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors"
+          className={`px-4 py-2 text-sm text-gray-600 border border-brand-400 rounded-xl hover:bg-gray-50 disabled:opacity-50 transition-colors ${springBtn}`}
         >
           Cancelar
         </button>
       </div>
-    </div>
+      </Stagger>
+    </PageTransition>
   );
 }

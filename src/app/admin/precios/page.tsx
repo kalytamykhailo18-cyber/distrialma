@@ -3,6 +3,7 @@
 import { useState, useRef } from "react";
 import { formatPrice } from "@/lib/utils";
 import { HiOutlineSearch } from "react-icons/hi";
+import { PageTransition, Stagger, staggerStyle, springBtn, hoverRow, LoadingCenter, useDataReady } from "@/components/AnimateIn";
 
 interface Product {
   sku: string;
@@ -71,6 +72,7 @@ export default function PreciosPage() {
   const [error, setError] = useState("");
   const [form, setForm] = useState<Record<string, string>>({});
   const timerRef = useRef<ReturnType<typeof setTimeout>>();
+  const productReady = useDataReady(product);
 
   function handleSearch(value: string) {
     setQuery(value);
@@ -233,117 +235,128 @@ export default function PreciosPage() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-6">
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Actualizar Precios</h1>
+    <PageTransition className="max-w-2xl mx-auto px-4 py-6">
+      <Stagger delay={0} y={-8}>
+        <h1 className="text-2xl font-bold text-gray-900 mb-6">Actualizar Precios</h1>
+      </Stagger>
 
       {/* Search */}
-      <div className="relative mb-6">
-        <HiOutlineSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-brand-500" />
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => handleSearch(e.target.value)}
-          placeholder="Buscar por nombre, SKU o código de barras..."
-          className="w-full pl-10 pr-4 py-2.5 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
-        />
-        {searching && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">Buscando...</span>}
+      <Stagger delay={100}>
+        <div className="relative mb-6">
+          <HiOutlineSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-brand-500" />
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => handleSearch(e.target.value)}
+            placeholder="Buscar por nombre, SKU o código de barras..."
+            className="w-full pl-10 pr-4 py-2.5 border border-brand-400 rounded-xl text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
+          />
+          {searching && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">Buscando...</span>}
 
-        {/* Search results dropdown */}
-        {searchResults.length > 0 && (
-          <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-lg border shadow-lg z-50 max-h-60 overflow-y-auto">
-            {searchResults.map((r) => (
-              <button
-                key={r.sku}
-                onClick={() => selectProduct(r.sku)}
-                className="w-full text-left px-4 py-2 hover:bg-gray-50 text-sm border-b last:border-0"
-              >
-                <span className="font-medium text-gray-900">{r.name}</span>
-                <span className="text-gray-400 ml-2">SKU {r.sku}</span>
-                {r.barcode && <span className="text-gray-400 ml-2">EAN {r.barcode}</span>}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
+          {/* Search results dropdown */}
+          {searchResults.length > 0 && (
+            <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-xl border shadow-lg z-50 max-h-60 overflow-y-auto">
+              {searchResults.map((r, i) => (
+                <button
+                  key={r.sku}
+                  onClick={() => selectProduct(r.sku)}
+                  className={`w-full text-left px-4 py-2 text-sm border-b last:border-0 ${hoverRow}`}
+                  style={staggerStyle(true, i)}
+                >
+                  <span className="font-medium text-gray-900">{r.name}</span>
+                  <span className="text-gray-400 ml-2">SKU {r.sku}</span>
+                  {r.barcode && <span className="text-gray-400 ml-2">EAN {r.barcode}</span>}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </Stagger>
 
-      {loading && <p className="text-gray-400">Cargando producto...</p>}
+      {loading && <LoadingCenter text="Cargando producto..." />}
 
-      {error && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-4">{error}</p>}
-      {success && <p className="text-sm text-green-600 bg-green-50 border border-green-200 rounded-lg px-3 py-2 mb-4">{success}</p>}
+      {error && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2 mb-4">{error}</p>}
+      {success && <p className="text-sm text-green-600 bg-green-50 border border-green-200 rounded-xl px-3 py-2 mb-4">{success}</p>}
 
       {/* Product detail */}
       {product && (
-        <div className="bg-white rounded-lg border p-6">
-          <div className="mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">{product.nombre}</h2>
-            <p className="text-sm text-gray-500">
-              SKU {product.sku}
-              {product.barcode && <span className="ml-3">EAN {product.barcode}</span>}
-              {product.marca && <span className="ml-3">{product.marca}</span>}
-              {product.rubro && <span className="ml-3">{product.rubro}</span>}
-            </p>
-            <p className="text-sm text-gray-500 mt-1">
-              Stock: {product.stock} {product.unidad || "UN"}
-            </p>
-          </div>
+        <Stagger delay={150}>
+          <div className="bg-white rounded-xl border shadow-sm p-6">
+            <div className="mb-4">
+              <h2 className="text-lg font-semibold text-gray-900">{product.nombre}</h2>
+              <p className="text-sm text-gray-500">
+                SKU {product.sku}
+                {product.barcode && <span className="ml-3">EAN {product.barcode}</span>}
+                {product.marca && <span className="ml-3">{product.marca}</span>}
+                {product.rubro && <span className="ml-3">{product.rubro}</span>}
+              </p>
+              <p className="text-sm text-gray-500 mt-1">
+                Stock: {product.stock} {product.unidad || "UN"}
+              </p>
+            </div>
 
-          <div className="space-y-3">
-            {PRICE_FIELDS.map((field) => {
-              const isCosto = field.key === "costo";
-              return (
-                <div key={field.key} className="flex items-center gap-3">
-                  <span className="text-sm text-gray-700 w-24">{field.label}</span>
-                  {!isCosto && (
-                    <MarginInput
-                      margin={getMargin(field.key)}
-                      onChange={(pct) => updateFromMargin(field.key, pct)}
-                    />
-                  )}
-                  <div className="flex items-center gap-2 flex-1">
-                    <span className="text-gray-400">$</span>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={form[field.key] || ""}
-                      onChange={(e) => updateField(field.key, e.target.value)}
-                      placeholder="0"
-                      className={`flex-1 text-right px-3 py-2 border rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 ${
-                        isCosto ? "border-brand-400 font-medium" : "border-gray-300"
-                      }`}
-                    />
+            <div className="space-y-3">
+              {PRICE_FIELDS.map((field, i) => {
+                const isCosto = field.key === "costo";
+                return (
+                  <div
+                    key={field.key}
+                    className={`flex items-center gap-3 ${hoverRow} rounded-lg px-2 -mx-2 py-1`}
+                    style={staggerStyle(productReady, i)}
+                  >
+                    <span className="text-sm text-gray-700 w-24">{field.label}</span>
+                    {!isCosto && (
+                      <MarginInput
+                        margin={getMargin(field.key)}
+                        onChange={(pct) => updateFromMargin(field.key, pct)}
+                      />
+                    )}
+                    <div className="flex items-center gap-2 flex-1">
+                      <span className="text-gray-400">$</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={form[field.key] || ""}
+                        onChange={(e) => updateField(field.key, e.target.value)}
+                        placeholder="0"
+                        className={`flex-1 text-right px-3 py-2 border rounded-xl text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 ${
+                          isCosto ? "border-brand-400 font-medium" : "border-gray-300"
+                        }`}
+                      />
+                    </div>
+                    {!isCosto && product[field.key as keyof Product] !== parseFloat(form[field.key] || "0") && parseFloat(form[field.key] || "0") > 0 && (
+                      <span className="text-xs text-amber-600">
+                        era {formatPrice(product[field.key as keyof Product] as number)}
+                      </span>
+                    )}
                   </div>
-                  {!isCosto && product[field.key as keyof Product] !== parseFloat(form[field.key] || "0") && parseFloat(form[field.key] || "0") > 0 && (
-                    <span className="text-xs text-amber-600">
-                      era {formatPrice(product[field.key as keyof Product] as number)}
-                    </span>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
 
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="mt-6 w-full py-2 bg-brand-400 text-white rounded-lg text-sm font-medium hover:bg-brand-500 disabled:opacity-50 transition-colors"
-          >
-            {saving ? "Guardando..." : "Guardar precios"}
-          </button>
-          {parseFloat(form.costo || "0") > 0 && (
-            <>
-              <button onClick={handleApplyCosto} disabled={saving}
-                className="mt-3 w-full py-2.5 text-sm font-semibold text-blue-700 bg-blue-50 border-2 border-blue-200 rounded-lg hover:bg-blue-100 disabled:opacity-50 transition-colors">
-                Aplicar costo a similares
-              </button>
-              <button onClick={handleCloneListas} disabled={saving}
-                className="mt-2 w-full py-2.5 text-sm font-semibold text-green-700 bg-green-50 border-2 border-green-200 rounded-lg hover:bg-green-100 disabled:opacity-50 transition-colors">
-                Clonar listas a similares
-              </button>
-            </>
-          )}
-        </div>
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className={`mt-6 w-full py-2 bg-brand-400 text-white rounded-xl text-sm font-medium hover:bg-brand-500 disabled:opacity-50 transition-colors ${springBtn}`}
+            >
+              {saving ? "Guardando..." : "Guardar precios"}
+            </button>
+            {parseFloat(form.costo || "0") > 0 && (
+              <>
+                <button onClick={handleApplyCosto} disabled={saving}
+                  className={`mt-3 w-full py-2.5 text-sm font-semibold text-blue-700 bg-blue-50 border-2 border-blue-200 rounded-xl hover:bg-blue-100 disabled:opacity-50 transition-colors ${springBtn}`}>
+                  Aplicar costo a similares
+                </button>
+                <button onClick={handleCloneListas} disabled={saving}
+                  className={`mt-2 w-full py-2.5 text-sm font-semibold text-green-700 bg-green-50 border-2 border-green-200 rounded-xl hover:bg-green-100 disabled:opacity-50 transition-colors ${springBtn}`}>
+                  Clonar listas a similares
+                </button>
+              </>
+            )}
+          </div>
+        </Stagger>
       )}
-    </div>
+    </PageTransition>
   );
 }

@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import type { Product } from "@/types";
 import { formatPrice } from "@/lib/utils";
 import ConfirmModal from "@/components/ConfirmModal";
+import { PageTransition, Stagger, staggerStyle, springBtn, hoverRow, LoadingCenter, Spinner } from "@/components/AnimateIn";
 
 interface ComboItem {
   sku: string;
@@ -189,188 +190,195 @@ export default function CombosPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-6">
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Combos</h1>
+    <PageTransition className="max-w-4xl mx-auto px-4 py-6">
+      <Stagger delay={0} y={-8}>
+        <h1 className="text-2xl font-bold text-gray-900 mb-6">Combos</h1>
+      </Stagger>
 
       {/* Form */}
-      <div className="bg-white rounded-lg border p-4 mb-6">
-        <h2 className="text-sm font-medium text-gray-700 mb-3">
-          {editId ? "Editar combo" : "Crear combo"}
-        </h2>
+      <Stagger delay={50}>
+        <div className="bg-white rounded-xl border shadow-sm p-4 mb-6">
+          <h2 className="text-sm font-medium text-gray-700 mb-3">
+            {editId ? "Editar combo" : "Crear combo"}
+          </h2>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Nombre del combo"
+              className="px-3 py-2 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
+            />
+            <input
+              type="number"
+              value={price}
+              onChange={(e) => setPrice(e.target.value)}
+              placeholder="Precio especial (opcional, vacío = suma automática)"
+              className="px-3 py-2 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
+            />
+          </div>
+
           <input
             type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Nombre del combo"
-            className="px-3 py-2 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Descripción (opcional)"
+            className="w-full px-3 py-2 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 mb-3"
           />
-          <input
-            type="number"
-            value={price}
-            onChange={(e) => setPrice(e.target.value)}
-            placeholder="Precio especial (opcional, vacío = suma automática)"
-            className="px-3 py-2 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
-          />
-        </div>
 
-        <input
-          type="text"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          placeholder="Descripción (opcional)"
-          className="w-full px-3 py-2 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 mb-3"
-        />
+          {/* Product search */}
+          <div className="relative mb-3">
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => handleSearch(e.target.value)}
+              placeholder="Buscar producto para agregar..."
+              className="w-full px-3 py-2 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
+            />
+            {searching && <span className="absolute right-3 top-2.5 text-gray-400 text-xs">Buscando...</span>}
+            {results.length > 0 && (
+              <div className="absolute z-10 w-full mt-1 bg-white border rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                {results.map((p) => {
+                  const added = items.some((i) => i.sku === p.sku);
+                  return (
+                    <button
+                      key={p.sku}
+                      onClick={() => !added && addProduct(p)}
+                      disabled={added}
+                      className={`w-full text-left px-4 py-2 text-sm border-b last:border-b-0 ${
+                        added ? "bg-gray-50 text-gray-400" : "hover:bg-brand-50"
+                      }`}
+                    >
+                      <span className="font-mono text-gray-500 mr-2">{p.sku}</span>
+                      {p.name}
+                      <span className="ml-2 text-gray-400">{formatPrice(p.precioMayorista)}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
 
-        {/* Product search */}
-        <div className="relative mb-3">
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => handleSearch(e.target.value)}
-            placeholder="Buscar producto para agregar..."
-            className="w-full px-3 py-2 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
-          />
-          {searching && <span className="absolute right-3 top-2.5 text-gray-400 text-xs">Buscando...</span>}
-          {results.length > 0 && (
-            <div className="absolute z-10 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-48 overflow-y-auto">
-              {results.map((p) => {
-                const added = items.some((i) => i.sku === p.sku);
-                return (
+          {/* Selected items */}
+          {items.length > 0 && (
+            <div className="border rounded-xl p-3 mb-3 space-y-2">
+              {items.map((item, idx) => (
+                <div key={item.sku} className="flex items-center gap-3">
+                  <span className="text-sm flex-1">
+                    <span className="font-mono text-gray-400 mr-1">{item.sku}</span>
+                    {item.name || item.sku}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <span className="text-xs text-gray-500">Cant:</span>
+                    <input
+                      type="number"
+                      value={item.quantity}
+                      onChange={(e) => {
+                        const newItems = [...items];
+                        newItems[idx].quantity = Math.max(1, parseInt(e.target.value) || 1);
+                        setItems(newItems);
+                      }}
+                      className="w-14 text-center text-sm border rounded py-1"
+                      min={1}
+                    />
+                  </div>
                   <button
-                    key={p.sku}
-                    onClick={() => !added && addProduct(p)}
-                    disabled={added}
-                    className={`w-full text-left px-4 py-2 text-sm border-b last:border-b-0 ${
-                      added ? "bg-gray-50 text-gray-400" : "hover:bg-brand-50"
-                    }`}
+                    onClick={() => setItems(items.filter((_, i) => i !== idx))}
+                    className={`text-red-500 hover:text-red-700 text-sm ${springBtn}`}
                   >
-                    <span className="font-mono text-gray-500 mr-2">{p.sku}</span>
-                    {p.name}
-                    <span className="ml-2 text-gray-400">{formatPrice(p.precioMayorista)}</span>
+                    Quitar
                   </button>
-                );
-              })}
+                </div>
+              ))}
             </div>
           )}
-        </div>
 
-        {/* Selected items */}
-        {items.length > 0 && (
-          <div className="border rounded-lg p-3 mb-3 space-y-2">
-            {items.map((item, idx) => (
-              <div key={item.sku} className="flex items-center gap-3">
-                <span className="text-sm flex-1">
-                  <span className="font-mono text-gray-400 mr-1">{item.sku}</span>
-                  {item.name || item.sku}
-                </span>
-                <div className="flex items-center gap-1">
-                  <span className="text-xs text-gray-500">Cant:</span>
-                  <input
-                    type="number"
-                    value={item.quantity}
-                    onChange={(e) => {
-                      const newItems = [...items];
-                      newItems[idx].quantity = Math.max(1, parseInt(e.target.value) || 1);
-                      setItems(newItems);
-                    }}
-                    className="w-14 text-center text-sm border rounded py-1"
-                    min={1}
-                  />
+          {formError && (
+            <p className="text-sm text-red-600 mb-2">{formError}</p>
+          )}
+
+          <div className="flex gap-2">
+            <button
+              onClick={handleSave}
+              disabled={saving || items.length < 2}
+              className={`px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50 ${springBtn}`}
+            >
+              {saving ? <span className="flex items-center gap-2"><Spinner className="w-4 h-4" color="border-white" />Guardando...</span> : editId ? "Actualizar" : "Crear combo"}
+            </button>
+            {editId && (
+              <button
+                onClick={resetForm}
+                className={`px-4 py-2 border text-gray-700 rounded-lg text-sm hover:bg-gray-50 ${springBtn}`}
+              >
+                Cancelar
+              </button>
+            )}
+          </div>
+        </div>
+      </Stagger>
+
+      {/* List */}
+      <Stagger delay={150}>
+        {loading ? (
+          <LoadingCenter />
+        ) : combos.length === 0 ? (
+          <p className="text-gray-400">No hay combos creados.</p>
+        ) : (
+          <div className="space-y-3">
+            {combos.map((combo, i) => (
+              <div
+                key={combo.id}
+                style={staggerStyle(true, i)}
+                className={`bg-white rounded-xl border shadow-sm p-4 ${hoverRow} ${!combo.active ? "opacity-50" : ""}`}
+              >
+                <div className="flex items-start justify-between mb-2">
+                  <div>
+                    <h3 className="font-medium text-gray-900">{combo.name}</h3>
+                    {combo.description && (
+                      <p className="text-xs text-gray-500">{combo.description}</p>
+                    )}
+                  </div>
+                  <span className="text-lg font-bold text-green-700">
+                    {formatPrice(combo.price)}
+                  </span>
                 </div>
-                <button
-                  onClick={() => setItems(items.filter((_, i) => i !== idx))}
-                  className="text-red-500 hover:text-red-700 text-sm"
-                >
-                  Quitar
-                </button>
+                <div className="text-sm text-gray-600 mb-3">
+                  {combo.items.map((item, j) => (
+                    <span key={item.sku}>
+                      {j > 0 && " + "}
+                      {item.quantity > 1 && `${item.quantity}x `}
+                      {item.name || item.sku}
+                    </span>
+                  ))}
+                </div>
+                <div className="flex gap-2 text-sm">
+                  <button
+                    onClick={() => startEdit(combo)}
+                    className={`text-brand-600 hover:underline ${springBtn}`}
+                  >
+                    Editar
+                  </button>
+                  <button
+                    onClick={() => handleToggle(combo)}
+                    disabled={togglingId === combo.id}
+                    className={`text-amber-600 hover:underline disabled:opacity-50 ${springBtn}`}
+                  >
+                    {togglingId === combo.id ? "..." : combo.active ? "Desactivar" : "Activar"}
+                  </button>
+                  <button
+                    onClick={() => setConfirmDeleteId(combo.id)}
+                    disabled={deletingId === combo.id}
+                    className={`text-red-600 hover:underline disabled:opacity-50 ${springBtn}`}
+                  >
+                    {deletingId === combo.id ? "..." : "Eliminar"}
+                  </button>
+                </div>
               </div>
             ))}
           </div>
         )}
-
-        {formError && (
-          <p className="text-sm text-red-600 mb-2">{formError}</p>
-        )}
-
-        <div className="flex gap-2">
-          <button
-            onClick={handleSave}
-            disabled={saving || items.length < 2}
-            className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50"
-          >
-            {saving ? "Guardando..." : editId ? "Actualizar" : "Crear combo"}
-          </button>
-          {editId && (
-            <button
-              onClick={resetForm}
-              className="px-4 py-2 border text-gray-700 rounded-lg text-sm hover:bg-gray-50"
-            >
-              Cancelar
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* List */}
-      {loading ? (
-        <p className="text-gray-400">Cargando...</p>
-      ) : combos.length === 0 ? (
-        <p className="text-gray-400">No hay combos creados.</p>
-      ) : (
-        <div className="space-y-3">
-          {combos.map((combo) => (
-            <div
-              key={combo.id}
-              className={`bg-white rounded-lg border p-4 ${!combo.active ? "opacity-50" : ""}`}
-            >
-              <div className="flex items-start justify-between mb-2">
-                <div>
-                  <h3 className="font-medium text-gray-900">{combo.name}</h3>
-                  {combo.description && (
-                    <p className="text-xs text-gray-500">{combo.description}</p>
-                  )}
-                </div>
-                <span className="text-lg font-bold text-green-700">
-                  {formatPrice(combo.price)}
-                </span>
-              </div>
-              <div className="text-sm text-gray-600 mb-3">
-                {combo.items.map((item, i) => (
-                  <span key={item.sku}>
-                    {i > 0 && " + "}
-                    {item.quantity > 1 && `${item.quantity}x `}
-                    {item.name || item.sku}
-                  </span>
-                ))}
-              </div>
-              <div className="flex gap-2 text-sm">
-                <button
-                  onClick={() => startEdit(combo)}
-                  className="text-brand-600 hover:underline"
-                >
-                  Editar
-                </button>
-                <button
-                  onClick={() => handleToggle(combo)}
-                  disabled={togglingId === combo.id}
-                  className="text-amber-600 hover:underline disabled:opacity-50"
-                >
-                  {togglingId === combo.id ? "..." : combo.active ? "Desactivar" : "Activar"}
-                </button>
-                <button
-                  onClick={() => setConfirmDeleteId(combo.id)}
-                  disabled={deletingId === combo.id}
-                  className="text-red-600 hover:underline disabled:opacity-50"
-                >
-                  {deletingId === combo.id ? "..." : "Eliminar"}
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+      </Stagger>
 
       <ConfirmModal
         open={confirmDeleteId !== null}
@@ -379,6 +387,6 @@ export default function CombosPage() {
         onConfirm={() => confirmDeleteId !== null && handleDelete(confirmDeleteId)}
         onCancel={() => setConfirmDeleteId(null)}
       />
-    </div>
+    </PageTransition>
   );
 }

@@ -47,6 +47,8 @@ const humanTakeover = new Map(); // chatId → timestamp
 const HUMAN_SILENCE_MS = 2 * 60 * 60 * 1000; // 2 hours
 // Track chats where the bot is actively replying (to avoid race condition with message_create)
 const botReplying = new Set();
+// Track chats where inbox just sent a message (to avoid double-store and human takeover)
+const inboxReplying = new Set();
 
 const SYSTEM_PROMPT = `Sos el asistente virtual de Distrialma, una distribuidora mayorista de almacén, bebidas, limpieza, fiambres y más en Merlo, Buenos Aires.
 
@@ -396,7 +398,17 @@ client.on("message", async (msg) => {
 
   const chatId = msg.from;
   console.log(`[IN] ${chatId}: ${msg.body.substring(0, 100)}`);
-  if (msg.body) storeMessage(chatId, "in", msg.body, "contact");
+  if (msg.body) {
+    storeMessage(chatId, "in", msg.body, "contact");
+    // Try to update contact name
+    try {
+      const contact = await msg.getContact();
+      const name = contact.pushname || contact.name || "";
+      if (name) {
+        await prisma.whatsAppChat.update({ where: { chatId }, data: { contactName: name } }).catch(() => {});
+      }
+    } catch {}
+  }
 
   // Check if a human took over recently
   const takeover = humanTakeover.get(chatId);
@@ -522,6 +534,10 @@ client.on("message", async (msg) => {
       console.log(`[UNREG] ${chatId}: no registrado, esperando datos`);
     }
 
+    // Mark as bot-replying BEFORE calling Claude so auto-greetings during
+    // the API call don't trigger human takeover
+    botReplying.add(chatId);
+
     // Show typing indicator
     const chat = await msg.getChat();
     await chat.sendStateTyping();
@@ -531,7 +547,6 @@ client.on("message", async (msg) => {
     const cleanReply = reply.replace(/\*\*/g, "").replace(/\*/g, "").replace(/__/g, "").replace(/_/g, "");
     console.log(`[OUT] ${chatId}: ${cleanReply.substring(0, 100)}`);
     storeMessage(chatId, "out", cleanReply, "bot");
-    botReplying.add(chatId);
     try {
       await msg.reply(cleanReply);
     } finally {
@@ -572,6 +587,8 @@ const AUTO_REPLY_PATTERNS = [
   /no estamos disponibles/i,
   /respuesta autom[aá]tica/i,
   /mensaje autom[aá]tico/i,
+  /chat autom[aá]tico/i,
+  /elija una opci[oó]n/i,
   /nuestro horario/i,
   /volvemos a las/i,
   /atendemos de/i,
@@ -582,8 +599,9 @@ client.on("message_create", async (msg) => {
   if (!msg.fromMe) return;
   const chatId = msg.to;
   if (!chatId || chatId.endsWith("@g.us") || chatId === "status@broadcast") return;
-  // Skip messages sent by the bot (race-safe: check if bot is replying to this chat)
+  // Skip messages sent by the bot or inbox
   if (botReplying.has(chatId)) return;
+  if (inboxReplying.has(chatId)) return;
   // Skip WhatsApp auto-replies (fuera de horario, etc.)
   const body = msg.body || "";
   if (AUTO_REPLY_PATTERNS.some((p) => p.test(body))) {
@@ -606,9 +624,11 @@ const httpServer = http.createServer(async (req, res) => {
       try {
         const { chatId, message } = JSON.parse(body);
         if (!chatId || !message) { res.writeHead(400); res.end('{"error":"chatId and message required"}'); return; }
+        inboxReplying.add(chatId);
         await client.sendMessage(chatId, message);
         storeMessage(chatId, "out", message, "human");
         console.log(`[INBOX] ${chatId}: ${message.substring(0, 60)}`);
+        setTimeout(() => inboxReplying.delete(chatId), 10000);
         res.writeHead(200); res.end('{"ok":true}');
       } catch (e) {
         res.writeHead(500); res.end('{"error":"' + e.message + '"}');

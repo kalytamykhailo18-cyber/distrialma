@@ -4,6 +4,7 @@ import { signIn } from "next-auth/react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { HiEye, HiEyeOff } from "react-icons/hi";
+import { PageTransition, Stagger, springBtn } from "@/components/AnimateIn";
 
 export default function LoginPage() {
   const [username, setUsername] = useState("");
@@ -35,11 +36,12 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="max-w-md mx-auto px-4 py-16">
-      <div className="bg-white rounded-lg border p-8">
-        <h1 className="text-2xl font-bold text-gray-900 mb-6 text-center">
-          Iniciar Sesión
-        </h1>
+    <PageTransition className="max-w-md mx-auto px-4 py-16">
+      <Stagger delay={0} y={-8}>
+        <div className="bg-white rounded-xl border shadow-sm p-8">
+          <h1 className="text-2xl font-bold text-gray-900 mb-6 text-center">
+            Iniciar Sesión
+          </h1>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -83,15 +85,18 @@ export default function LoginPage() {
             <p className="text-red-600 text-sm">{error}</p>
           )}
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-brand-400 text-white py-2 rounded-lg font-medium hover:bg-brand-500 disabled:opacity-50"
-          >
-            {loading ? "Ingresando..." : "Ingresar"}
-          </button>
+          <Stagger delay={100}>
+            <button
+              type="submit"
+              disabled={loading}
+              className={`w-full bg-brand-400 text-white py-2 rounded-xl font-medium hover:bg-brand-500 shadow-sm disabled:opacity-50 ${springBtn}`}
+            >
+              {loading ? "Ingresando..." : "Ingresar"}
+            </button>
+          </Stagger>
         </form>
-      </div>
-    </div>
+        </div>
+      </Stagger>
+    </PageTransition>
   );
 }

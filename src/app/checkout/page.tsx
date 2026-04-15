@@ -7,6 +7,7 @@ import { useCart } from "@/components/CartProvider";
 import { formatPrice } from "@/lib/utils";
 import { HiExclamation } from "react-icons/hi";
 import { FaWhatsapp } from "react-icons/fa";
+import { PageTransition, Stagger, LoadingCenter, springBtn } from "@/components/AnimateIn";
 
 interface ClientInfo {
   name: string;
@@ -100,8 +101,8 @@ export default function CheckoutPage() {
 
   if (status === "loading" || loadingClient) {
     return (
-      <div className="max-w-2xl mx-auto px-4 py-16 text-center">
-        <p className="text-gray-500">Cargando...</p>
+      <div className="max-w-2xl mx-auto px-4">
+        <LoadingCenter />
       </div>
     );
   }
@@ -111,11 +112,14 @@ export default function CheckoutPage() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-6">
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Finalizar pedido</h1>
+    <PageTransition className="max-w-2xl mx-auto px-4 py-6">
+      <Stagger delay={0} y={-8}>
+        <h1 className="text-2xl font-bold text-gray-900 mb-6">Finalizar pedido</h1>
+      </Stagger>
 
       {/* Client info */}
-      <div className="bg-white rounded-lg border p-4 mb-4">
+      <Stagger delay={80}>
+      <div className="bg-white rounded-lg border shadow-sm p-4 mb-4">
         <h2 className="text-sm font-medium text-gray-700 mb-3">Datos del cliente</h2>
         <div className="text-sm space-y-1">
           <p><span className="text-gray-500">Nombre:</span> {clientInfo?.name || session?.user?.name}</p>
@@ -133,9 +137,11 @@ export default function CheckoutPage() {
           )}
         </div>
       </div>
+      </Stagger>
 
       {/* Order summary */}
-      <div className="bg-white rounded-lg border p-4 mb-4">
+      <Stagger delay={160}>
+      <div className="bg-white rounded-lg border shadow-sm p-4 mb-4">
         <h2 className="text-sm font-medium text-gray-700 mb-3">
           Resumen del pedido ({items.length} producto{items.length !== 1 ? "s" : ""})
         </h2>
@@ -163,9 +169,11 @@ export default function CheckoutPage() {
           </div>
         </div>
       </div>
+      </Stagger>
 
       {/* Notes */}
-      <div className="bg-white rounded-lg border p-4 mb-4">
+      <Stagger delay={240}>
+      <div className="bg-white rounded-lg border shadow-sm p-4 mb-4">
         <h2 className="text-sm font-medium text-gray-700 mb-2">Notas (opcional)</h2>
         <textarea
           value={notes}
@@ -175,8 +183,10 @@ export default function CheckoutPage() {
           className="w-full px-3 py-2 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
         />
       </div>
+      </Stagger>
 
       {/* Actions */}
+      <Stagger delay={320}>
       <div className="space-y-3">
         {!meetsMinimum && items.length > 0 && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
@@ -196,7 +206,7 @@ export default function CheckoutPage() {
               setShowDisclaimer(true);
             }}
             disabled={sending || !meetsMinimum}
-            className="w-full py-3 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors disabled:opacity-50"
+            className={`w-full py-3 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors disabled:opacity-50 ${springBtn}`}
           >
             {sending ? "Enviando..." : `Enviar pedido (entrega: ${clientInfo.deliveryDay})`}
           </button>
@@ -207,7 +217,7 @@ export default function CheckoutPage() {
             setPendingAction("whatsapp");
             setShowDisclaimer(true);
           }}
-          className="w-full py-3 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600 transition-colors flex items-center justify-center gap-2"
+          className={`w-full py-3 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600 transition-colors flex items-center justify-center gap-2 ${springBtn}`}
         >
           <FaWhatsapp className="w-5 h-5" />
           Enviar por WhatsApp
@@ -219,6 +229,7 @@ export default function CheckoutPage() {
           </p>
         )}
       </div>
+      </Stagger>
 
       {/* Disclaimer modal */}
       {showDisclaimer && (
@@ -258,7 +269,7 @@ export default function CheckoutPage() {
                   setShowDisclaimer(false);
                   setPendingAction(null);
                 }}
-                className="flex-1 py-2.5 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50"
+                className={`flex-1 py-2.5 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 ${springBtn}`}
               >
                 Cancelar
               </button>
@@ -291,7 +302,7 @@ export default function CheckoutPage() {
                   setPendingAction(null);
                 }}
                 disabled={sending}
-                className="flex-1 py-2.5 bg-brand-400 text-white rounded-lg text-sm font-medium hover:bg-brand-500 disabled:opacity-50"
+                className={`flex-1 py-2.5 bg-brand-400 text-white rounded-lg text-sm font-medium hover:bg-brand-500 disabled:opacity-50 ${springBtn}`}
               >
                 Aceptar y enviar
               </button>
@@ -299,6 +310,6 @@ export default function CheckoutPage() {
           </div>
         </div>
       )}
-    </div>
+    </PageTransition>
   );
 }

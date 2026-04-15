@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { useState, useRef, useEffect } from "react";
 import { useCart } from "./CartProvider";
-import { hasPermission, isStaffUser } from "@/lib/permissions";
+import { isStaffUser } from "@/lib/permissions";
 import {
   HiOutlineShoppingCart, HiOutlineUser, HiChevronDown, HiX, HiMenu,
   HiOutlineCube, HiOutlineCog, HiOutlineViewGrid, HiOutlineTag,
@@ -47,9 +47,8 @@ export default function Navbar() {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const { totalItems } = useCart();
 
-  const user = session?.user as { role?: string; permissions?: string[]; name?: string } | undefined;
+  const user = session?.user as { role?: string; name?: string } | undefined;
   const role = user?.role;
-  const permissions = user?.permissions;
   const isStaff = isStaffUser(role);
 
   // Close dropdown on outside click
@@ -65,17 +64,28 @@ export default function Navbar() {
     }
   }, [dropdownOpen]);
 
-  const NAV_TABS = [
-    { href: "/productos", label: "Productos", match: "/productos" },
-    { href: "/#novedades", label: "Novedades", match: null },
-    { href: "/#marcas", label: "Marcas", match: null },
-    { href: "/#locales", label: "Locales", match: null },
-  ];
+  const NAV_TABS = isStaff
+    ? [
+        { href: "/productos", label: "Productos", match: "/productos" },
+        { href: "/admin/dashboard", label: "Dashboard", match: "/admin" },
+      ]
+    : session?.user
+    ? [
+        { href: "/productos", label: "Productos", match: "/productos" },
+        { href: "/mis-pedidos", label: "Mis Pedidos", match: "/mis-pedidos" },
+        { href: "/estado-cuenta", label: "Mi Cuenta", match: "/estado-cuenta" },
+      ]
+    : [
+        { href: "/productos", label: "Productos", match: "/productos" },
+        { href: "/#novedades", label: "Novedades", match: null },
+        { href: "/#marcas", label: "Marcas", match: null },
+        { href: "/#locales", label: "Locales", match: null },
+      ];
 
   const navLinks = (
     <>
       {NAV_TABS.map((tab) => {
-        const isActive = tab.match && (pathname === tab.match || pathname.startsWith(tab.match + "/") || pathname.startsWith("/categoria") || pathname.startsWith("/marca"));
+        const isActive = tab.match && (pathname === tab.match || pathname.startsWith(tab.match + "/") || (tab.match === "/productos" && (pathname.startsWith("/categoria") || pathname.startsWith("/marca"))));
         const baseClass = "text-sm font-medium px-3 py-1.5 rounded-full transition-colors";
         const activeClass = isActive
           ? "bg-brand-400 text-white"
@@ -104,51 +114,9 @@ export default function Navbar() {
     </>
   );
 
-  const STAFF_MENU: { href: string; label: string; perm: string; iconKey: string }[] = [
-    { href: "/admin", label: "Productos", perm: "productos", iconKey: "productos" },
-    { href: "/admin/configuracion", label: "Configuración", perm: "configuracion", iconKey: "configuracion" },
-    { href: "/admin/categorias", label: "Categorías", perm: "categorias", iconKey: "categorias" },
-    { href: "/admin/marcas", label: "Marcas", perm: "marcas", iconKey: "marcas" },
-    { href: "/admin/combos", label: "Combos", perm: "combos", iconKey: "combos" },
-    { href: "/admin/pedidos", label: "Pedidos", perm: "pedidos", iconKey: "pedidos" },
-    { href: "/reparto", label: "Reparto", perm: "reparto", iconKey: "reparto" },
-    { href: "/admin/picking", label: "Picking", perm: "picking", iconKey: "picking" },
-    { href: "/admin/dias-entrega", label: "Días Entrega", perm: "dias-entrega", iconKey: "dias-entrega" },
-    { href: "/admin/informes", label: "Informes", perm: "informes", iconKey: "informes" },
-    { href: "/admin/compras", label: "Compras", perm: "compras", iconKey: "compras" },
-    { href: "/admin/precios", label: "Precios", perm: "costeo", iconKey: "precios" },
-    { href: "/admin/precios-masivos", label: "Precios Masivos", perm: "costeo", iconKey: "precios" },
-    { href: "/admin/proveedores", label: "Proveedores", perm: "compras", iconKey: "proveedores" },
-    { href: "/admin/movimientos", label: "Movimientos", perm: "movimientos", iconKey: "compras" },
-    { href: "/admin/vendedores", label: "Vendedores", perm: "vendedores", iconKey: "usuarios" },
-    { href: "/vendedor", label: "Tomar Pedido", perm: "vendedor", iconKey: "pedidos" },
-    { href: "/admin/pedidosya", label: "PedidosYa", perm: "costeo", iconKey: "pedidosya" },
-    { href: "/admin/cierre-caja", label: "Cierre Caja", perm: "informes", iconKey: "informes" },
-    // { href: "/admin/inbox", label: "WhatsApp", perm: "informes", iconKey: "informes" },
-    { href: "/admin/dashboard", label: "Dashboard", perm: "informes", iconKey: "informes" },
-    { href: "/admin/proveedores-productos", label: "Reposicion", perm: "compras", iconKey: "proveedores" },
-    { href: "/admin/resumen-productos", label: "Resumen Prod.", perm: "informes", iconKey: "informes" },
-    { href: "/admin/usuarios", label: "Usuarios", perm: "usuarios", iconKey: "usuarios" },
-    { href: "/admin/etiquetas", label: "Etiquetas", perm: "etiquetas", iconKey: "etiquetas" },
-  ];
-
-  const CUSTOMER_MENU: { href: string; label: string; iconKey: string }[] = [
-    { href: "/mis-pedidos", label: "Mis Pedidos", iconKey: "mis-pedidos" },
-    { href: "/estado-cuenta", label: "Mi Cuenta", iconKey: "mi-cuenta" },
+  const menuItems = (!session?.user || isStaff) ? [] : [
     { href: "/lista-precios", label: "Lista Precios", iconKey: "lista-precios" },
   ];
-
-  function getUserMenuItems(): { href: string; label: string; iconKey: string }[] {
-    if (!session?.user) return [];
-    if (isStaff) {
-      return STAFF_MENU.filter((item) =>
-        hasPermission(role, permissions, item.perm as Parameters<typeof hasPermission>[2])
-      );
-    }
-    return CUSTOMER_MENU;
-  }
-
-  const menuItems = getUserMenuItems();
 
   return (
     <nav className="bg-white shadow-md border-b border-gray-200 sticky top-0 z-40">
@@ -175,50 +143,57 @@ export default function Navbar() {
             )}
           </Link>
 
-          {/* User dropdown or login */}
+          {/* User menu */}
           {session?.user ? (
-            <div className="relative" ref={dropdownRef}>
-              <button
-                onClick={() => setDropdownOpen(!dropdownOpen)}
-                className="flex items-center gap-1.5 text-sm text-gray-600 hover:text-brand-600 px-3 py-1.5 rounded-lg border border-gray-200 hover:border-brand-400 transition-colors"
-              >
+            isStaff ? (
+              <span className="flex items-center gap-1.5 text-sm text-gray-500 px-3 py-1.5">
                 <HiOutlineUser className="w-4 h-4" />
                 <span className="max-w-[120px] truncate">{session.user.name}</span>
-                <HiChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${dropdownOpen ? "rotate-180" : ""}`} />
-              </button>
-
-              <div
-                className={`absolute right-0 mt-1 w-52 bg-white rounded-lg border shadow-lg py-1 z-50 origin-top transition-all duration-200 ease-out max-h-[calc(100vh-80px)] overflow-y-auto ${
-                  dropdownOpen
-                    ? "opacity-100 scale-100 translate-y-0"
-                    : "opacity-0 scale-95 -translate-y-1 pointer-events-none"
-                }`}
-              >
-                {menuItems.map((item) => {
-                  const Icon = ICON_MAP[item.iconKey];
-                  return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      onClick={() => setDropdownOpen(false)}
-                      className="flex items-center gap-2.5 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-brand-600 transition-colors"
-                    >
-                      {Icon && <Icon className="w-4 h-4 text-gray-400" />}
-                      {item.label}
-                    </Link>
-                  );
-                })}
-                <div className="border-t my-1" />
+              </span>
+            ) : (
+              <div className="relative" ref={dropdownRef}>
                 <button
-                  onClick={() => { setSigningOut(true); signOut(); setDropdownOpen(false); }}
-                  disabled={signingOut}
-                  className="w-full text-left flex items-center gap-2.5 px-4 py-2 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50 transition-colors"
+                  onClick={() => setDropdownOpen(!dropdownOpen)}
+                  className="flex items-center gap-1.5 text-sm text-gray-600 hover:text-brand-600 px-3 py-1.5 rounded-lg border border-gray-200 hover:border-brand-400 transition-colors"
                 >
-                  <HiOutlineLogout className="w-4 h-4" />
-                  {signingOut ? "Saliendo..." : "Salir"}
+                  <HiOutlineUser className="w-4 h-4" />
+                  <span className="max-w-[120px] truncate">{session.user.name}</span>
+                  <HiChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${dropdownOpen ? "rotate-180" : ""}`} />
                 </button>
+
+                <div
+                  className={`absolute right-0 mt-1 w-52 bg-white rounded-lg border shadow-lg py-1 z-50 origin-top transition-all duration-200 ease-out max-h-[calc(100vh-80px)] overflow-y-auto ${
+                    dropdownOpen
+                      ? "opacity-100 scale-100 translate-y-0"
+                      : "opacity-0 scale-95 -translate-y-1 pointer-events-none"
+                  }`}
+                >
+                  {menuItems.map((item) => {
+                    const Icon = ICON_MAP[item.iconKey];
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        onClick={() => setDropdownOpen(false)}
+                        className="flex items-center gap-2.5 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-brand-600 transition-colors"
+                      >
+                        {Icon && <Icon className="w-4 h-4 text-gray-400" />}
+                        {item.label}
+                      </Link>
+                    );
+                  })}
+                  <div className="border-t my-1" />
+                  <button
+                    onClick={() => { setSigningOut(true); signOut(); setDropdownOpen(false); }}
+                    disabled={signingOut}
+                    className="w-full text-left flex items-center gap-2.5 px-4 py-2 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50 transition-colors"
+                  >
+                    <HiOutlineLogout className="w-4 h-4" />
+                    {signingOut ? "Saliendo..." : "Salir"}
+                  </button>
+                </div>
               </div>
-            </div>
+            )
           ) : (
             <Link
               href="/login"
@@ -262,43 +237,45 @@ export default function Navbar() {
           <div className="flex flex-col gap-3">
             {navLinks}
           </div>
-          <div className="border-t pt-3 flex flex-col gap-1">
-            {session?.user && (
-              <span className="text-sm text-gray-500 font-medium px-2 mb-1">{session.user.name}</span>
-            )}
-            {menuItems.map((item) => {
-              const Icon = ICON_MAP[item.iconKey];
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={() => setMenuOpen(false)}
-                  className="flex items-center gap-2.5 text-sm text-gray-600 hover:text-brand-600 hover:bg-gray-50 px-2 py-1.5 rounded-lg transition-colors"
+          {!isStaff && (
+            <div className="border-t pt-3 flex flex-col gap-1">
+              {session?.user && (
+                <span className="text-sm text-gray-500 font-medium px-2 mb-1">{session.user.name}</span>
+              )}
+              {menuItems.map((item) => {
+                const Icon = ICON_MAP[item.iconKey];
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={() => setMenuOpen(false)}
+                    className="flex items-center gap-2.5 text-sm text-gray-600 hover:text-brand-600 hover:bg-gray-50 px-2 py-1.5 rounded-lg transition-colors"
+                  >
+                    {Icon && <Icon className="w-4 h-4 text-gray-400" />}
+                    {item.label}
+                  </Link>
+                );
+              })}
+              {session?.user ? (
+                <button
+                  onClick={() => { setSigningOut(true); signOut(); setMenuOpen(false); }}
+                  disabled={signingOut}
+                  className="flex items-center gap-2.5 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50 text-left px-2 py-1.5 rounded-lg transition-colors"
                 >
-                  {Icon && <Icon className="w-4 h-4 text-gray-400" />}
-                  {item.label}
+                  <HiOutlineLogout className="w-4 h-4" />
+                  {signingOut ? "Saliendo..." : "Salir"}
+                </button>
+              ) : (
+                <Link
+                  href="/login"
+                  className="text-sm bg-brand-400 text-white px-4 py-2 rounded-lg hover:bg-brand-500 text-center mt-1"
+                  onClick={() => setMenuOpen(false)}
+                >
+                  Ingresar
                 </Link>
-              );
-            })}
-            {session?.user ? (
-              <button
-                onClick={() => { setSigningOut(true); signOut(); setMenuOpen(false); }}
-                disabled={signingOut}
-                className="flex items-center gap-2.5 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50 text-left px-2 py-1.5 rounded-lg transition-colors"
-              >
-                <HiOutlineLogout className="w-4 h-4" />
-                {signingOut ? "Saliendo..." : "Salir"}
-              </button>
-            ) : (
-              <Link
-                href="/login"
-                className="text-sm bg-brand-400 text-white px-4 py-2 rounded-lg hover:bg-brand-500 text-center mt-1"
-                onClick={() => setMenuOpen(false)}
-              >
-                Ingresar
-              </Link>
-            )}
-          </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </nav>

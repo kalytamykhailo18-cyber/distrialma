@@ -5,6 +5,7 @@ import { formatPrice } from "@/lib/utils";
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from "recharts";
 import { HiTrendingUp, HiTrendingDown, HiChevronDown, HiSearch, HiPencil } from "react-icons/hi";
 import Link from "next/link";
+import { PageTransition, Stagger, staggerStyle, springBtn, hoverRow, LoadingCenter, useDataReady, CollapsiblePanel } from "@/components/AnimateIn";
 
 const SUC_NAMES: Record<string, string> = { "1": "Minorista 435", "2": "Mayorista 387", "6": "May. Pontevedra", "7": "Distribuidora", "10": "Reventas" };
 const DIAS_SEMANA = ["lunes", "martes", "miercoles", "jueves", "viernes", "sabado", "domingo"];
@@ -98,52 +99,61 @@ export default function DashboardPage() {
     return mx;
   }, 0) || 1;
 
+  const dataReady = useDataReady(data);
+
   return (
-    <div className="max-w-6xl mx-auto px-4 py-6">
-      <h1 className="text-2xl font-bold text-gray-900 mb-2">Dashboard</h1>
-      <p className="text-sm text-gray-500 mb-4">Panel de control con indicadores clave del negocio.</p>
+    <PageTransition className="max-w-6xl mx-auto px-4 py-6">
+      <Stagger delay={0} y={-8}>
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">Dashboard</h1>
+        <p className="text-sm text-gray-500 mb-4">Panel de control con indicadores clave del negocio.</p>
+      </Stagger>
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-3 mb-6">
-        <input type="month" value={mes} onChange={(e) => setMes(e.target.value)} className="px-3 py-2 border border-brand-400 rounded-lg text-sm" />
-        <div className="flex flex-wrap gap-1">
-          {["1", "2", "6", "7", "10"].map((s) => (
-            <button key={s} onClick={() => toggleSuc(s)}
-              className={`px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs font-medium transition-colors ${sucursales.includes(s) ? "bg-brand-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
-              {SUC_NAMES[s]}
-            </button>
-          ))}
+      <Stagger delay={50}>
+        <div className="flex flex-wrap gap-3 mb-6">
+          <input type="month" value={mes} onChange={(e) => setMes(e.target.value)} className="px-3 py-2 border border-brand-400 rounded-lg text-sm" />
+          <div className="flex flex-wrap gap-1">
+            {["1", "2", "6", "7", "10"].map((s) => (
+              <button key={s} onClick={() => toggleSuc(s)}
+                className={`px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs font-medium ${springBtn} ${sucursales.includes(s) ? "bg-brand-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
+                {SUC_NAMES[s]}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      </Stagger>
 
-      {loading ? <p className="text-gray-400">Cargando...</p> : !data ? <p className="text-gray-400">Sin datos</p> : (
+      {loading ? <LoadingCenter /> : !data ? <p className="text-gray-400">Sin datos</p> : (
         <>
           {/* Comparativo cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-            {[
-              { label: "Ventas", actual: comp?.mesActual.ventas || 0, cambio: ventasCambio, format: fmtK },
-              { label: "Ganancia", actual: comp?.mesActual.ganancia || 0, cambio: gananciaCambio, format: fmtK },
-              { label: "Ticket Promedio", actual: comp?.mesActual.ticketPromedio || 0, cambio: ticketCambio, format: fmt },
-              { label: "Clientes", actual: comp?.mesActual.clientesUnicos || 0, cambio: clientesCambio, format: (n: number) => String(n) },
-            ].map((card) => {
-              const isUp = parseFloat(card.cambio) > 0;
-              const isDown = parseFloat(card.cambio) < 0;
-              return (
-                <div key={card.label} className="bg-white border rounded-xl p-4">
-                  <div className="text-xs text-gray-500 mb-1">{card.label}</div>
-                  <div className="text-2xl font-bold text-gray-900">{card.format(card.actual)}</div>
-                  <div className={`flex items-center gap-1 text-xs mt-1 ${isUp ? "text-green-600" : isDown ? "text-red-500" : "text-gray-400"}`}>
-                    {isUp && <HiTrendingUp className="w-3.5 h-3.5" />}
-                    {isDown && <HiTrendingDown className="w-3.5 h-3.5" />}
-                    {card.cambio !== "N/A" ? `${isUp ? "+" : ""}${card.cambio}% vs mes ant.` : "Sin datos anteriores"}
+          <Stagger delay={100}>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+              {[
+                { label: "Ventas", actual: comp?.mesActual.ventas || 0, cambio: ventasCambio, format: fmtK },
+                { label: "Ganancia", actual: comp?.mesActual.ganancia || 0, cambio: gananciaCambio, format: fmtK },
+                { label: "Ticket Promedio", actual: comp?.mesActual.ticketPromedio || 0, cambio: ticketCambio, format: fmt },
+                { label: "Clientes", actual: comp?.mesActual.clientesUnicos || 0, cambio: clientesCambio, format: (n: number) => String(n) },
+              ].map((card, i) => {
+                const isUp = parseFloat(card.cambio) > 0;
+                const isDown = parseFloat(card.cambio) < 0;
+                return (
+                  <div key={card.label} className="bg-white border rounded-xl shadow-sm p-4" style={staggerStyle(dataReady, i, 100)}>
+                    <div className="text-xs text-gray-500 mb-1">{card.label}</div>
+                    <div className="text-2xl font-bold text-gray-900">{card.format(card.actual)}</div>
+                    <div className={`flex items-center gap-1 text-xs mt-1 ${isUp ? "text-green-600" : isDown ? "text-red-500" : "text-gray-400"}`}>
+                      {isUp && <HiTrendingUp className="w-3.5 h-3.5" />}
+                      {isDown && <HiTrendingDown className="w-3.5 h-3.5" />}
+                      {card.cambio !== "N/A" ? `${isUp ? "+" : ""}${card.cambio}% vs mes ant.` : "Sin datos anteriores"}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          </Stagger>
 
           {/* Daily sales chart */}
-          <div className="bg-white border rounded-xl p-4 mb-6 overflow-hidden">
+          <Stagger delay={150}>
+          <div className="bg-white border rounded-xl shadow-sm p-4 mb-6 overflow-hidden">
             <h3 className="text-sm font-bold text-gray-700 mb-3">Ventas Diarias</h3>
             <ResponsiveContainer width="100%" height={280}>
               <LineChart data={dailyChart}>
@@ -157,10 +167,12 @@ export default function DashboardPage() {
               </LineChart>
             </ResponsiveContainer>
           </div>
+          </Stagger>
 
+          <Stagger delay={200}>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
             {/* Payment methods */}
-            <div className="bg-white border rounded-xl p-4 overflow-hidden">
+            <div className="bg-white border rounded-xl shadow-sm p-4 overflow-hidden">
               <h3 className="text-sm font-bold text-gray-700 mb-3">Metodos de Pago</h3>
               <ResponsiveContainer width="100%" height={280}>
                 <BarChart data={data.metodosPago.slice(0, 10)} layout="vertical" margin={{ left: 10, right: 10 }}>
@@ -173,7 +185,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Employee performance */}
-            <div className="bg-white border rounded-xl p-4 overflow-hidden">
+            <div className="bg-white border rounded-xl shadow-sm p-4 overflow-hidden">
               <h3 className="text-sm font-bold text-gray-700 mb-3">Rendimiento por Empleado</h3>
               <ResponsiveContainer width="100%" height={280}>
                 <BarChart data={data.empleados.slice(0, 10)} layout="vertical" margin={{ left: 10, right: 10 }}>
@@ -185,7 +197,7 @@ export default function DashboardPage() {
               </ResponsiveContainer>
               <div className="mt-2 space-y-1">
                 {data.empleados.slice(0, 10).map((e) => (
-                  <div key={e.empleadoCod} className="flex justify-between text-xs text-gray-500">
+                  <div key={e.empleadoCod} className={`flex justify-between text-xs text-gray-500 rounded px-1 py-0.5 ${hoverRow}`}>
                     <span>{e.nombre}</span>
                     <span>{e.cantTickets} tickets — prom: {fmt(e.ticketPromedio)}</span>
                   </div>
@@ -193,9 +205,11 @@ export default function DashboardPage() {
               </div>
             </div>
           </div>
+          </Stagger>
 
           {/* Heatmap */}
-          <div className="bg-white border rounded-xl p-4 mb-6">
+          <Stagger delay={250}>
+          <div className="bg-white border rounded-xl shadow-sm p-4 mb-6">
             <h3 className="text-sm font-bold text-gray-700 mb-3">Horarios Pico</h3>
             <div className="overflow-x-auto">
               <table className="text-xs w-full">
@@ -225,10 +239,12 @@ export default function DashboardPage() {
               </table>
             </div>
           </div>
+          </Stagger>
 
+          <Stagger delay={300}>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
           {/* Top clients */}
-          <div className="bg-white border rounded-xl overflow-hidden">
+          <div className="bg-white border rounded-xl shadow-sm overflow-hidden">
             <div className="px-4 py-3 border-b flex flex-wrap items-center gap-3">
               <h3 className="text-sm font-bold text-gray-700">Top 20 Clientes</h3>
               <div className="relative flex-1 min-w-[200px]">
@@ -255,14 +271,14 @@ export default function DashboardPage() {
                           <div className="text-sm font-bold text-gray-900">{fmt(c.total)}</div>
                           <div className="text-xs text-gray-400">{c.cantCompras} compras</div>
                         </div>
-                        <HiChevronDown className={`w-4 h-4 transition-transform ${isOpen ? "rotate-180 text-brand-600" : "text-gray-400"}`} />
+                        <HiChevronDown className={`w-4 h-4 transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${isOpen ? "rotate-180 text-brand-600" : "text-gray-400"}`} />
                       </div>
                     </button>
-                    {isOpen && (
+                    <CollapsiblePanel open={isOpen}>
                       <div className="px-4 py-2 bg-brand-50/50 border-t border-brand-200 text-xs text-gray-600">
                         <span>Cod: {c.clienteCod}</span> — <span>Ultima compra: {c.ultimaCompra ? `${c.ultimaCompra.slice(6, 8)}/${c.ultimaCompra.slice(4, 6)}/${c.ultimaCompra.slice(0, 4)}` : "—"}</span> — <span>Promedio: {fmt(c.cantCompras > 0 ? c.total / c.cantCompras : 0)}</span>
                       </div>
-                    )}
+                    </CollapsiblePanel>
                   </div>
                 );
               })}
@@ -271,7 +287,7 @@ export default function DashboardPage() {
 
           {/* Diferencias de caja */}
           {diferencias && diferencias.empleados.length > 0 && (
-            <div className="bg-white border rounded-xl overflow-hidden">
+            <div className="bg-white border rounded-xl shadow-sm overflow-hidden">
               <div className="px-4 py-3 border-b">
                 <h3 className="text-sm font-bold text-gray-700">Diferencias de Caja por Empleado</h3>
               </div>
@@ -291,10 +307,10 @@ export default function DashboardPage() {
                           <span className={`text-sm font-bold ${isNeg ? "text-red-600" : "text-green-600"}`}>
                             {isNeg ? "-" : "+"}{fmt(Math.abs(emp.totalDiferencia))}
                           </span>
-                          <HiChevronDown className={`w-4 h-4 transition-transform ${isOpen ? "rotate-180 text-brand-600" : "text-gray-400"}`} />
+                          <HiChevronDown className={`w-4 h-4 transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${isOpen ? "rotate-180 text-brand-600" : "text-gray-400"}`} />
                         </div>
                       </button>
-                      {isOpen && (
+                      <CollapsiblePanel open={isOpen}>
                         <div className="px-4 py-2 bg-brand-50/50 border-t border-brand-200 space-y-1">
                           {emp.diferencias.map((d) => (
                             <div key={d.id} className="flex items-center justify-between text-xs gap-2">
@@ -326,7 +342,7 @@ export default function DashboardPage() {
                             </div>
                           ))}
                         </div>
-                      )}
+                      </CollapsiblePanel>
                     </div>
                   );
                 })}
@@ -336,13 +352,13 @@ export default function DashboardPage() {
 
           {/* Dead stock */}
           {deadStock && (
-            <div className="bg-white border rounded-xl overflow-hidden">
+            <div className="bg-white border rounded-xl shadow-sm overflow-hidden">
               <div className="px-4 py-3 border-b flex flex-wrap items-center gap-3">
                 <h3 className="text-sm font-bold text-gray-700">Productos sin Movimiento</h3>
                 <div className="flex gap-1">
                   {[30, 60, 90].map((d) => (
                     <button key={d} onClick={() => { setDeadDias(d); setDeadPage(0); setDeadSearch(""); }}
-                      className={`px-2 py-1 rounded text-xs font-medium ${deadDias === d ? "bg-red-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
+                      className={`px-2 py-1 rounded text-xs font-medium ${springBtn} ${deadDias === d ? "bg-red-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
                       {d} dias
                     </button>
                   ))}
@@ -438,7 +454,7 @@ export default function DashboardPage() {
                     doc.text("distrialma.com.ar", w / 2, pageH - 8, { align: "center" });
 
                     doc.save(`sin-movimiento-${deadDias}dias-${new Date().toISOString().slice(0, 10)}.pdf`);
-                  }} className="px-2 py-1 bg-red-500 text-white rounded text-xs font-medium hover:bg-red-600">
+                  }} className={`px-2 py-1 bg-red-500 text-white rounded text-xs font-medium hover:bg-red-600 ${springBtn}`}>
                     PDF
                   </button>
                 </div>
@@ -472,7 +488,7 @@ export default function DashboardPage() {
                 </div>
                 <div className="divide-y max-h-[400px] overflow-y-auto">
                   {paged.map((p) => (
-                    <Link key={p.sku} href={`/admin/dashboard/producto?sku=${p.sku}`} target="_blank" className="px-4 py-2 flex items-center justify-between hover:bg-red-50/50 block">
+                    <Link key={p.sku} href={`/admin/dashboard/producto?sku=${p.sku}`} target="_blank" className={`px-4 py-2 flex items-center justify-between hover:bg-red-50/50 block ${hoverRow}`}>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <span className="text-xs text-gray-400 font-mono">{p.sku}</span>
@@ -499,8 +515,9 @@ export default function DashboardPage() {
             </div>
           )}
           </div>
+          </Stagger>
         </>
       )}
-    </div>
+    </PageTransition>
   );
 }

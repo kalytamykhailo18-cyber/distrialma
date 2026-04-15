@@ -5,6 +5,7 @@ import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { formatPrice } from "@/lib/utils";
 import { HiOutlineDocumentDownload, HiOutlineTable, HiOutlineTrash } from "react-icons/hi";
+import { PageTransition, Stagger, staggerStyle, springBtn, hoverRow, LoadingCenter } from "@/components/AnimateIn";
 
 interface StockEntry {
   id: number;
@@ -236,134 +237,145 @@ export default function ComprasPage() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-6">
+    <PageTransition className="max-w-5xl mx-auto px-4 py-6">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Compras / Ingresos</h1>
-        <div className="flex gap-2">
-          <Link
-            href="/admin/compras/nuevo?tipo=devolucion"
-            className="px-4 py-2 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors"
-          >
-            Pre-nota de crédito
-          </Link>
-          <Link
-            href="/admin/compras/nuevo"
-            className="px-4 py-2 text-sm text-white bg-brand-400 rounded-lg hover:bg-brand-500 transition-colors"
-          >
-            Nuevo ingreso
-          </Link>
-        </div>
+        <Stagger delay={0} y={-8}>
+          <h1 className="text-2xl font-bold text-gray-900">Compras / Ingresos</h1>
+        </Stagger>
+        <Stagger delay={50} y={-6}>
+          <div className="flex gap-2">
+            <Link
+              href="/admin/compras/nuevo?tipo=devolucion"
+              className={`px-4 py-2 text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl hover:bg-red-100 transition-colors ${springBtn}`}
+            >
+              Pre-nota de crédito
+            </Link>
+            <Link
+              href="/admin/compras/nuevo"
+              className={`px-4 py-2 text-sm text-white bg-brand-400 rounded-xl hover:bg-brand-500 transition-colors ${springBtn}`}
+            >
+              Nuevo ingreso
+            </Link>
+          </div>
+        </Stagger>
       </div>
 
       {/* Tabs */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit">
-          {(Object.keys(TAB_LABELS) as Tab[]).map((t) => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              className={`px-4 py-1.5 text-sm rounded-md transition-colors ${
-                tab === t
-                  ? "bg-white text-gray-900 shadow-sm font-medium"
-                  : "text-gray-500 hover:text-gray-700"
-              }`}
-            >
-              {TAB_LABELS[t]}
-            </button>
-          ))}
-        </div>
-
-        {/* Export buttons */}
-        {entries.length > 0 && (
-          <div className="flex gap-2">
-            <button
-              onClick={exportPDF}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors"
-            >
-              <HiOutlineDocumentDownload className="w-4 h-4" />
-              PDF
-            </button>
-            <button
-              onClick={exportCSV}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-green-600 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 transition-colors"
-            >
-              <HiOutlineTable className="w-4 h-4" />
-              Excel
-            </button>
+      <Stagger delay={100}>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-fit shadow-sm">
+            {(Object.keys(TAB_LABELS) as Tab[]).map((t) => (
+              <button
+                key={t}
+                onClick={() => setTab(t)}
+                className={`px-4 py-1.5 text-sm rounded-md transition-colors ${springBtn} ${
+                  tab === t
+                    ? "bg-white text-gray-900 shadow-sm font-medium"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                {TAB_LABELS[t]}
+              </button>
+            ))}
           </div>
-        )}
-      </div>
+
+          {/* Export buttons */}
+          {entries.length > 0 && (
+            <div className="flex gap-2">
+              <button
+                onClick={exportPDF}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 border border-red-200 rounded-xl hover:bg-red-100 transition-colors ${springBtn}`}
+              >
+                <HiOutlineDocumentDownload className="w-4 h-4" />
+                PDF
+              </button>
+              <button
+                onClick={exportCSV}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-green-600 bg-green-50 border border-green-200 rounded-xl hover:bg-green-100 transition-colors ${springBtn}`}
+              >
+                <HiOutlineTable className="w-4 h-4" />
+                Excel
+              </button>
+            </div>
+          )}
+        </div>
+      </Stagger>
 
       {loading ? (
-        <p className="text-gray-400">Cargando ingresos...</p>
+        <LoadingCenter text="Cargando ingresos..." />
       ) : entries.length === 0 ? (
-        <p className="text-gray-400">No hay ingresos.</p>
+        <Stagger delay={150}>
+          <p className="text-gray-400">No hay ingresos.</p>
+        </Stagger>
       ) : (
-        <div className="space-y-2">
-          {entries.map((entry) => (
-            <Link
-              key={entry.id}
-              href={`/admin/compras/${entry.id}`}
-              className="block bg-white rounded-lg border hover:border-brand-400 transition-colors"
-            >
-              <div className="px-4 py-3 flex items-center justify-between">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm font-medium text-gray-900">
-                      #{entry.id}
-                    </span>
-                    <span className="text-sm text-gray-700">
-                      {entry.proveedorName}
-                    </span>
-                    {entry.tipo === "devolucion" && (
-                      <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-red-100 text-red-700">
-                        Devolución
+        <Stagger delay={150}>
+          <div className="space-y-2">
+            {entries.map((entry, i) => (
+              <Link
+                key={entry.id}
+                href={`/admin/compras/${entry.id}`}
+                className={`block bg-white rounded-xl border shadow-sm hover:border-brand-400 ${hoverRow}`}
+                style={staggerStyle(true, i)}
+              >
+                <div className="px-4 py-3 flex items-center justify-between">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm font-medium text-gray-900">
+                        #{entry.id}
                       </span>
-                    )}
-                    <span
-                      className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                        entry.estado === "costeado"
-                          ? "bg-green-100 text-green-700"
-                          : "bg-amber-100 text-amber-700"
-                      }`}
-                    >
-                      {entry.estado === "costeado" ? (entry.tipo === "devolucion" ? "Aprobada" : "Costeado") : "Pendiente"}
-                    </span>
+                      <span className="text-sm text-gray-700">
+                        {entry.proveedorName}
+                      </span>
+                      {entry.tipo === "devolucion" && (
+                        <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-red-100 text-red-700">
+                          Devolución
+                        </span>
+                      )}
+                      <span
+                        className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                          entry.estado === "costeado"
+                            ? "bg-green-100 text-green-700"
+                            : "bg-amber-100 text-amber-700"
+                        }`}
+                      >
+                        {entry.estado === "costeado" ? (entry.tipo === "devolucion" ? "Aprobada" : "Costeado") : "Pendiente"}
+                      </span>
+                    </div>
+                    <div className="text-xs text-gray-400 mt-0.5">
+                      {formatDate(entry.createdAt)} — {entry.usuario} —{" "}
+                      {entry.itemCount} producto{entry.itemCount !== 1 ? "s" : ""}
+                      {entry.nroFactura && (
+                        <span className="ml-2 text-blue-600">
+                          Fact: {entry.nroFactura}
+                        </span>
+                      )}
+                      {entry.notas && (
+                        <span className="ml-2 text-amber-600">
+                          Nota: {entry.notas}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <div className="text-xs text-gray-400 mt-0.5">
-                    {formatDate(entry.createdAt)} — {entry.usuario} —{" "}
-                    {entry.itemCount} producto{entry.itemCount !== 1 ? "s" : ""}
-                    {entry.nroFactura && (
-                      <span className="ml-2 text-blue-600">
-                        Fact: {entry.nroFactura}
-                      </span>
-                    )}
-                    {entry.notas && (
-                      <span className="ml-2 text-amber-600">
-                        Nota: {entry.notas}
-                      </span>
+                  <div className="shrink-0 flex items-center gap-2">
+                    <span className="text-sm font-semibold text-gray-900">
+                      {entry.total > 0 ? formatPrice(entry.total) : "---"}
+                    </span>
+                    {isAdmin && entry.estado === "pendiente" && (
+                      <button
+                        onClick={(e) => deleteEntry(entry.id, e)}
+                        className={`p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded ${springBtn}`}
+                        title="Eliminar"
+                      >
+                        <HiOutlineTrash className="w-4 h-4" />
+                      </button>
                     )}
                   </div>
                 </div>
-                <div className="shrink-0 flex items-center gap-2">
-                  <span className="text-sm font-semibold text-gray-900">
-                    {entry.total > 0 ? formatPrice(entry.total) : "—"}
-                  </span>
-                  {isAdmin && entry.estado === "pendiente" && (
-                    <button
-                      onClick={(e) => deleteEntry(entry.id, e)}
-                      className="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded"
-                      title="Eliminar"
-                    >
-                      <HiOutlineTrash className="w-4 h-4" />
-                    </button>
-                  )}
-                </div>
-              </div>
-            </Link>
-          ))}
-        </div>
+              </Link>
+            ))}
+          </div>
+        </Stagger>
       )}
-    </div>
+    </PageTransition>
   );
 }

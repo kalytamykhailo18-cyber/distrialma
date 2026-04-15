@@ -3,6 +3,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { HiOutlineSearch, HiOutlineX, HiOutlineArrowLeft, HiOutlineCamera } from "react-icons/hi";
+import { PageTransition, Stagger, springBtn } from "@/components/AnimateIn";
 
 interface Empleado {
   cod: string;
@@ -292,227 +293,243 @@ export default function NuevoMovimiento() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-6">
-      <div className="flex items-center gap-3 mb-6">
-        <button
-          onClick={() => {
-            if (items.length > 0 && !confirm("¿Salir? Se perderán los cambios no guardados.")) return;
-            router.push("/admin/movimientos");
-          }}
-          className="p-2 hover:bg-gray-100 rounded-lg"
-        >
-          <HiOutlineArrowLeft className="w-5 h-5" />
-        </button>
-        <h1 className="text-2xl font-bold text-gray-900">Nuevo Movimiento Interno</h1>
-      </div>
+    <PageTransition className="max-w-3xl mx-auto px-4 py-6">
+      <Stagger delay={0} y={-8}>
+        <div className="flex items-center gap-3 mb-6">
+          <button
+            onClick={() => {
+              if (items.length > 0 && !confirm("¿Salir? Se perderán los cambios no guardados.")) return;
+              router.push("/admin/movimientos");
+            }}
+            className={`p-2 hover:bg-gray-100 rounded-xl ${springBtn}`}
+          >
+            <HiOutlineArrowLeft className="w-5 h-5" />
+          </button>
+          <h1 className="text-2xl font-bold text-gray-900">Nuevo Movimiento Interno</h1>
+        </div>
+      </Stagger>
 
       {/* Step 1: Sucursal */}
-      <div className="bg-white border rounded-xl p-4 mb-4">
-        <label className="block text-sm font-medium text-gray-700 mb-2">1. Sucursal</label>
-        <div className="grid grid-cols-2 gap-2">
-          {SUCURSALES.map((s) => (
-            <button
-              key={s}
-              onClick={() => setSucursal(s)}
-              className={`px-3 py-2.5 text-sm rounded-lg border transition-colors text-left ${
-                sucursal === s
-                  ? "border-brand-400 bg-brand-50 text-brand-600 font-medium"
-                  : "border-gray-200 hover:border-gray-300 text-gray-700"
-              }`}
-            >
-              {s}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Step 2: Motivo */}
-      <div className="bg-white border rounded-xl p-4 mb-4">
-        <label className="block text-sm font-medium text-gray-700 mb-2">2. Motivo</label>
-        <div className="grid grid-cols-2 gap-2">
-          {MOTIVOS.map((m) => {
-            const isRed = m.includes("Rotura") || m.includes("Descuento");
-            return (
+      <Stagger delay={50} y={10}>
+        <div className="bg-white border rounded-xl p-4 mb-4 shadow-sm">
+          <label className="block text-sm font-medium text-gray-700 mb-2">1. Sucursal</label>
+          <div className="grid grid-cols-2 gap-2">
+            {SUCURSALES.map((s) => (
               <button
-                key={m}
-                onClick={() => setMotivo(m)}
-                className={`px-3 py-2.5 text-sm rounded-lg border transition-colors text-left ${
-                  motivo === m
-                    ? isRed
-                      ? "border-red-400 bg-red-50 text-red-600 font-medium"
-                      : "border-brand-400 bg-brand-50 text-brand-600 font-medium"
+                key={s}
+                onClick={() => setSucursal(s)}
+                className={`px-3 py-2.5 text-sm rounded-xl border text-left ${springBtn} ${
+                  sucursal === s
+                    ? "border-brand-400 bg-brand-50 text-brand-600 font-medium shadow-sm"
                     : "border-gray-200 hover:border-gray-300 text-gray-700"
                 }`}
               >
-                {m}
+                {s}
               </button>
-            );
-          })}
+            ))}
+          </div>
         </div>
-      </div>
+      </Stagger>
 
-      {/* Step 2b: Empleados (only for Rotura de empleado) */}
-      {(motivo === "Rotura de empleado" || motivo === "Descuento empleados") && (
-        <div className="bg-white border rounded-xl p-4 mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Empleado(s) responsable(s) <span className="text-red-500">*</span>
-          </label>
-          <p className="text-xs text-gray-400 mb-3">
-            El descuento se divide entre los seleccionados a fin de mes.
-          </p>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-            {empleados.map((emp) => {
-              const selected = selectedEmpleados.some((e) => e.cod === emp.cod);
+      {/* Step 2: Motivo */}
+      <Stagger delay={100} y={10}>
+        <div className="bg-white border rounded-xl p-4 mb-4 shadow-sm">
+          <label className="block text-sm font-medium text-gray-700 mb-2">2. Motivo</label>
+          <div className="grid grid-cols-2 gap-2">
+            {MOTIVOS.map((m) => {
+              const isRed = m.includes("Rotura") || m.includes("Descuento");
               return (
                 <button
-                  key={emp.cod}
-                  onClick={() => toggleEmpleado(emp)}
-                  className={`px-3 py-2 text-sm rounded-lg border transition-colors text-left ${
-                    selected
-                      ? "border-red-400 bg-red-50 text-red-700 font-medium"
+                  key={m}
+                  onClick={() => setMotivo(m)}
+                  className={`px-3 py-2.5 text-sm rounded-xl border text-left ${springBtn} ${
+                    motivo === m
+                      ? isRed
+                        ? "border-red-400 bg-red-50 text-red-600 font-medium shadow-sm"
+                        : "border-brand-400 bg-brand-50 text-brand-600 font-medium shadow-sm"
                       : "border-gray-200 hover:border-gray-300 text-gray-700"
                   }`}
                 >
-                  <span className="text-xs text-gray-400 mr-1">#{emp.cod}</span> {emp.nombre}
+                  {m}
                 </button>
               );
             })}
           </div>
-          {selectedEmpleados.length > 0 && (
-            <p className="text-xs text-red-600 mt-2 font-medium">
-              {selectedEmpleados.length} empleado{selectedEmpleados.length > 1 ? "s" : ""} seleccionado{selectedEmpleados.length > 1 ? "s" : ""}
-            </p>
-          )}
         </div>
+      </Stagger>
+
+      {/* Step 2b: Empleados (only for Rotura de empleado) */}
+      {(motivo === "Rotura de empleado" || motivo === "Descuento empleados") && (
+        <Stagger delay={120} y={10}>
+          <div className="bg-white border rounded-xl p-4 mb-4 shadow-sm">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Empleado(s) responsable(s) <span className="text-red-500">*</span>
+            </label>
+            <p className="text-xs text-gray-400 mb-3">
+              El descuento se divide entre los seleccionados a fin de mes.
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {empleados.map((emp) => {
+                const selected = selectedEmpleados.some((e) => e.cod === emp.cod);
+                return (
+                  <button
+                    key={emp.cod}
+                    onClick={() => toggleEmpleado(emp)}
+                    className={`px-3 py-2 text-sm rounded-xl border text-left ${springBtn} ${
+                      selected
+                        ? "border-red-400 bg-red-50 text-red-700 font-medium shadow-sm"
+                        : "border-gray-200 hover:border-gray-300 text-gray-700"
+                    }`}
+                  >
+                    <span className="text-xs text-gray-400 mr-1">#{emp.cod}</span> {emp.nombre}
+                  </button>
+                );
+              })}
+            </div>
+            {selectedEmpleados.length > 0 && (
+              <p className="text-xs text-red-600 mt-2 font-medium">
+                {selectedEmpleados.length} empleado{selectedEmpleados.length > 1 ? "s" : ""} seleccionado{selectedEmpleados.length > 1 ? "s" : ""}
+              </p>
+            )}
+          </div>
+        </Stagger>
       )}
 
       {/* Step 3: Products */}
-      <div className="bg-white border rounded-xl p-4 mb-4">
-        <label className="block text-sm font-medium text-gray-700 mb-2">3. Productos</label>
+      <Stagger delay={150} y={10}>
+        <div className="bg-white border rounded-xl p-4 mb-4 shadow-sm">
+          <label className="block text-sm font-medium text-gray-700 mb-2">3. Productos</label>
 
-        <div className="flex gap-2">
-          <div className="relative flex-1">
-            <HiOutlineSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-            <input
-              ref={searchRef}
-              type="text"
-              value={search}
-              onChange={(e) => handleSearchChange(e.target.value)}
-              placeholder="Nombre, SKU o código de barras..."
-              className="w-full pl-10 pr-4 py-2.5 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
-            />
-            {searching && (
-              <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                <div className="animate-spin w-4 h-4 border-2 border-brand-400 border-t-transparent rounded-full" />
-              </div>
-            )}
-          </div>
-          <button
-            onClick={startScanner}
-            disabled={scanning}
-            className="px-3 py-2 border rounded-lg text-gray-600 hover:bg-gray-50 hover:text-brand-600 transition-colors disabled:opacity-50"
-            title="Escanear código de barras"
-          >
-            <HiOutlineCamera className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* Camera scanner */}
-        {scanning && (
-          <div className="mt-3 relative rounded-lg overflow-hidden bg-black">
-            <div
-              id="scanner-container"
-              className="w-full"
-              style={{ minHeight: "240px" }}
-            />
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <HiOutlineSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <input
+                ref={searchRef}
+                type="text"
+                value={search}
+                onChange={(e) => handleSearchChange(e.target.value)}
+                placeholder="Nombre, SKU o código de barras..."
+                className="w-full pl-10 pr-4 py-2.5 border border-brand-400 rounded-xl text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
+              />
+              {searching && (
+                <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                  <div className="animate-spin w-4 h-4 border-2 border-brand-400 border-t-transparent rounded-full" />
+                </div>
+              )}
+            </div>
             <button
-              onClick={stopScanner}
-              className="absolute top-2 right-2 bg-white/80 rounded-full p-1.5 hover:bg-white"
+              onClick={startScanner}
+              disabled={scanning}
+              className={`px-3 py-2 border rounded-xl text-gray-600 hover:bg-gray-50 hover:text-brand-600 disabled:opacity-50 ${springBtn}`}
+              title="Escanear código de barras"
             >
-              <HiOutlineX className="w-5 h-5" />
+              <HiOutlineCamera className="w-5 h-5" />
             </button>
           </div>
-        )}
-        {scanError && (
-          <p className="text-xs text-red-500 mt-2">{scanError}</p>
-        )}
 
-        {/* Search results */}
-        {results.length > 0 && (
-          <div className="mt-2 border rounded-lg max-h-60 overflow-y-auto">
-            {results.map((p) => (
+          {/* Camera scanner */}
+          {scanning && (
+            <div className="mt-3 relative rounded-xl overflow-hidden bg-black">
+              <div
+                id="scanner-container"
+                className="w-full"
+                style={{ minHeight: "240px" }}
+              />
               <button
-                key={p.sku}
-                onClick={() => addItem(p)}
-                className="w-full text-left px-3 py-2 hover:bg-gray-50 border-b last:border-b-0 flex items-center justify-between"
+                onClick={stopScanner}
+                className={`absolute top-2 right-2 bg-white/80 rounded-full p-1.5 hover:bg-white ${springBtn}`}
               >
-                <div>
-                  <span className="text-sm font-medium text-gray-800">{p.name}</span>
-                  <span className="text-xs text-gray-400 ml-2">SKU: {p.sku}</span>
-                  {p.barcode && (
-                    <span className="text-xs text-gray-400 ml-2">CB: {p.barcode}</span>
-                  )}
-                </div>
-                <span className="text-xs text-gray-500">Stock: {p.currentStock}</span>
+                <HiOutlineX className="w-5 h-5" />
               </button>
-            ))}
-          </div>
-        )}
-      </div>
+            </div>
+          )}
+          {scanError && (
+            <p className="text-xs text-red-500 mt-2">{scanError}</p>
+          )}
+
+          {/* Search results */}
+          {results.length > 0 && (
+            <div className="mt-2 border rounded-xl max-h-60 overflow-y-auto shadow-sm">
+              {results.map((p) => (
+                <button
+                  key={p.sku}
+                  onClick={() => addItem(p)}
+                  className="w-full text-left px-3 py-2 hover:bg-gray-50 border-b last:border-b-0 flex items-center justify-between"
+                >
+                  <div>
+                    <span className="text-sm font-medium text-gray-800">{p.name}</span>
+                    <span className="text-xs text-gray-400 ml-2">SKU: {p.sku}</span>
+                    {p.barcode && (
+                      <span className="text-xs text-gray-400 ml-2">CB: {p.barcode}</span>
+                    )}
+                  </div>
+                  <span className="text-xs text-gray-500">Stock: {p.currentStock}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </Stagger>
 
       {/* Items list */}
       {items.length > 0 && (
-        <div className="bg-white border rounded-xl p-4 mb-4">
-          <h3 className="text-sm font-medium text-gray-700 mb-3">
-            Productos ({items.length})
-          </h3>
-          <div className="space-y-2">
-            {items.map((item) => (
-              <div key={item.sku} className="flex items-center gap-3 p-2 bg-gray-50 rounded-lg">
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-800 truncate">{item.productName}</p>
-                  <p className="text-xs text-gray-400">SKU: {item.sku} — Stock: {item.stock} {item.unidad}</p>
+        <Stagger delay={180} y={10}>
+          <div className="bg-white border rounded-xl p-4 mb-4 shadow-sm">
+            <h3 className="text-sm font-medium text-gray-700 mb-3">
+              Productos ({items.length})
+            </h3>
+            <div className="space-y-2">
+              {items.map((item) => (
+                <div key={item.sku} className="flex items-center gap-3 p-2 bg-gray-50 rounded-xl">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-800 truncate">{item.productName}</p>
+                    <p className="text-xs text-gray-400">SKU: {item.sku} — Stock: {item.stock} {item.unidad}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      value={item.cantidad || ""}
+                      onChange={(e) => updateQty(item.sku, e.target.value)}
+                      min="0"
+                      step={item.unidad === "KG" ? "0.001" : "1"}
+                      className="w-20 text-sm text-center border border-brand-400 rounded-xl px-2 py-1.5 focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
+                    />
+                    <span className="text-xs text-gray-400 w-6">{item.unidad || "UN"}</span>
+                    <button onClick={() => removeItem(item.sku)} className={`p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded ${springBtn}`}>
+                      <HiOutlineX className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    value={item.cantidad || ""}
-                    onChange={(e) => updateQty(item.sku, e.target.value)}
-                    min="0"
-                    step={item.unidad === "KG" ? "0.001" : "1"}
-                    className="w-20 text-sm text-center border border-brand-400 rounded-lg px-2 py-1.5 focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
-                  />
-                  <span className="text-xs text-gray-400 w-6">{item.unidad || "UN"}</span>
-                  <button onClick={() => removeItem(item.sku)} className="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded">
-                    <HiOutlineX className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
+        </Stagger>
       )}
 
       {/* Notes */}
-      <div className="bg-white border rounded-xl p-4 mb-4">
-        <label className="block text-sm font-medium text-gray-700 mb-2">Notas (opcional)</label>
-        <textarea
-          value={notas}
-          onChange={(e) => setNotas(e.target.value)}
-          rows={2}
-          className="w-full border border-brand-400 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
-          placeholder="Observaciones sobre el movimiento..."
-        />
-      </div>
+      <Stagger delay={200} y={10}>
+        <div className="bg-white border rounded-xl p-4 mb-4 shadow-sm">
+          <label className="block text-sm font-medium text-gray-700 mb-2">Notas (opcional)</label>
+          <textarea
+            value={notas}
+            onChange={(e) => setNotas(e.target.value)}
+            rows={2}
+            className="w-full border border-brand-400 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
+            placeholder="Observaciones sobre el movimiento..."
+          />
+        </div>
+      </Stagger>
 
       {/* Submit */}
-      <button
-        onClick={handleSubmit}
-        disabled={saving || !sucursal || !motivo || items.length === 0}
-        className="w-full py-3 text-sm font-medium text-white bg-brand-400 rounded-xl hover:bg-brand-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        {saving ? "Enviando..." : "Enviar para aprobación"}
-      </button>
-    </div>
+      <Stagger delay={230} y={10}>
+        <button
+          onClick={handleSubmit}
+          disabled={saving || !sucursal || !motivo || items.length === 0}
+          className={`w-full py-3 text-sm font-medium text-white bg-brand-400 rounded-xl hover:bg-brand-500 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed ${springBtn}`}
+        >
+          {saving ? "Enviando..." : "Enviar para aprobación"}
+        </button>
+      </Stagger>
+    </PageTransition>
   );
 }

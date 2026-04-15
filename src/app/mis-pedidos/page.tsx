@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { formatPrice } from "@/lib/utils";
 import { HiChevronDown, HiOutlineDocumentDownload } from "react-icons/hi";
+import { PageTransition, Stagger, LoadingCenter, springBtn, hoverRow, CollapsiblePanel } from "@/components/AnimateIn";
 
 interface OrderItem {
   sku: string;
@@ -248,8 +249,8 @@ export default function MisPedidosPage() {
 
   if (status === "loading" || (status === "authenticated" && loading)) {
     return (
-      <div className="max-w-3xl mx-auto px-4 py-16 text-center">
-        <p className="text-gray-500">Cargando pedidos...</p>
+      <div className="max-w-3xl mx-auto px-4">
+        <LoadingCenter text="Cargando pedidos..." />
       </div>
     );
   }
@@ -257,26 +258,31 @@ export default function MisPedidosPage() {
   if (status === "unauthenticated") return null;
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-6">
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Mis Pedidos</h1>
+    <PageTransition className="max-w-3xl mx-auto px-4 py-6">
+      <Stagger delay={0} y={-8}>
+        <h1 className="text-2xl font-bold text-gray-900 mb-6">Mis Pedidos</h1>
+      </Stagger>
 
       {orders.length === 0 ? (
+        <Stagger delay={80}>
         <div className="text-center py-12">
           <p className="text-gray-500 mb-4">No tenés pedidos realizados.</p>
           <Link
             href="/productos"
-            className="inline-block bg-brand-400 text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-brand-500"
+            className={`inline-block bg-brand-400 text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-brand-500 ${springBtn}`}
           >
             Ver productos
           </Link>
         </div>
+        </Stagger>
       ) : (
+        <Stagger delay={100}>
         <div className="space-y-3">
           {orders.map((order) => (
-            <div key={order.boleta} className="bg-white rounded-lg border">
+            <div key={order.boleta} className="bg-white rounded-lg border shadow-sm">
               <button
                 onClick={() => toggleExpand(order.boleta)}
-                className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-gray-50"
+                className={`w-full px-4 py-3 flex items-center justify-between text-left ${hoverRow}`}
               >
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-3">
@@ -303,19 +309,19 @@ export default function MisPedidosPage() {
                     {formatPrice(order.total)}
                   </span>
                   <HiChevronDown
-                    className={`w-4 h-4 text-gray-400 transition-transform ${
+                    className={`w-4 h-4 text-gray-400 transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${
                       expanded.has(order.boleta) ? "rotate-180" : ""
                     }`}
                   />
                 </div>
               </button>
 
-              {expanded.has(order.boleta) && (
+              <CollapsiblePanel open={expanded.has(order.boleta)}>
                 <div className="border-t px-4 py-3">
                   <div className="flex justify-end mb-2">
                     <button
                       onClick={(e) => { e.stopPropagation(); downloadPDF(order); }}
-                      className="flex items-center gap-1 text-xs text-brand-600 hover:text-brand-700 font-medium"
+                      className={`flex items-center gap-1 text-xs text-brand-600 hover:text-brand-700 font-medium ${springBtn}`}
                     >
                       <HiOutlineDocumentDownload className="w-4 h-4" />
                       Descargar PDF
@@ -353,15 +359,17 @@ export default function MisPedidosPage() {
                     </tbody>
                   </table>
                 </div>
-              )}
+              </CollapsiblePanel>
             </div>
           ))}
         </div>
+        </Stagger>
       )}
 
       {/* Estado de cuenta */}
       {orders.length > 0 && (
-        <div className="mt-6 rounded-lg border bg-gray-50 p-4">
+        <Stagger delay={200}>
+        <div className="mt-6 rounded-lg border shadow-sm bg-gray-50 p-4">
           <p className="text-sm font-bold text-gray-700 mb-2">Estado de cuenta</p>
           <div className="space-y-1">
             <div className="flex justify-between text-sm">
@@ -378,7 +386,8 @@ export default function MisPedidosPage() {
             </div>
           </div>
         </div>
+        </Stagger>
       )}
-    </div>
+    </PageTransition>
   );
 }

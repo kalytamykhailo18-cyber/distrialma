@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { formatPrice } from "@/lib/utils";
 import { HiOutlineArrowLeft, HiOutlineSearch } from "react-icons/hi";
+import { PageTransition, Stagger, staggerStyle, springBtn, hoverRow, LoadingCenter, useDataReady } from "@/components/AnimateIn";
 
 function CostoSinIva({ costoConIva, ivaPct, onSync, disabled }: {
   costoConIva: string;
@@ -454,10 +455,12 @@ export default function EntryDetailPage() {
     }
   }
 
+  const dataReady = useDataReady(entry);
+
   if (loading) {
     return (
       <div className="max-w-5xl mx-auto px-4 py-6">
-        <p className="text-gray-400">Cargando...</p>
+        <LoadingCenter />
       </div>
     );
   }
@@ -473,17 +476,20 @@ export default function EntryDetailPage() {
   const isPendiente = entry.estado === "pendiente";
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-6">
+    <PageTransition className="max-w-5xl mx-auto px-4 py-6">
       {/* Back */}
+      <Stagger delay={0} y={-8}>
       <button
         onClick={() => router.push("/admin/compras")}
-        className="flex items-center gap-2 text-base text-gray-600 hover:text-brand-600 mb-5 transition-colors font-medium"
+        className={`flex items-center gap-2 text-base text-gray-600 hover:text-brand-600 mb-5 transition-colors font-medium ${springBtn}`}
       >
         <HiOutlineArrowLeft className="w-5 h-5" />
         Volver a compras
       </button>
+      </Stagger>
 
       {/* Header */}
+      <Stagger delay={50} y={-8}>
       <div className="flex items-start justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">
@@ -514,10 +520,12 @@ export default function EntryDetailPage() {
             : (entry.estado === "costeado" ? "Costeado" : "Pendiente")}
         </span>
       </div>
+      </Stagger>
 
       {/* Total — hide for devolucion */}
       {entry.total > 0 && entry.tipo !== "devolucion" && (
-        <div className="mb-5 bg-blue-50 rounded-lg border-2 border-blue-200 p-5">
+        <Stagger delay={100}>
+        <div className="mb-5 bg-blue-50 rounded-xl shadow-sm border-2 border-blue-200 p-5">
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-base">
             <div>
               <span className="text-gray-600 text-sm font-semibold block">Subtotal</span>
@@ -541,10 +549,12 @@ export default function EntryDetailPage() {
             </div>
           </div>
         </div>
+        </Stagger>
       )}
 
       {/* Add product to pending entry */}
       {isPendiente && (
+        <Stagger delay={150}>
         <div className="mb-5">
           <div className="relative">
             <HiOutlineSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -602,15 +612,17 @@ export default function EntryDetailPage() {
             </div>
           )}
         </div>
+        </Stagger>
       )}
 
       {/* Items cards */}
+      <Stagger delay={200}>
       <div className="space-y-6 mb-8">
-        {entry.items.map((item) => {
+        {entry.items.map((item, itemIdx) => {
           // Simplified view for devolucion
           if (entry.tipo === "devolucion") {
             return (
-              <div key={item.id} className="bg-white rounded-lg border-2">
+              <div key={item.id} className={`bg-white rounded-xl shadow-sm border-2 ${hoverRow}`} style={staggerStyle(dataReady, itemIdx)}>
                 <div className="flex items-center justify-between px-5 py-3 bg-red-50 rounded-t-lg border-b">
                   <div>
                     <span className="text-lg font-bold text-gray-900">{item.productName}</span>
@@ -635,7 +647,7 @@ export default function EntryDetailPage() {
           ];
 
           return (
-            <div key={item.id} className="bg-white rounded-lg border-2">
+            <div key={item.id} className={`bg-white rounded-xl shadow-sm border-2 ${hoverRow}`} style={staggerStyle(dataReady, itemIdx)}>
               {/* Header row */}
               <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-5 py-3 border-b-2 bg-green-50 rounded-t-lg">
                 <span className="text-lg font-bold text-gray-900">{item.productName}</span>
@@ -700,7 +712,7 @@ export default function EntryDetailPage() {
                       finally { setDeletingItemId(null); }
                     }}
                     disabled={deletingItemId === item.id}
-                    className="ml-auto px-4 py-2 text-sm font-bold text-white bg-red-500 hover:bg-red-600 rounded-lg disabled:opacity-50 transition-colors"
+                    className={`ml-auto px-4 py-2 text-sm font-bold text-white bg-red-500 hover:bg-red-600 rounded-lg disabled:opacity-50 transition-colors ${springBtn}`}
                   >
                     {deletingItemId === item.id ? "..." : "Quitar"}
                   </button>
@@ -836,7 +848,7 @@ export default function EntryDetailPage() {
                       }
                     }}
                     disabled={saving || applyingId === item.id || loadingPreview}
-                    className="w-full py-2.5 text-sm font-semibold text-blue-700 bg-blue-50 border-2 border-blue-200 rounded-lg hover:bg-blue-100 disabled:opacity-50 transition-colors"
+                    className={`w-full py-2.5 text-sm font-semibold text-blue-700 bg-blue-50 border-2 border-blue-200 rounded-xl hover:bg-blue-100 disabled:opacity-50 transition-colors ${springBtn}`}
                   >
                     {applyingId === item.id ? "Aplicando..." : "Aplicar a similares"}
                   </button>
@@ -846,9 +858,11 @@ export default function EntryDetailPage() {
           );
         })}
       </div>
+      </Stagger>
 
       {/* New product extra fields */}
       {isPendiente && newProductRows.length > 0 && (
+        <Stagger delay={250}>
         <div className="mb-8">
           <h2 className="text-lg font-bold text-gray-800 mb-4">
             Datos de productos nuevos
@@ -859,7 +873,7 @@ export default function EntryDetailPage() {
               return (
                 <div
                   key={np.sku}
-                  className="bg-blue-50 rounded-lg border-2 border-blue-200 p-5"
+                  className="bg-blue-50 rounded-xl shadow-sm border-2 border-blue-200 p-5"
                 >
                   <p className="text-base font-bold text-gray-900 mb-3">
                     {item?.productName} <span className="text-gray-500 font-medium">(SKU: {np.sku})</span>
@@ -947,11 +961,13 @@ export default function EntryDetailPage() {
             })}
           </div>
         </div>
+        </Stagger>
       )}
 
       {/* Error / Success */}
-      {error && <p className="text-base font-semibold text-red-600 mb-5 bg-red-50 border-2 border-red-200 rounded-lg px-4 py-3">{error}</p>}
-      {success && <p className="text-base font-semibold text-green-700 mb-5 bg-green-50 border-2 border-green-200 rounded-lg px-4 py-3">{success}</p>}
+      <Stagger delay={300}>
+      {error && <p className="text-base font-semibold text-red-600 mb-5 bg-red-50 border-2 border-red-200 rounded-xl shadow-sm px-4 py-3">{error}</p>}
+      {success && <p className="text-base font-semibold text-green-700 mb-5 bg-green-50 border-2 border-green-200 rounded-xl shadow-sm px-4 py-3">{success}</p>}
 
       {applyResult && (
         <div className="bg-blue-50 border-2 border-blue-200 rounded-lg px-4 py-3 mb-5">
@@ -984,13 +1000,15 @@ export default function EntryDetailPage() {
           )}
         </div>
       )}
+      </Stagger>
 
       {/* Invoice type toggle + taxes */}
       {isPendiente && (
+        <Stagger delay={350}>
         <div className="flex gap-3 mb-4">
           <button
             onClick={() => setInvoiceType("A")}
-            className={`px-5 py-2 rounded-lg text-base font-bold border-2 transition-colors ${
+            className={`px-5 py-2 rounded-xl text-base font-bold border-2 transition-colors ${springBtn} ${
               invoiceType === "A"
                 ? "bg-brand-400 text-white border-brand-400"
                 : "bg-white text-gray-600 border-gray-300 hover:border-brand-400"
@@ -1000,7 +1018,7 @@ export default function EntryDetailPage() {
           </button>
           <button
             onClick={() => setInvoiceType("X")}
-            className={`px-5 py-2 rounded-lg text-base font-bold border-2 transition-colors ${
+            className={`px-5 py-2 rounded-xl text-base font-bold border-2 transition-colors ${springBtn} ${
               invoiceType === "X"
                 ? "bg-brand-400 text-white border-brand-400"
                 : "bg-white text-gray-600 border-gray-300 hover:border-brand-400"
@@ -1009,6 +1027,7 @@ export default function EntryDetailPage() {
             Factura X
           </button>
         </div>
+        </Stagger>
       )}
       {isPendiente && invoiceType === "A" && (() => {
         const sub = parseFloat(taxSubtotal) || 0;
@@ -1037,7 +1056,8 @@ export default function EntryDetailPage() {
         }
 
         return (
-          <div className="bg-white rounded-lg border-2 p-5 mb-6" style={{ display: entry.tipo === "devolucion" ? "none" : undefined }}>
+          <Stagger delay={400}>
+          <div className="bg-white rounded-xl shadow-sm border-2 p-5 mb-6" style={{ display: entry.tipo === "devolucion" ? "none" : undefined }}>
             <h3 className="text-lg font-bold text-gray-800 mb-4">Datos de la factura</h3>
             <div className="space-y-4">
               {/* Subtotal (con IVA) */}
@@ -1184,12 +1204,14 @@ export default function EntryDetailPage() {
               </div>
             </div>
           </div>
+          </Stagger>
         );
       })()}
 
       {/* Factura X — just total, no tax breakdown */}
       {isPendiente && entry.tipo !== "devolucion" && invoiceType === "X" && (
-        <div className="bg-white rounded-lg border-2 p-5 mb-6">
+        <Stagger delay={400}>
+        <div className="bg-white rounded-xl shadow-sm border-2 p-5 mb-6">
           <div className="flex justify-between items-center">
             <span className="text-base font-bold text-gray-800">Total factura</span>
             <span className="text-2xl font-bold text-gray-900">
@@ -1197,10 +1219,12 @@ export default function EntryDetailPage() {
             </span>
           </div>
         </div>
+        </Stagger>
       )}
 
       {/* Costeo / Devolucion button */}
       {isPendiente && entry.tipo === "devolucion" && (
+        <Stagger delay={450}>
           <button
             onClick={async () => {
               if (!confirm("Aprobar esta devolucion? Se descontara el stock.")) return;
@@ -1221,26 +1245,29 @@ export default function EntryDetailPage() {
               }
             }}
             disabled={saving}
-            className="w-full sm:w-auto px-8 py-3 text-lg font-bold text-white bg-red-500 rounded-lg hover:bg-red-600 disabled:opacity-50 transition-colors"
+            className={`w-full sm:w-auto px-8 py-3 text-lg font-bold text-white bg-red-500 rounded-xl hover:bg-red-600 disabled:opacity-50 transition-colors ${springBtn}`}
           >
             {saving ? "Aprobando..." : "Aprobar devolucion (descuenta stock)"}
           </button>
+        </Stagger>
       )}
       {isPendiente && entry.tipo !== "devolucion" && (
+        <Stagger delay={450}>
           <button
             onClick={handleCosteo}
             disabled={saving}
-            className="w-full sm:w-auto px-8 py-3 text-lg font-bold text-white bg-brand-400 rounded-lg hover:bg-brand-500 disabled:opacity-50 transition-colors"
+            className={`w-full sm:w-auto px-8 py-3 text-lg font-bold text-white bg-brand-400 rounded-xl hover:bg-brand-500 disabled:opacity-50 transition-colors ${springBtn}`}
           >
             {saving ? "Guardando costeo..." : "Confirmar costeo"}
           </button>
+        </Stagger>
       )}
 
       {/* Apply similar confirmation modal */}
       {confirmApply && (
         <>
           <div className="fixed inset-0 bg-black/50 z-50" onClick={() => setConfirmApply(null)} />
-          <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 bg-white rounded-lg shadow-xl p-6 w-[420px] max-w-[90vw] max-h-[80vh] overflow-y-auto">
+          <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 bg-white rounded-xl shadow-xl p-6 w-[420px] max-w-[90vw] max-h-[80vh] overflow-y-auto">
             <h3 className="text-base font-bold text-gray-900 mb-2">Aplicar costo ${confirmApply.costo} a similares</h3>
             <p className="text-sm text-gray-500 mb-3">Se actualizará el costo y se recalcularán los precios manteniendo los márgenes actuales en estos {confirmApply.products.length} productos:</p>
             <ul className="space-y-1 mb-4 max-h-48 overflow-y-auto">
@@ -1254,7 +1281,7 @@ export default function EntryDetailPage() {
               <button
                 onClick={() => setConfirmApply(null)}
                 disabled={applyingId !== null}
-                className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                className={`px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-xl hover:bg-gray-50 disabled:opacity-50 ${springBtn}`}
               >
                 Cancelar
               </button>
@@ -1287,7 +1314,7 @@ export default function EntryDetailPage() {
                   }
                 }}
                 disabled={applyingId !== null}
-                className="px-4 py-2 text-sm text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                className={`px-4 py-2 text-sm text-white bg-blue-600 rounded-xl hover:bg-blue-700 disabled:opacity-50 ${springBtn}`}
               >
                 {applyingId !== null ? "Aplicando..." : "Confirmar"}
               </button>
@@ -1295,6 +1322,6 @@ export default function EntryDetailPage() {
           </div>
         </>
       )}
-    </div>
+    </PageTransition>
   );
 }

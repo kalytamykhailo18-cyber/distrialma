@@ -4,37 +4,47 @@ import Link from "next/link";
 import { useCart } from "@/components/CartProvider";
 import { formatPrice } from "@/lib/utils";
 import { HiOutlineShoppingCart, HiX } from "react-icons/hi";
+import { PageTransition, Stagger, springBtn, hoverRow } from "@/components/AnimateIn";
 
 export default function CarritoPage() {
   const { items, removeItem, updateQuantity, clearCart, totalPrice } = useCart();
 
   if (items.length === 0) {
     return (
-      <div className="max-w-3xl mx-auto px-4 py-16 text-center">
-        <HiOutlineShoppingCart className="w-16 h-16 mx-auto text-gray-300 mb-4" />
-        <p className="text-gray-500 mb-4">Tu carrito está vacío</p>
-        <Link
-          href="/productos"
-          className="inline-block bg-brand-400 text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-brand-500"
-        >
-          Ver productos
-        </Link>
-      </div>
+      <PageTransition className="max-w-3xl mx-auto px-4 py-16 text-center">
+        <Stagger delay={0} y={-8}>
+          <HiOutlineShoppingCart className="w-16 h-16 mx-auto text-gray-300 mb-4" />
+        </Stagger>
+        <Stagger delay={80}>
+          <p className="text-gray-500 mb-4">Tu carrito está vacío</p>
+        </Stagger>
+        <Stagger delay={160}>
+          <Link
+            href="/productos"
+            className={`inline-block bg-brand-400 text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-brand-500 ${springBtn}`}
+          >
+            Ver productos
+          </Link>
+        </Stagger>
+      </PageTransition>
     );
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-6">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Carrito</h1>
-        <button
-          onClick={clearCart}
-          className="text-sm text-red-500 hover:text-red-700"
-        >
-          Vaciar carrito
-        </button>
-      </div>
+    <PageTransition className="max-w-3xl mx-auto px-4 py-6">
+      <Stagger delay={0} y={-8}>
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-2xl font-bold text-gray-900">Carrito</h1>
+          <button
+            onClick={clearCart}
+            className={`text-sm text-red-500 hover:text-red-700 ${springBtn}`}
+          >
+            Vaciar carrito
+          </button>
+        </div>
+      </Stagger>
 
+      <Stagger delay={100}>
       <div className="space-y-3 mb-6">
         {items.map((item) => {
           const isKg = item.unit === "KG";
@@ -56,7 +66,7 @@ export default function CarritoPage() {
             : item.precioMayorista * item.quantity;
 
           return (
-            <div key={item.sku} className="bg-white rounded-lg border p-4">
+            <div key={item.sku} className={`bg-white rounded-lg border shadow-sm p-4 ${hoverRow}`}>
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1 min-w-0">
                   <Link href={`/productos/${item.sku}`} className="text-sm font-medium text-gray-900 hover:text-brand-600">
@@ -131,26 +141,29 @@ export default function CarritoPage() {
           );
         })}
       </div>
+      </Stagger>
 
       {/* Total + checkout */}
-      <div className="bg-white rounded-lg border p-4">
+      <Stagger delay={200}>
+      <div className="bg-white rounded-lg border shadow-sm p-4">
         <div className="flex justify-between items-center mb-4">
           <span className="text-lg font-medium text-gray-900">Total</span>
           <span className="text-2xl font-bold text-gray-900">{formatPrice(totalPrice)}</span>
         </div>
         <Link
           href="/checkout"
-          className="block w-full py-3 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors text-center"
+          className={`block w-full py-3 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors text-center ${springBtn}`}
         >
           Finalizar pedido
         </Link>
         <Link
           href="/productos"
-          className="block w-full py-3 mt-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors text-center"
+          className={`block w-full py-3 mt-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors text-center ${springBtn}`}
         >
           Seguir comprando
         </Link>
       </div>
-    </div>
+      </Stagger>
+    </PageTransition>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { PageTransition, Stagger, staggerStyle, springBtn, hoverRow, LoadingCenter } from "@/components/AnimateIn";
 
 interface Brand {
   id: string;
@@ -92,90 +93,99 @@ export default function MarcasPage() {
     : brands;
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-6">
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Marcas en Landing</h1>
+    <PageTransition className="max-w-3xl mx-auto px-4 py-6">
+      <Stagger delay={0} y={-8}>
+        <h1 className="text-2xl font-bold text-gray-900 mb-6">Marcas en Landing</h1>
+      </Stagger>
 
-      <p className="text-sm text-gray-500 mb-4">
-        Seleccioná las marcas que aparecen en la página principal. Marcadas: {featured.size} de {brands.length}
-      </p>
+      <Stagger delay={50} y={-6}>
+        <p className="text-sm text-gray-500 mb-4">
+          Seleccioná las marcas que aparecen en la página principal. Marcadas: {featured.size} de {brands.length}
+        </p>
+      </Stagger>
 
-      <input
-        type="text"
-        value={filter}
-        onChange={(e) => setFilter(e.target.value)}
-        placeholder="Filtrar marcas..."
-        className="w-full px-4 py-2 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 mb-4"
-      />
+      <Stagger delay={100}>
+        <input
+          type="text"
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          placeholder="Filtrar marcas..."
+          className="w-full px-4 py-2 border border-brand-400 rounded-xl text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 mb-4"
+        />
+      </Stagger>
 
       {loading ? (
-        <p className="text-gray-400">Cargando marcas...</p>
+        <LoadingCenter text="Cargando marcas..." />
       ) : (
-        <div className="bg-white rounded-lg border divide-y max-h-[60vh] overflow-y-auto">
-          {filtered.map((brand) => (
-            <div
-              key={brand.id}
-              className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50"
-            >
-              <input
-                type="checkbox"
-                checked={featured.has(brand.id)}
-                onChange={() => toggleBrand(brand.id)}
-                disabled={togglingBrand === brand.id}
-                className="w-4 h-4 rounded border-gray-300 text-brand-400 focus:ring-brand-400 shrink-0 disabled:opacity-50"
-              />
-
-              {/* Logo thumbnail */}
-              {logos[brand.id] ? (
-                <div className="relative w-10 h-10 shrink-0 group">
-                  <img
-                    src={logos[brand.id]}
-                    alt={brand.name}
-                    className="w-10 h-10 object-contain rounded border"
-                  />
-                  <button
-                    onClick={() => deleteLogo(brand.id)}
-                    disabled={deletingLogo === brand.id}
-                    className="absolute -top-1 -right-1 w-4 h-4 bg-red-600 text-white text-xs rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 disabled:opacity-50"
-                  >
-                    ✕
-                  </button>
-                </div>
-              ) : (
-                <div className="w-10 h-10 shrink-0 bg-gray-100 rounded border flex items-center justify-center">
-                  <span className="text-gray-300 text-xs">—</span>
-                </div>
-              )}
-
-              <span className="text-sm text-gray-800 flex-1">{brand.name}</span>
-
-              {/* Upload button */}
-              <label
-                className={`text-xs px-2 py-1 rounded border cursor-pointer shrink-0 ${
-                  uploading === brand.id
-                    ? "bg-gray-100 text-gray-400"
-                    : "bg-white text-brand-600 border-brand-400 hover:bg-brand-50"
-                }`}
+        <Stagger delay={150}>
+          <div className="bg-white rounded-xl shadow-sm border divide-y max-h-[60vh] overflow-y-auto">
+            {filtered.map((brand, i) => (
+              <div
+                key={brand.id}
+                className={`flex items-center gap-3 px-4 py-2.5 ${hoverRow}`}
+                style={staggerStyle(true, i)}
               >
-                {uploading === brand.id ? "..." : logos[brand.id] ? "Cambiar" : "Subir logo"}
                 <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  disabled={uploading === brand.id}
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) uploadLogo(brand.id, file);
-                    e.target.value = "";
-                  }}
+                  type="checkbox"
+                  checked={featured.has(brand.id)}
+                  onChange={() => toggleBrand(brand.id)}
+                  disabled={togglingBrand === brand.id}
+                  className="w-4 h-4 rounded border-gray-300 text-brand-400 focus:ring-brand-400 shrink-0 disabled:opacity-50"
                 />
-              </label>
-            </div>
-          ))}
-          {filtered.length === 0 && (
-            <p className="px-4 py-3 text-sm text-gray-400">Sin resultados</p>
-          )}
-        </div>
+
+                {/* Logo thumbnail */}
+                {logos[brand.id] ? (
+                  <div className="relative w-10 h-10 shrink-0 group">
+                    <img
+                      src={logos[brand.id]}
+                      alt={brand.name}
+                      className="w-10 h-10 object-contain rounded border"
+                    />
+                    <button
+                      onClick={() => deleteLogo(brand.id)}
+                      disabled={deletingLogo === brand.id}
+                      className={`absolute -top-1 -right-1 w-4 h-4 bg-red-600 text-white text-xs rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 disabled:opacity-50 ${springBtn}`}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ) : (
+                  <div className="w-10 h-10 shrink-0 bg-gray-100 rounded border flex items-center justify-center">
+                    <span className="text-gray-300 text-xs">—</span>
+                  </div>
+                )}
+
+                <span className="text-sm text-gray-800 flex-1">{brand.name}</span>
+
+                {/* Upload button */}
+                <label
+                  className={`text-xs px-2 py-1 rounded border cursor-pointer shrink-0 ${springBtn} ${
+                    uploading === brand.id
+                      ? "bg-gray-100 text-gray-400"
+                      : "bg-white text-brand-600 border-brand-400 hover:bg-brand-50"
+                  }`}
+                >
+                  {uploading === brand.id ? "..." : logos[brand.id] ? "Cambiar" : "Subir logo"}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    disabled={uploading === brand.id}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) uploadLogo(brand.id, file);
+                      e.target.value = "";
+                    }}
+                  />
+                </label>
+              </div>
+            ))}
+            {filtered.length === 0 && (
+              <p className="px-4 py-3 text-sm text-gray-400">Sin resultados</p>
+            )}
+          </div>
+        </Stagger>
       )}
-    </div>
+    </PageTransition>
   );
 }

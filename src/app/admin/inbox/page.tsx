@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { HiSearch, HiPaperAirplane } from "react-icons/hi";
+import { PageTransition, Stagger, springBtn, hoverRow } from "@/components/AnimateIn";
 
 interface Chat {
   id: number;
@@ -32,6 +33,8 @@ export default function InboxPage() {
   const [loading, setLoading] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const pollRef = useRef<ReturnType<typeof setInterval>>();
+  const lastMsgCount = useRef(0);
+  const userScrolled = useRef(false);
 
   async function loadChats() {
     try {
@@ -47,8 +50,14 @@ export default function InboxPage() {
     try {
       const res = await fetch(`/api/admin/inbox?chatId=${encodeURIComponent(chatId)}`);
       const d = await res.json();
-      setMessages(d.messages || []);
-      setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
+      const newMsgs = d.messages || [];
+      setMessages(newMsgs);
+      if (newMsgs.length !== lastMsgCount.current) {
+        lastMsgCount.current = newMsgs.length;
+        if (!userScrolled.current) {
+          setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
+        }
+      }
     } catch {}
   }
 
@@ -62,6 +71,7 @@ export default function InboxPage() {
         body: JSON.stringify({ chatId: selectedChat, message: reply.trim() }),
       });
       setReply("");
+      userScrolled.current = false;
       await loadMessages(selectedChat);
       await loadChats();
     } catch {}
@@ -70,6 +80,8 @@ export default function InboxPage() {
 
   function selectChat(chatId: string) {
     setSelectedChat(chatId);
+    userScrolled.current = false;
+    lastMsgCount.current = 0;
     loadMessages(chatId);
   }
 
@@ -93,10 +105,10 @@ export default function InboxPage() {
   }
 
   return (
-    <div className="h-[calc(100vh-64px)] flex">
+    <PageTransition className="h-[calc(100vh-64px)] flex">
       {/* Chat list */}
       <div className={`w-full sm:w-80 lg:w-96 border-r flex flex-col bg-white ${selectedChat ? "hidden sm:flex" : "flex"}`}>
-        <div className="p-3 border-b">
+        <Stagger delay={0} className="p-3 border-b">
           <div className="relative">
             <HiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
             <input type="text" value={search} onChange={(e) => { setSearch(e.target.value); }}
@@ -104,13 +116,13 @@ export default function InboxPage() {
               placeholder="Buscar chat..."
               className="w-full pl-9 pr-3 py-2 border rounded-lg text-sm focus:outline-none focus:border-brand-500" />
           </div>
-        </div>
+        </Stagger>
         <div className="flex-1 overflow-y-auto">
           {loading ? <p className="p-4 text-gray-400 text-sm">Cargando...</p> :
             chats.length === 0 ? <p className="p-4 text-gray-400 text-sm">No hay chats.</p> :
             chats.map((chat) => (
               <button key={chat.chatId} onClick={() => selectChat(chat.chatId)}
-                className={`w-full px-4 py-3 flex items-start gap-3 text-left border-b hover:bg-gray-50 ${selectedChat === chat.chatId ? "bg-brand-50 border-l-4 border-l-brand-500" : ""}`}>
+                className={`w-full px-4 py-3 flex items-start gap-3 text-left border-b ${hoverRow} ${selectedChat === chat.chatId ? "bg-brand-50 border-l-4 border-l-brand-500" : ""}`}>
                 <div className="w-10 h-10 rounded-full bg-brand-100 text-brand-600 flex items-center justify-center text-sm font-bold shrink-0">
                   {(chat.contactName || chat.contactPhone || "?")[0].toUpperCase()}
                 </div>
@@ -135,8 +147,8 @@ export default function InboxPage() {
         {selectedChat ? (
           <>
             {/* Chat header */}
-            <div className="px-4 py-3 bg-white border-b flex items-center gap-3">
-              <button onClick={() => setSelectedChat(null)} className="sm:hidden text-gray-500 mr-1">←</button>
+            <Stagger delay={60} className="px-4 py-3 bg-white border-b flex items-center gap-3">
+              <button onClick={() => setSelectedChat(null)} className={`sm:hidden text-gray-500 mr-1 ${springBtn}`}>←</button>
               <div className="w-8 h-8 rounded-full bg-brand-100 text-brand-600 flex items-center justify-center text-sm font-bold">
                 {(chats.find((c) => c.chatId === selectedChat)?.contactName || "?")[0].toUpperCase()}
               </div>
@@ -148,12 +160,14 @@ export default function InboxPage() {
                   {chats.find((c) => c.chatId === selectedChat)?.contactPhone}
                 </div>
               </div>
-            </div>
+            </Stagger>
 
             {/* Messages area */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-2">
+            <Stagger delay={120} className="flex-1 overflow-y-auto p-4 space-y-2">
+
               {messages.map((msg) => (
-                <div key={msg.id} className={`flex ${msg.direction === "out" ? "justify-end" : "justify-start"}`}>
+                <div key={msg.id} className={`flex ${msg.direction === "out" ? "justify-end" : "justify-start"}`}
+                  style={{ animation: "fadeSlideUp 300ms cubic-bezier(0.25,1,0.5,1) both" }}>
                   <div className={`max-w-[75%] rounded-lg px-3 py-2 text-sm ${
                     msg.direction === "out"
                       ? msg.sender === "bot" ? "bg-blue-100 text-blue-900" : "bg-green-100 text-green-900"
@@ -168,20 +182,20 @@ export default function InboxPage() {
                 </div>
               ))}
               <div ref={messagesEndRef} />
-            </div>
+            </Stagger>
 
             {/* Reply input */}
-            <div className="p-3 bg-white border-t flex gap-2">
+            <Stagger delay={180} className="p-3 bg-white border-t flex gap-2">
               <input type="text" value={reply}
                 onChange={(e) => setReply(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendReply(); } }}
                 placeholder="Escribir mensaje..."
                 className="flex-1 px-4 py-2 border rounded-lg text-sm focus:outline-none focus:border-brand-500" />
               <button onClick={sendReply} disabled={sending || !reply.trim()}
-                className="px-4 py-2 bg-brand-500 text-white rounded-lg disabled:opacity-50">
+                className={`px-4 py-2 bg-brand-500 text-white rounded-lg disabled:opacity-50 ${springBtn}`}>
                 <HiPaperAirplane className="w-5 h-5" />
               </button>
-            </div>
+            </Stagger>
           </>
         ) : (
           <div className="flex-1 flex items-center justify-center text-gray-400 text-sm">
@@ -189,6 +203,6 @@ export default function InboxPage() {
           </div>
         )}
       </div>
-    </div>
+    </PageTransition>
   );
 }
