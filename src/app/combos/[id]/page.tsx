@@ -242,7 +242,7 @@ export default function ComboDetailPage() {
         </div>
       )}
 
-      <Stagger delay={0} y={-8}>
+      <Stagger delay={0} y={-8} zIndex={results.length > 0 ? 60 : undefined}>
       <div className="bg-white rounded-lg border shadow-sm p-6 flex flex-col md:flex-row gap-8">
         {/* Left: Images */}
         <div className="md:w-1/2">
@@ -356,7 +356,7 @@ export default function ComboDetailPage() {
 
           {/* Admin: add product search */}
           {isAdmin && (
-            <div className="relative mb-4">
+            <div className="relative mb-4" style={{ zIndex: results.length > 0 ? 60 : "auto" }}>
               <input
                 type="text"
                 value={search}
@@ -366,7 +366,7 @@ export default function ComboDetailPage() {
               />
               {searching && <span className="absolute right-3 top-2.5 text-gray-400 text-xs">Buscando...</span>}
               {results.length > 0 && (
-                <div className="absolute z-10 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                <div className="absolute left-0 right-0 z-50 bg-white border rounded-xl shadow-lg mt-1 max-h-48 overflow-y-auto">
                   {results.map((p) => {
                     const added = editItems.some((i) => i.sku === p.sku);
                     return (

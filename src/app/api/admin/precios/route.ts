@@ -98,6 +98,30 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: "Nada que actualizar" }, { status: 400 });
     }
 
+    // Validate no price is below cost
+    const costoVal = costo !== undefined ? parseFloat(costo) : null;
+    const effectiveCosto = costoVal ?? await (async () => {
+      const r = await pool.request().input("c", codPadded).query(
+        `SELECT ISNULL(Costo, 0) AS costo FROM [${dbProd}].dbo.Stock WHERE CodProducto = @c AND LTRIM(RTRIM(Deposito)) = '0'`
+      );
+      return r.recordset[0]?.costo || 0;
+    })();
+
+    if (effectiveCosto > 0) {
+      const priceChecks = [
+        { name: "Minorista", val: precio },
+        { name: "Mayorista", val: precio2 },
+        { name: "Especial", val: precio3 },
+        { name: "Caja Cerrada", val: precio4 },
+        { name: "PedidosYa", val: precio5 },
+      ];
+      const belowCost = priceChecks.filter((p) => p.val !== undefined && p.val !== null && parseFloat(p.val) > 0 && parseFloat(p.val) < effectiveCosto);
+      if (belowCost.length > 0) {
+        const names = belowCost.map((p) => p.name).join(", ");
+        return NextResponse.json({ error: `Precio por debajo del costo en: ${names}. Costo: $${effectiveCosto}` }, { status: 400 });
+      }
+    }
+
     await request.query(`
       UPDATE [${dbProd}].dbo.Stock
       SET ${updates.join(", ")}

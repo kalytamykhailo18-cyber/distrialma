@@ -368,7 +368,7 @@ export default function EtiquetasPage() {
       </Stagger>
 
       {/* Product search */}
-      <Stagger delay={150} y={10}>
+      <Stagger delay={150} y={10} zIndex={results.length > 0 ? 60 : undefined}>
         <div className="bg-white rounded-xl border shadow-sm p-4 mb-4">
           <h2 className="text-sm font-medium text-gray-700 mb-3">Agregar productos</h2>
 
@@ -429,7 +429,7 @@ export default function EtiquetasPage() {
           </div>
 
           {/* Name/SKU search */}
-          <div className="relative">
+          <div className="relative" style={{ zIndex: results.length > 0 ? 60 : "auto" }}>
             <input
               type="text"
               value={search}
@@ -441,7 +441,7 @@ export default function EtiquetasPage() {
               <div className="absolute right-3 top-2.5 text-gray-400 text-sm">Buscando...</div>
             )}
             {results.length > 0 && (
-              <div className="absolute z-10 w-full mt-1 bg-white border rounded-xl shadow-lg max-h-60 overflow-y-auto">
+              <div className="absolute left-0 right-0 z-50 bg-white border rounded-xl shadow-lg mt-1 max-h-60 overflow-y-auto">
                 {results.map((p, i) => {
                   const alreadyAdded = selected.some((s) => s.product.sku === p.sku);
                   return (

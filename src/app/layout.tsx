@@ -25,6 +25,9 @@ export const metadata: Metadata = {
     statusBarStyle: "default",
     title: "Distrialma",
   },
+  other: {
+    "mobile-web-app-capable": "yes",
+  },
 };
 
 export default function RootLayout({
@@ -33,8 +36,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="es">
-      <body className={`${geistSans.variable} antialiased bg-gray-50`}>
+    <html lang="es" translate="no">
+      <head>
+        <meta name="google" content="notranslate" />
+      </head>
+      <body className={`${geistSans.variable} antialiased bg-gray-50 notranslate`}>
         <Providers>
           <LayoutShell>{children}</LayoutShell>
         </Providers>

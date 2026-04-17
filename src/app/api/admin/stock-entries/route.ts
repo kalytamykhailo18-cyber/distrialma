@@ -177,12 +177,14 @@ export async function POST(req: NextRequest) {
             `);
 
           // Create Stock row
+          const itemCosto = parseFloat(String(item.costo || 0)) || 0;
           await new sql.Request(transaction)
             .input("codProd", codPadded)
             .input("stk", cantidad)
+            .input("costo", Math.round(itemCosto * 100) / 100)
             .query(`
               INSERT INTO [${dbProd}].dbo.Stock (CodProducto, Deposito, Stk, Costo)
-              VALUES (@codProd, '0  ', @stk, 0)
+              VALUES (@codProd, '0  ', @stk, @costo)
             `);
 
           pgItems.push({

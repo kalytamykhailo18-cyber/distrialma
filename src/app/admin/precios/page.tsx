@@ -241,8 +241,7 @@ export default function PreciosPage() {
       </Stagger>
 
       {/* Search */}
-      <Stagger delay={100}>
-        <div className="relative mb-6">
+        <div className="relative mb-6" style={{ zIndex: searchResults.length > 0 ? 60 : "auto" }}>
           <HiOutlineSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-brand-500" />
           <input
             type="text"
@@ -271,7 +270,6 @@ export default function PreciosPage() {
             </div>
           )}
         </div>
-      </Stagger>
 
       {loading && <LoadingCenter text="Cargando producto..." />}
 
@@ -281,7 +279,7 @@ export default function PreciosPage() {
       {/* Product detail */}
       {product && (
         <Stagger delay={150}>
-          <div className="bg-white rounded-xl border shadow-sm p-6">
+          <div className="bg-white rounded-xl border shadow-sm p-4 sm:p-6 overflow-hidden">
             <div className="mb-4">
               <h2 className="text-lg font-semibold text-gray-900">{product.nombre}</h2>
               <p className="text-sm text-gray-500">
@@ -301,17 +299,17 @@ export default function PreciosPage() {
                 return (
                   <div
                     key={field.key}
-                    className={`flex items-center gap-3 ${hoverRow} rounded-lg px-2 -mx-2 py-1`}
+                    className={`flex flex-wrap sm:flex-nowrap items-center gap-2 sm:gap-3 ${hoverRow} rounded-lg px-2 -mx-2 py-2`}
                     style={staggerStyle(productReady, i)}
                   >
-                    <span className="text-sm text-gray-700 w-24">{field.label}</span>
+                    <span className="text-sm text-gray-700 w-20 sm:w-24 shrink-0">{field.label}</span>
                     {!isCosto && (
                       <MarginInput
                         margin={getMargin(field.key)}
                         onChange={(pct) => updateFromMargin(field.key, pct)}
                       />
                     )}
-                    <div className="flex items-center gap-2 flex-1">
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
                       <span className="text-gray-400">$</span>
                       <input
                         type="number"
@@ -320,13 +318,18 @@ export default function PreciosPage() {
                         value={form[field.key] || ""}
                         onChange={(e) => updateField(field.key, e.target.value)}
                         placeholder="0"
-                        className={`flex-1 text-right px-3 py-2 border rounded-xl text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 ${
+                        className={`w-full min-w-0 text-right px-3 py-2 border rounded-xl text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 ${
                           isCosto ? "border-brand-400 font-medium" : "border-gray-300"
                         }`}
                       />
                     </div>
-                    {!isCosto && product[field.key as keyof Product] !== parseFloat(form[field.key] || "0") && parseFloat(form[field.key] || "0") > 0 && (
-                      <span className="text-xs text-amber-600">
+                    {!isCosto && parseFloat(form[field.key] || "0") > 0 && parseFloat(form.costo || "0") > 0 && parseFloat(form[field.key] || "0") < parseFloat(form.costo || "0") && (
+                      <span className="text-xs text-red-600 font-medium shrink-0">
+                        ⚠ bajo costo
+                      </span>
+                    )}
+                    {!isCosto && product[field.key as keyof Product] !== parseFloat(form[field.key] || "0") && parseFloat(form[field.key] || "0") > 0 && !(parseFloat(form[field.key] || "0") < parseFloat(form.costo || "0")) && (
+                      <span className="text-xs text-amber-600 shrink-0">
                         era {formatPrice(product[field.key as keyof Product] as number)}
                       </span>
                     )}

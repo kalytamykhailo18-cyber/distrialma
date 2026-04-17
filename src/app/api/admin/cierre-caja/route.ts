@@ -106,6 +106,9 @@ export async function POST(req: NextRequest) {
         .input("impoCos", clamp92(data.inicioCaja))
         .input("totalVentas", clamp92(data.ventas.total))
         .input("nroCierre", nextCierre)
+        .input("totalCaja", clamp92(data.totalEfectivoCaja))
+        .input("diferencia", clamp92(nuevoInicioVal - data.totalEfectivoCaja))
+        .input("obs", userName)
         .query(`
           INSERT INTO [${dbTransas}].dbo.Transas
             (Cod, Boleta, Itm, Tipo, TipoFac, Sucursal, Deposito, Terminal, Fechora, Producto,
@@ -119,10 +122,10 @@ export async function POST(req: NextRequest) {
              Filler1, Filler2, Filler3, FillerBit1, FillerBit2, FillerBit3, FillerBit4, FillerBit5)
           VALUES
             (@cod, @cod, '', 'C', '', @suc, '', 0, @fechora, '',
-             0, -@tarjeta, 0, @deuda, 0, @efectivo, @tarjeta, 0, 0, @inicio,
+             0, -@tarjeta, 0, @totalCaja, 0, @efectivo, @tarjeta, 0, @diferencia, @inicio,
              @retiros, 0, @totalVentas, @impoCos, @inicio, @nroCierre, 0,
-             '', '', '', '', '', 0,
-             '', '', '', '', '', '',
+             '', '', @obs, '', '', 0,
+             @obs, '', '', '', '', '',
              '', '', '', '', '', '', '', '',
              '', '', '', '', '', '',
              0, 0, 0, 0, 0, 0,
@@ -240,6 +243,20 @@ export async function POST(req: NextRequest) {
       })();
     }
 
+    // Enqueue print job for silent printing
+    if (pdfBase64) {
+      try {
+        await prisma.printJob.create({
+          data: {
+            tipo: "cierre",
+            filename: `CierreCaja-Suc${suc}-${new Date().toISOString().slice(0, 10)}.pdf`,
+            pdfBase64,
+            sucursal: suc,
+          },
+        });
+      } catch (e) { console.error("Print queue error:", e); }
+    }
+
     return NextResponse.json({
       ok: true,
       cierreId: cierre.id,
@@ -295,7 +312,7 @@ async function getCajaData(sucursal: string) {
       ISNULL(Total, 0) AS total,
       LTRIM(RTRIM(Fechora)) AS fechora
     FROM [${dbTransas}].dbo.Transas
-    WHERE LTRIM(RTRIM(MovCaja)) IN ('R', 'I', 'P')
+    WHERE LTRIM(RTRIM(MovCaja)) IN ('R', 'I', 'P', 'p')
       AND LTRIM(RTRIM(Sucursal)) = @suc
       AND CAST(LTRIM(RTRIM(Cod)) AS BIGINT) > @cierreCod
     ORDER BY Fechora ASC
@@ -363,8 +380,8 @@ async function getCajaData(sucursal: string) {
     .filter((m: { tipo: string }) => m.tipo === "I")
     .reduce((s: number, m: { efectivo: number }) => s + m.efectivo, 0);
   const pagos = movimientos.recordset
-    .filter((m: { tipo: string }) => m.tipo === "P")
-    .reduce((s: number, m: { efectivo: number }) => s + m.efectivo, 0);
+    .filter((m: { tipo: string }) => m.tipo === "P" || m.tipo === "p")
+    .reduce((s: number, m: { efectivo: number }) => s + Math.abs(m.efectivo), 0);
 
   const totalEfectivoCaja = inicioCaja + v.efectivo - retiros + ingresos - pagos;
 
@@ -390,7 +407,7 @@ async function getCajaData(sucursal: string) {
     movimientos: movimientos.recordset.map((m: { tipo: string; concepto: string; efectivo: number; total: number; fechora: string }) => ({
       tipo: m.tipo === "R" ? "Retiro" : m.tipo === "I" ? "Ingreso" : "Pago proveedor",
       concepto: m.concepto,
-      monto: m.efectivo || m.total,
+      monto: Math.abs(m.efectivo) || Math.abs(m.total),
       fechora: m.fechora,
     })),
     retiros,

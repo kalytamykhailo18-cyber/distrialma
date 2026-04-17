@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { formatPrice } from "@/lib/utils";
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from "recharts";
-import { HiTrendingUp, HiTrendingDown, HiChevronDown, HiSearch, HiPencil } from "react-icons/hi";
+import { HiTrendingUp, HiTrendingDown, HiChevronDown, HiSearch, HiPencil, HiOutlineDocumentDownload } from "react-icons/hi";
 import Link from "next/link";
 import { PageTransition, Stagger, staggerStyle, springBtn, hoverRow, LoadingCenter, useDataReady, CollapsiblePanel } from "@/components/AnimateIn";
 
@@ -26,6 +26,8 @@ interface DashData {
     mesAnterior: { ventas: number; ganancia: number; ticketPromedio: number; clientesUnicos: number };
   };
   horariosPico: Array<Record<string, number>>;
+  topProductosMargen?: Array<{ sku: string; nombre: string; marca: string; cantidad: number; totalVenta: number; totalCosto: number; ganancia: number; margen: string }>;
+  comparativoSucursales?: Array<{ sucursal: string; ventas: number; ganancia: number; cantTickets: number; margen: string }>;
 }
 
 export default function DashboardPage() {
@@ -35,10 +37,27 @@ export default function DashboardPage() {
   const [sucursales, setSucursales] = useState(["1", "2", "6", "7", "10"]);
   const [expandedCliente, setExpandedCliente] = useState<string | null>(null);
   const [clientSearch, setClientSearch] = useState("");
-  const [diferencias, setDiferencias] = useState<{ empleados: Array<{ nombre: string; cierres: number; totalDiferencia: number; diferencias: Array<{ id: number; fecha: string; sucursal: string; diferencia: number; ventas: number }> }> } | null>(null);
+  const [diferencias, setDiferencias] = useState<{ empleados: Array<{ nombre: string; cierres: number; totalDiferencia: number; totalPendiente: number; totalSobrante?: number; diferencias: Array<{ id: number; fecha: string; sucursal: string; diferencia: number; ventas: number; chargedAt: string | null; chargedBy: string | null }> }> } | null>(null);
   const [difExpanded, setDifExpanded] = useState<string | null>(null);
   const [editingDif, setEditingDif] = useState<number | null>(null);
   const [editDifValue, setEditDifValue] = useState("");
+
+  const [alertas, setAlertas] = useState<{
+    clientesInactivos: Array<{ cod: string; nombre: string; totalCompras: number; ultimaCompra: string; diasDesde: number | null }>;
+    margenBajo: Array<{ sku: string; nombre: string; totalVenta: number; ganancia: number; margen: string }>;
+    sinStock: Array<{ sku: string; nombre: string; cantidadVendida: number; totalVenta: number; stockActual: number }>;
+  } | null>(null);
+  const [alertasOpen, setAlertasOpen] = useState(false);
+
+  async function loadAlertas() {
+    try {
+      const res = await fetch(`/api/admin/dashboard/alertas?sucursales=${sucursales.join(",")}`);
+      const d = await res.json();
+      if (!d.error) setAlertas(d);
+    } catch {}
+  }
+
+  useEffect(() => { loadAlertas(); }, [sucursales]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [deadStock, setDeadStock] = useState<{ dias: number; cantProductos: number; totalInmovilizado: number; productos: Array<{ sku: string; nombre: string; marca: string; rubro: string; stock: number; costoUnit: number; costoInmovilizado: number; unidad: string }> } | null>(null);
   const [deadDias, setDeadDias] = useState(30);
@@ -122,6 +141,87 @@ export default function DashboardPage() {
           </div>
         </div>
       </Stagger>
+
+      {/* Alertas automaticas */}
+      {alertas && (alertas.clientesInactivos.length > 0 || alertas.margenBajo.length > 0 || alertas.sinStock.length > 0) && (
+        <Stagger delay={80}>
+          <div className="bg-gradient-to-r from-amber-50 to-red-50 border-2 border-amber-300 rounded-xl shadow-sm mb-6 overflow-hidden">
+            <button onClick={() => setAlertasOpen(!alertasOpen)}
+              className={`w-full px-4 py-3 flex items-center justify-between ${springBtn} ${alertasOpen ? "bg-amber-100" : "hover:bg-amber-100"}`}>
+              <div className="flex items-center gap-2">
+                <span className="text-lg">⚠️</span>
+                <div className="text-left">
+                  <div className="text-sm font-bold text-amber-800">Alertas automaticas</div>
+                  <div className="text-xs text-amber-700">
+                    {alertas.clientesInactivos.length} cliente{alertas.clientesInactivos.length === 1 ? "" : "s"} inactivo{alertas.clientesInactivos.length === 1 ? "" : "s"} ·
+                    {" "}{alertas.margenBajo.length} con margen bajo ·
+                    {" "}{alertas.sinStock.length} sin stock
+                  </div>
+                </div>
+              </div>
+              <HiChevronDown className={`w-5 h-5 text-amber-600 transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${alertasOpen ? "rotate-180" : ""}`} />
+            </button>
+            <CollapsiblePanel open={alertasOpen}>
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 p-3 bg-white">
+                {/* Clientes inactivos */}
+                {alertas.clientesInactivos.length > 0 && (
+                  <div className="bg-red-50 border border-red-200 rounded-xl p-3">
+                    <h4 className="text-xs font-bold text-red-800 mb-2 flex items-center gap-1">
+                      <HiTrendingDown className="w-4 h-4" />
+                      Top clientes sin comprar (30+ dias)
+                    </h4>
+                    <div className="space-y-1 max-h-64 overflow-y-auto">
+                      {alertas.clientesInactivos.map((c) => (
+                        <Link key={c.cod} href={`/admin/dashboard/cliente?cod=${c.cod}`} target="_blank"
+                          className="block text-xs bg-white rounded px-2 py-1.5 hover:bg-red-100 transition-colors">
+                          <div className="font-medium text-gray-900 truncate">{c.nombre}</div>
+                          <div className="text-gray-500">Ultima: {c.ultimaCompra} {c.diasDesde ? `(${c.diasDesde}d)` : ""} · {fmtK(c.totalCompras)}</div>
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {/* Margen bajo */}
+                {alertas.margenBajo.length > 0 && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
+                    <h4 className="text-xs font-bold text-amber-800 mb-2 flex items-center gap-1">
+                      <HiTrendingDown className="w-4 h-4" />
+                      Productos con margen bajo (&lt;10%)
+                    </h4>
+                    <div className="space-y-1 max-h-64 overflow-y-auto">
+                      {alertas.margenBajo.map((p) => (
+                        <Link key={p.sku} href={`/admin/precios`} target="_blank"
+                          className="block text-xs bg-white rounded px-2 py-1.5 hover:bg-amber-100 transition-colors">
+                          <div className="font-medium text-gray-900 truncate">{p.nombre}</div>
+                          <div className="text-gray-500">SKU {p.sku} · <span className="text-red-600 font-bold">{p.margen}%</span> · {fmtK(p.totalVenta)}</div>
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {/* Sin stock */}
+                {alertas.sinStock.length > 0 && (
+                  <div className="bg-orange-50 border border-orange-200 rounded-xl p-3">
+                    <h4 className="text-xs font-bold text-orange-800 mb-2 flex items-center gap-1">
+                      <HiTrendingDown className="w-4 h-4" />
+                      Top vendidos sin stock
+                    </h4>
+                    <div className="space-y-1 max-h-64 overflow-y-auto">
+                      {alertas.sinStock.map((p) => (
+                        <Link key={p.sku} href={`/admin/dashboard/producto?sku=${p.sku}`} target="_blank"
+                          className="block text-xs bg-white rounded px-2 py-1.5 hover:bg-orange-100 transition-colors">
+                          <div className="font-medium text-gray-900 truncate">{p.nombre}</div>
+                          <div className="text-gray-500">SKU {p.sku} · stock {p.stockActual} · {fmtK(p.totalVenta)} vendido</div>
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </CollapsiblePanel>
+          </div>
+        </Stagger>
+      )}
 
       {loading ? <LoadingCenter /> : !data ? <p className="text-gray-400">Sin datos</p> : (
         <>
@@ -207,6 +307,49 @@ export default function DashboardPage() {
           </div>
           </Stagger>
 
+          {/* Comparativo entre sucursales */}
+          {data.comparativoSucursales && data.comparativoSucursales.length > 1 && (
+            <Stagger delay={225}>
+              <div className="bg-white border rounded-xl shadow-sm p-4 mb-6">
+                <h3 className="text-sm font-bold text-gray-700 mb-3">Comparativo entre sucursales</h3>
+                <ResponsiveContainer width="100%" height={Math.max(180, data.comparativoSucursales.length * 45)}>
+                  <BarChart data={data.comparativoSucursales.map((s) => ({ ...s, nombre: SUC_NAMES[s.sucursal] || `Suc ${s.sucursal}` }))} layout="vertical" margin={{ left: 10, right: 10 }}>
+                    <XAxis type="number" tickFormatter={fmtK} tick={{ fontSize: 11 }} />
+                    <YAxis type="category" dataKey="nombre" width={110} tick={{ fontSize: 11 }} />
+                    <Tooltip formatter={(v) => fmt(Number(v))} wrapperStyle={{ zIndex: 10, maxWidth: "90vw" }} />
+                    <Bar dataKey="ventas" fill="#3b82f6" radius={[0, 4, 4, 0]} name="Ventas" />
+                    <Bar dataKey="ganancia" fill="#22c55e" radius={[0, 4, 4, 0]} name="Ganancia" />
+                  </BarChart>
+                </ResponsiveContainer>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mt-4">
+                  {data.comparativoSucursales.map((s) => (
+                    <div key={s.sucursal} className="bg-gray-50 rounded-xl p-3 border">
+                      <div className="text-xs font-semibold text-gray-700 mb-1">{SUC_NAMES[s.sucursal] || `Suc ${s.sucursal}`}</div>
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div>
+                          <div className="text-blue-600 font-bold">{fmtK(s.ventas)}</div>
+                          <div className="text-gray-400">Ventas</div>
+                        </div>
+                        <div>
+                          <div className="text-green-600 font-bold">{fmtK(s.ganancia)}</div>
+                          <div className="text-gray-400">Ganancia</div>
+                        </div>
+                        <div>
+                          <div className="text-gray-700 font-bold">{s.cantTickets}</div>
+                          <div className="text-gray-400">Tickets</div>
+                        </div>
+                        <div>
+                          <div className="text-brand-600 font-bold">{s.margen}%</div>
+                          <div className="text-gray-400">Margen</div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </Stagger>
+          )}
+
           {/* Heatmap */}
           <Stagger delay={250}>
           <div className="bg-white border rounded-xl shadow-sm p-4 mb-6">
@@ -288,13 +431,131 @@ export default function DashboardPage() {
           {/* Diferencias de caja */}
           {diferencias && diferencias.empleados.length > 0 && (
             <div className="bg-white border rounded-xl shadow-sm overflow-hidden">
-              <div className="px-4 py-3 border-b">
+              <div className="px-4 py-3 border-b flex items-center justify-between">
                 <h3 className="text-sm font-bold text-gray-700">Diferencias de Caja por Empleado</h3>
+                <button
+                  onClick={async () => {
+                    const { default: jsPDF } = await import("jspdf");
+                    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+                    const w = doc.internal.pageSize.getWidth();
+                    const pageH = doc.internal.pageSize.getHeight();
+
+                    // Load logo
+                    let logoImg: string | null = null;
+                    try {
+                      const resp = await fetch("/logo.png");
+                      const blob = await resp.blob();
+                      logoImg = await new Promise<string>((resolve) => {
+                        const reader = new FileReader();
+                        reader.onload = () => resolve(reader.result as string);
+                        reader.readAsDataURL(blob);
+                      });
+                    } catch {}
+
+                    // Header
+                    doc.setFillColor(251, 154, 71);
+                    doc.rect(0, 0, w, 22, "F");
+                    if (logoImg) {
+                      try { doc.addImage(logoImg, "PNG", 10, 3, 16, 16); } catch {}
+                    }
+                    doc.setTextColor(255, 255, 255);
+                    doc.setFontSize(16);
+                    doc.setFont("helvetica", "bold");
+                    doc.text("Distrialma — Diferencias de Caja", logoImg ? 30 : 14, 13);
+                    doc.setFontSize(9);
+                    doc.setFont("helvetica", "normal");
+                    doc.text(`Mes: ${mes} — ${new Date().toLocaleString("es-AR")}`, w - 14, 13, { align: "right" });
+                    let y = 30;
+
+                    const totalGeneralPendiente = diferencias.empleados.reduce((s, e) => s + (e.totalPendiente || 0), 0);
+                    const totalGeneralDif = diferencias.empleados.reduce((s, e) => s + e.totalDiferencia, 0);
+                    const totalCargado = totalGeneralDif - totalGeneralPendiente;
+
+                    // Summary bar
+                    doc.setFillColor(55, 65, 81);
+                    doc.rect(10, y, w - 20, 10, "F");
+                    doc.setTextColor(255, 255, 255);
+                    doc.setFontSize(10);
+                    doc.setFont("helvetica", "bold");
+                    doc.text(`Total: ${fmt(Math.abs(totalGeneralDif))} — Pendiente: ${fmt(Math.abs(totalGeneralPendiente))} — Cargado: ${fmt(Math.abs(totalCargado))}`, 14, y + 7);
+                    y += 14;
+
+                    for (const emp of diferencias.empleados) {
+                      if (y + 15 > pageH - 15) { doc.addPage(); y = 15; }
+
+                      // Employee header
+                      doc.setFillColor(245, 245, 245);
+                      doc.rect(10, y, w - 20, 9, "F");
+                      doc.setTextColor(30, 30, 30);
+                      doc.setFontSize(11);
+                      doc.setFont("helvetica", "bold");
+                      doc.text(emp.nombre, 14, y + 6);
+                      doc.setFontSize(9);
+                      doc.setFont("helvetica", "normal");
+                      doc.text(`${emp.cierres} cierres`, w - 80, y + 6, { align: "right" });
+                      doc.setTextColor(185, 28, 28);
+                      doc.setFont("helvetica", "bold");
+                      doc.text(`Pendiente: ${fmt(Math.abs(emp.totalPendiente || 0))}`, w - 14, y + 6, { align: "right" });
+                      y += 11;
+
+                      // Column headers
+                      doc.setFillColor(55, 65, 81);
+                      doc.rect(10, y, w - 20, 7, "F");
+                      doc.setTextColor(255, 255, 255);
+                      doc.setFontSize(8);
+                      doc.setFont("helvetica", "bold");
+                      doc.text("Fecha", 14, y + 5);
+                      doc.text("Sucursal", 50, y + 5);
+                      doc.text("Ventas", 85, y + 5, { align: "right" });
+                      doc.text("Diferencia", 130, y + 5, { align: "right" });
+                      doc.text("Estado", w - 14, y + 5, { align: "right" });
+                      y += 12;
+
+                      doc.setTextColor(50, 50, 50);
+                      doc.setFont("helvetica", "normal");
+                      doc.setFontSize(8);
+
+                      for (const d of emp.diferencias) {
+                        if (y + 5 > pageH - 15) { doc.addPage(); y = 15; }
+                        doc.text(new Date(d.fecha).toLocaleDateString("es-AR"), 14, y);
+                        doc.text(d.sucursal, 50, y);
+                        doc.text(String(d.ventas), 85, y, { align: "right" });
+                        doc.setTextColor(185, 28, 28);
+                        doc.setFont("helvetica", "bold");
+                        doc.text(fmt(Math.abs(d.diferencia)), 130, y, { align: "right" });
+                        doc.setTextColor(d.chargedAt ? 22 : 150, d.chargedAt ? 101 : 150, d.chargedAt ? 52 : 150);
+                        doc.setFont("helvetica", "normal");
+                        doc.text(d.chargedAt ? `Cargado ${new Date(d.chargedAt).toLocaleDateString("es-AR")}` : "Pendiente", w - 14, y, { align: "right" });
+                        doc.setTextColor(50, 50, 50);
+                        doc.setDrawColor(230, 230, 230);
+                        doc.line(10, y + 1.5, w - 10, y + 1.5);
+                        y += 5;
+                      }
+                      y += 3;
+                    }
+
+                    // Footer
+                    const pc = doc.getNumberOfPages();
+                    for (let p = 1; p <= pc; p++) {
+                      doc.setPage(p);
+                      doc.setTextColor(160, 160, 160);
+                      doc.setFontSize(7);
+                      doc.text(`Pagina ${p}/${pc} — distrialma.com.ar`, w / 2, pageH - 8, { align: "center" });
+                    }
+
+                    doc.save(`Diferencias-Caja-${mes}.pdf`);
+                  }}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 bg-red-500 text-white rounded-lg text-xs font-medium hover:bg-red-600 ${springBtn}`}
+                >
+                  <HiOutlineDocumentDownload className="w-4 h-4" />
+                  PDF
+                </button>
               </div>
               <div className="divide-y max-h-[400px] overflow-y-auto">
                 {diferencias.empleados.map((emp) => {
                   const isOpen = difExpanded === emp.nombre;
-                  const isNeg = emp.totalDiferencia < 0;
+                  const pendiente = emp.totalPendiente || 0;
+                  const cargado = emp.totalDiferencia - pendiente;
                   return (
                     <div key={emp.nombre} className={isOpen ? "bg-brand-50 border-l-4 border-l-brand-500" : ""}>
                       <button onClick={() => setDifExpanded(isOpen ? null : emp.nombre)}
@@ -304,17 +565,22 @@ export default function DashboardPage() {
                           <span className="text-xs text-gray-400 ml-2">{emp.cierres} cierres</span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <span className={`text-sm font-bold ${isNeg ? "text-red-600" : "text-green-600"}`}>
-                            {isNeg ? "-" : "+"}{fmt(Math.abs(emp.totalDiferencia))}
-                          </span>
+                          <div className="text-right">
+                            <div className="text-sm font-bold text-red-600">Pendiente: {fmt(Math.abs(pendiente))}</div>
+                            {cargado < 0 && <div className="text-xs text-gray-400">Cargado: {fmt(Math.abs(cargado))}</div>}
+                            {(emp.totalSobrante || 0) > 0 && <div className="text-xs text-blue-600">Sobrante: +{fmt(emp.totalSobrante || 0)}</div>}
+                          </div>
                           <HiChevronDown className={`w-4 h-4 transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${isOpen ? "rotate-180 text-brand-600" : "text-gray-400"}`} />
                         </div>
                       </button>
                       <CollapsiblePanel open={isOpen}>
                         <div className="px-4 py-2 bg-brand-50/50 border-t border-brand-200 space-y-1">
                           {emp.diferencias.map((d) => (
-                            <div key={d.id} className="flex items-center justify-between text-xs gap-2">
-                              <span className="text-gray-500">Suc {d.sucursal} — {new Date(d.fecha).toLocaleDateString("es-AR")} — {d.ventas} ventas</span>
+                            <div key={d.id} className={`flex items-center justify-between text-xs gap-2 py-1 ${d.chargedAt ? "opacity-60" : ""} ${d.diferencia > 0 ? "bg-blue-50/50 rounded" : ""}`}>
+                              <span className="text-gray-500">
+                                Suc {d.sucursal} — {new Date(d.fecha).toLocaleDateString("es-AR")} — {d.ventas} ventas
+                                {d.diferencia > 0 && <span className="ml-1 text-blue-500 font-medium">(sobrante)</span>}
+                              </span>
                               <div className="flex items-center gap-1">
                                 {editingDif === d.id ? (
                                   <>
@@ -333,9 +599,32 @@ export default function DashboardPage() {
                                   </>
                                 ) : (
                                   <>
-                                    <span className={d.diferencia < 0 ? "text-red-600 font-medium" : "text-green-600"}>{d.diferencia < 0 ? "-" : "+"}{fmt(Math.abs(d.diferencia))}</span>
+                                    <span className={d.diferencia < 0 ? "text-red-600 font-medium" : "text-blue-600 font-medium"}>{d.diferencia < 0 ? "-" : "+"}{fmt(Math.abs(d.diferencia))}</span>
                                     <button onClick={() => { setEditingDif(d.id); setEditDifValue(String(d.diferencia)); }}
                                       className="ml-1 !text-gray-400 hover:!text-gray-600" title="Corregir"><HiPencil className="w-3 h-3" /></button>
+                                    {d.diferencia < 0 && (d.chargedAt ? (
+                                      <button onClick={async () => {
+                                        await fetch("/api/admin/cierre-caja/diferencias", {
+                                          method: "PATCH",
+                                          headers: { "Content-Type": "application/json" },
+                                          body: JSON.stringify({ id: d.id, uncharge: true }),
+                                        });
+                                        loadDiferencias();
+                                      }} className="ml-1 px-2 py-0.5 bg-green-100 text-green-700 rounded text-xs font-medium hover:bg-green-200" title={`Cargado ${new Date(d.chargedAt).toLocaleDateString("es-AR")}${d.chargedBy ? " por " + d.chargedBy : ""}`}>
+                                        ✓ Cargado
+                                      </button>
+                                    ) : (
+                                      <button onClick={async () => {
+                                        await fetch("/api/admin/cierre-caja/diferencias", {
+                                          method: "PATCH",
+                                          headers: { "Content-Type": "application/json" },
+                                          body: JSON.stringify({ id: d.id, charge: true }),
+                                        });
+                                        loadDiferencias();
+                                      }} className="ml-1 px-2 py-0.5 bg-brand-500 text-white rounded text-xs font-medium hover:bg-brand-600" title="Cargar faltante a cuenta del empleado">
+                                        Cargar
+                                      </button>
+                                    ))}
                                   </>
                                 )}
                               </div>
@@ -346,6 +635,40 @@ export default function DashboardPage() {
                     </div>
                   );
                 })}
+              </div>
+            </div>
+          )}
+
+          {/* Top productos por margen */}
+          {data.topProductosMargen && data.topProductosMargen.length > 0 && (
+            <div className="bg-white border rounded-xl shadow-sm overflow-hidden">
+              <div className="px-4 py-3 border-b">
+                <h3 className="text-sm font-bold text-gray-700">Ranking productos por ganancia ({mes})</h3>
+                <p className="text-xs text-gray-500">Los que mas aportan a la ganancia total</p>
+              </div>
+              <div className="divide-y max-h-[400px] overflow-y-auto">
+                {data.topProductosMargen.map((p, i) => (
+                  <Link key={p.sku} href={`/admin/dashboard/producto?sku=${p.sku}`} target="_blank"
+                    className={`block px-4 py-2.5 ${hoverRow}`}>
+                    <div className="flex items-center gap-3">
+                      <span className={`text-xs font-bold w-6 text-center shrink-0 ${i < 3 ? "text-amber-600" : "text-gray-400"}`}>
+                        {i + 1}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium text-gray-900 truncate">{p.nombre}</div>
+                        <div className="text-xs text-gray-400">
+                          {p.marca && <span className="mr-2">{p.marca}</span>}
+                          <span>SKU {p.sku}</span>
+                          <span className="ml-2">— {p.cantidad.toLocaleString("es-AR", { maximumFractionDigits: 1 })} vendidos</span>
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <div className="text-sm font-bold text-green-600">{fmt(p.ganancia)}</div>
+                        <div className="text-xs text-gray-500">{p.margen}% margen</div>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
               </div>
             </div>
           )}

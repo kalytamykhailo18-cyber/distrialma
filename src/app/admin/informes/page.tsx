@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { formatPrice } from "@/lib/utils";
+import { HiOutlineDocumentDownload } from "react-icons/hi";
 import { PageTransition, Stagger, staggerStyle, springBtn, hoverRow, LoadingCenter, useDataReady } from "@/components/AnimateIn";
 
 interface SalesProduct {
@@ -88,7 +89,187 @@ export default function InformesPage() {
   useEffect(() => {
     loadOrders();
     loadReport();
-  }, [days]);
+  }, [days]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function loadPdf() {
+    const jsPDFMod = await import("jspdf");
+    return jsPDFMod.default;
+  }
+
+  async function loadLogo(): Promise<string | null> {
+    try {
+      const resp = await fetch("/logo.png");
+      const blob = await resp.blob();
+      return await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.readAsDataURL(blob);
+      });
+    } catch { return null; }
+  }
+
+  function pdfHeader(doc: InstanceType<Awaited<ReturnType<typeof loadPdf>>>, w: number, title: string, logoImg: string | null) {
+    doc.setFillColor(251, 154, 71);
+    doc.rect(0, 0, w, 24, "F");
+    if (logoImg) {
+      try { doc.addImage(logoImg, "PNG", 10, 4, 16, 16); } catch {}
+    }
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "bold");
+    doc.text("Distrialma — " + title, logoImg ? 30 : 14, 12);
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Local 1 — Periodo: ${days} dias — ${new Date().toLocaleString("es-AR")}`, w - 14, 14, { align: "right" });
+  }
+
+  async function exportSummaryPdf() {
+    const jsPDF = await loadPdf();
+    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+    const w = doc.internal.pageSize.getWidth();
+    const pageH = doc.internal.pageSize.getHeight();
+    const logoImg = await loadLogo();
+    pdfHeader(doc, w, "Resumen por Producto", logoImg);
+    let y = 32;
+
+    // Column headers
+    const drawTableHeader = () => {
+      doc.setFillColor(55, 65, 81);
+      doc.rect(10, y, w - 20, 8, "F");
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "bold");
+      doc.text("SKU", 14, y + 5.5);
+      doc.text("Producto", 35, y + 5.5);
+      doc.text("Cant.", 135, y + 5.5, { align: "right" });
+      doc.text("Unid.", 150, y + 5.5, { align: "right" });
+      doc.text("Importe", w - 14, y + 5.5, { align: "right" });
+      y += 13;
+      doc.setTextColor(50, 50, 50);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8);
+    };
+    drawTableHeader();
+
+    const filtered = periodSummary.filter((p) => {
+      if (!searchFilter.trim()) return true;
+      const term = searchFilter.toLowerCase();
+      return p.sku.toLowerCase().includes(term) || p.name.toLowerCase().includes(term);
+    });
+
+    for (const p of filtered) {
+      if (y + 6 > pageH - 15) { doc.addPage(); y = 15; drawTableHeader(); }
+      doc.setTextColor(120, 120, 120);
+      doc.text(p.sku, 14, y);
+      doc.setTextColor(30, 30, 30);
+      doc.text(p.name.substring(0, 55), 35, y);
+      doc.text(String(p.totalCant), 135, y, { align: "right" });
+      doc.text(p.unit || "UN", 150, y, { align: "right" });
+      doc.setFont("helvetica", "bold");
+      doc.text(formatPrice(p.totalImpo), w - 14, y, { align: "right" });
+      doc.setFont("helvetica", "normal");
+      doc.setDrawColor(235, 235, 235);
+      doc.line(10, y + 1.5, w - 10, y + 1.5);
+      y += 5;
+    }
+
+    // Total
+    y += 3;
+    if (y + 12 > pageH - 15) { doc.addPage(); y = 15; }
+    doc.setFillColor(251, 154, 71);
+    doc.rect(10, y, w - 20, 10, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.text(`TOTAL (${filtered.length} productos)`, 14, y + 7);
+    doc.text(formatPrice(grandTotal), w - 14, y + 7, { align: "right" });
+
+    // Footer pages
+    const pc = doc.getNumberOfPages();
+    for (let p = 1; p <= pc; p++) {
+      doc.setPage(p);
+      doc.setTextColor(160, 160, 160);
+      doc.setFontSize(7);
+      doc.text(`Pagina ${p}/${pc} — distrialma.com.ar`, w / 2, pageH - 8, { align: "center" });
+    }
+
+    doc.save(`Informes-Local1-Resumen-${days}dias-${new Date().toISOString().slice(0, 10)}.pdf`);
+  }
+
+  async function exportDailyPdf() {
+    const jsPDF = await loadPdf();
+    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+    const w = doc.internal.pageSize.getWidth();
+    const pageH = doc.internal.pageSize.getHeight();
+    const logoImg = await loadLogo();
+    pdfHeader(doc, w, "Detalle Diario", logoImg);
+    let y = 32;
+
+    for (const day of report) {
+      if (y + 20 > pageH - 15) { doc.addPage(); y = 15; }
+
+      // Day header
+      doc.setFillColor(240, 240, 240);
+      doc.rect(10, y, w - 20, 8, "F");
+      doc.setTextColor(30, 30, 30);
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "bold");
+      doc.text(day.date, 14, y + 5.5);
+      doc.text(formatPrice(day.dayTotal), w - 14, y + 5.5, { align: "right" });
+      y += 10;
+
+      // Column headers
+      doc.setFillColor(55, 65, 81);
+      doc.rect(10, y, w - 20, 7, "F");
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(8);
+      doc.text("Producto", 14, y + 5);
+      doc.text("Cant.", 135, y + 5, { align: "right" });
+      doc.text("Importe", w - 14, y + 5, { align: "right" });
+      y += 12;
+
+      doc.setTextColor(50, 50, 50);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8);
+
+      for (const p of day.products) {
+        if (y + 5 > pageH - 15) { doc.addPage(); y = 15; }
+        doc.text(p.name.substring(0, 50), 14, y);
+        doc.setTextColor(150, 150, 150);
+        doc.text(`(${p.sku})`, 100, y);
+        doc.setTextColor(50, 50, 50);
+        doc.text(String(p.totalCant), 135, y, { align: "right" });
+        doc.setFont("helvetica", "bold");
+        doc.text(formatPrice(p.totalImpo), w - 14, y, { align: "right" });
+        doc.setFont("helvetica", "normal");
+        doc.setDrawColor(240, 240, 240);
+        doc.line(10, y + 1.5, w - 10, y + 1.5);
+        y += 5;
+      }
+      y += 3;
+    }
+
+    // Grand total
+    y += 2;
+    if (y + 12 > pageH - 15) { doc.addPage(); y = 15; }
+    doc.setFillColor(251, 154, 71);
+    doc.rect(10, y, w - 20, 10, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.text("TOTAL PERIODO", 14, y + 7);
+    doc.text(formatPrice(grandTotal), w - 14, y + 7, { align: "right" });
+
+    const pc = doc.getNumberOfPages();
+    for (let p = 1; p <= pc; p++) {
+      doc.setPage(p);
+      doc.setTextColor(160, 160, 160);
+      doc.setFontSize(7);
+      doc.text(`Pagina ${p}/${pc} — distrialma.com.ar`, w / 2, pageH - 8, { align: "center" });
+    }
+
+    doc.save(`Informes-Local1-Diario-${days}dias-${new Date().toISOString().slice(0, 10)}.pdf`);
+  }
 
   function formatDate(fechora: string): string {
     if (!fechora || fechora.length < 8) return fechora;
@@ -186,13 +367,22 @@ export default function InformesPage() {
                 <p className="text-gray-400">No hay datos. Archivá los pedidos de PunTouch primero.</p>
               ) : (
                 <>
-                  <input
-                    type="text"
-                    value={searchFilter}
-                    onChange={(e) => setSearchFilter(e.target.value)}
-                    placeholder="Buscar por nombre o SKU..."
-                    className="w-full px-4 py-2 border border-brand-400 rounded-xl text-sm mb-3 focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
-                  />
+                  <div className="flex flex-wrap items-center gap-2 mb-3">
+                    <input
+                      type="text"
+                      value={searchFilter}
+                      onChange={(e) => setSearchFilter(e.target.value)}
+                      placeholder="Buscar por nombre o SKU..."
+                      className="flex-1 min-w-[200px] px-4 py-2 border border-brand-400 rounded-xl text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
+                    />
+                    <button
+                      onClick={exportSummaryPdf}
+                      className={`flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-xl text-sm font-medium hover:bg-red-600 ${springBtn}`}
+                    >
+                      <HiOutlineDocumentDownload className="w-4 h-4" />
+                      PDF
+                    </button>
+                  </div>
                   <div className="bg-white rounded-lg border shadow-sm overflow-hidden">
                     <table className="w-full text-sm">
                       <thead className="bg-gray-50">
@@ -239,6 +429,15 @@ export default function InformesPage() {
                 <p className="text-gray-400">No hay datos. Archivá los pedidos de PunTouch primero.</p>
               ) : (
                 <>
+                  <div className="flex justify-end mb-3">
+                    <button
+                      onClick={exportDailyPdf}
+                      className={`flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-xl text-sm font-medium hover:bg-red-600 ${springBtn}`}
+                    >
+                      <HiOutlineDocumentDownload className="w-4 h-4" />
+                      PDF
+                    </button>
+                  </div>
                   {report.map((day, dayIdx) => (
                     <div key={day.date} className="mb-6" style={staggerStyle(dataReady, dayIdx, 100, 60)}>
                       <div className="flex justify-between items-center mb-2">

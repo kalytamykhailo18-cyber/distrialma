@@ -16,8 +16,8 @@ export function PageTransition({ children, className = "" }: { children: React.R
 }
 
 /* ── Staggered entrance wrapper ── */
-export function Stagger({ delay = 0, y = 10, children, className = "", show }: {
-  delay?: number; y?: number; children: React.ReactNode; className?: string; show?: boolean;
+export function Stagger({ delay = 0, y = 10, children, className = "", show, zIndex }: {
+  delay?: number; y?: number; children: React.ReactNode; className?: string; show?: boolean; zIndex?: number;
 }) {
   const pageReady = useContext(ReadyContext);
   const visible = show !== undefined ? show : pageReady;
@@ -28,6 +28,7 @@ export function Stagger({ delay = 0, y = 10, children, className = "", show }: {
         opacity: visible ? 1 : 0,
         transform: visible ? "translateY(0) scale(1)" : `translateY(${y}px) scale(0.98)`,
         transition: `opacity 400ms cubic-bezier(0.25,1,0.5,1) ${delay}ms, transform 400ms cubic-bezier(0.25,1,0.5,1) ${delay}ms`,
+        ...(zIndex !== undefined ? { zIndex, position: "relative" as const } : {}),
       }}
     >
       {children}

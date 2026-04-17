@@ -62,8 +62,11 @@ export async function GET(req: NextRequest) {
              LTRIM(RTRIM(c.Nombre)) AS nombre,
              LTRIM(RTRIM(ISNULL(c.Calle, ''))) AS calle,
              LTRIM(RTRIM(ISNULL(c.Nume, ''))) AS numero,
-             LTRIM(RTRIM(ISNULL(c.Telclave3, ISNULL(c.TelClave1, '')))) AS telefono
+             LTRIM(RTRIM(ISNULL(c.Telclave3, ISNULL(c.TelClave1, '')))) AS telefono,
+             LTRIM(RTRIM(ISNULL(c.Localidad, ''))) AS localidad,
+             LTRIM(RTRIM(ISNULL(z.[Desc], ''))) AS zona
       FROM [${dbClientes}].dbo.Clientes c
+      LEFT JOIN [${dbClientes}].dbo.Zonas z ON z.Cod = c.Zona
       WHERE c.Cod IN (${placeholders})
         AND (c.DeBaja = 0 OR c.DeBaja IS NULL)
       ORDER BY c.Nombre
@@ -82,9 +85,13 @@ export async function GET(req: NextRequest) {
     const targetDate = new Date(now);
     targetDate.setDate(targetDate.getDate() + daysDiff);
     targetDate.setUTCHours(0, 0, 0, 0);
-    const sinceStr = targetDate.getUTCFullYear().toString()
-      + String(targetDate.getUTCMonth() + 1).padStart(2, "0")
-      + String(targetDate.getUTCDate()).padStart(2, "0") + "000000";
+    // Expand window: include the day BEFORE the delivery day too, since orders
+    // are often invoiced the evening before they are delivered
+    const sinceDate = new Date(targetDate);
+    sinceDate.setDate(sinceDate.getDate() - 1);
+    const sinceStr = sinceDate.getUTCFullYear().toString()
+      + String(sinceDate.getUTCMonth() + 1).padStart(2, "0")
+      + String(sinceDate.getUTCDate()).padStart(2, "0") + "000000";
     const nextDay = new Date(targetDate);
     nextDay.setDate(nextDay.getDate() + 1);
     const untilStr = nextDay.getUTCFullYear().toString()
@@ -131,18 +138,48 @@ export async function GET(req: NextRequest) {
         AND t.Fechora < @until
     `);
 
+    // For clients with multiple delivery days, only show pending orders
+    // on the NEXT upcoming delivery day (not on past days)
+    // Find which clients have multiple delivery days
+    const clientDeliveryDays = new Map<string, string[]>();
+    for (const d of ourDays) {
+      if (!clientDeliveryDays.has(d.clientId)) clientDeliveryDays.set(d.clientId, []);
+      clientDeliveryDays.get(d.clientId)!.push(d.day);
+    }
+
+    // Determine if this selected day is the NEXT delivery day for each client
+    const dayOrder = ["LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO", "DOMINGO"];
+    const todayIdx = dayOrder.indexOf(getTodayDay());
+    const selectedIdx = dayOrder.indexOf(day);
+
+    const isNextDeliveryDay = (clientId: string): boolean => {
+      const days = clientDeliveryDays.get(clientId);
+      if (!days || days.length <= 1) return true; // single day or zona-based, always show
+      // Find the closest upcoming delivery day from today
+      const dayIndices = days.map((d) => dayOrder.indexOf(d)).filter((i) => i >= 0);
+      let closest = -1;
+      let closestDist = 999;
+      for (const di of dayIndices) {
+        const dist = (di - todayIdx + 7) % 7;
+        if (dist === 0 || dist < closestDist) { closest = di; closestDist = dist === 0 ? 0 : dist; }
+      }
+      return closest === selectedIdx;
+    };
+
     // Merge both sources
     const allOrders = [...ordersResult.recordset, ...transResult.recordset];
 
-    // Group orders by client
+    // Group orders by client — filter pending orders for multi-day clients
     const ordersByClient = new Map<string, { boleta: string; fechora: string; total: number; cant: number; origen: string }[]>();
     for (const o of allOrders) {
+      // Skip pending orders if this isn't the client's next delivery day
+      if (o.origen === "pendiente" && !isNextDeliveryDay(o.clienteCod)) continue;
       if (!ordersByClient.has(o.clienteCod)) ordersByClient.set(o.clienteCod, []);
       ordersByClient.get(o.clienteCod)!.push(o);
     }
 
     // Build result
-    const clients = clientsResult.recordset.map((c: { cod: string; nombre: string; calle: string; numero: string; telefono: string }) => {
+    const clients = clientsResult.recordset.map((c: { cod: string; nombre: string; calle: string; numero: string; telefono: string; localidad: string; zona: string }) => {
       const orders = ordersByClient.get(c.cod) || [];
       const hasOrder = orders.length > 0;
       const latestOrder = hasOrder ? orders.sort((a, b) => b.fechora.localeCompare(a.fechora))[0] : null;
@@ -160,15 +197,28 @@ export async function GET(req: NextRequest) {
         status = "none";
       }
 
+      // Sum ALL orders for this client (not just the latest one)
+      const totalPlata = orders.reduce((s, o) => s + (Number(o.total) || 0), 0);
+      const totalMercaderia = orders.reduce((s, o) => s + (Number(o.cant) || 0), 0);
+      // Facturado-only totals for the summary
+      const facturadoPlata = orders.filter((o) => o.origen === "facturado").reduce((s, o) => s + (Number(o.total) || 0), 0);
+      const facturadoMercaderia = orders.filter((o) => o.origen === "facturado").reduce((s, o) => s + (Number(o.cant) || 0), 0);
+
       return {
         cod: c.cod,
         nombre: c.nombre,
         address,
+        localidad: c.localidad || "",
+        zona: c.zona || "",
         telefono: c.telefono,
         hasOrder,
         status,
         orderCount: orders.length,
-        lastOrderTotal: latestOrder?.total || 0,
+        totalPlata,
+        totalMercaderia,
+        facturadoPlata,
+        facturadoMercaderia,
+        lastOrderTotal: totalPlata, // retained for backwards compat
         lastOrderDate: latestOrder ? `${latestOrder.fechora.slice(6, 8)}/${latestOrder.fechora.slice(4, 6)}/${latestOrder.fechora.slice(0, 4)}` : null,
       };
     });

@@ -143,6 +143,22 @@ model ClientDeliveryDay {
   @@map("client_delivery_days")
 }
 
+// Delivery status tracking — per client per delivery date
+model DeliveryStatus {
+  id           Int      @id @default(autoincrement())
+  clientId     String   @db.VarChar(7)
+  fecha        DateTime @db.Date // delivery date
+  estado       String   @db.VarChar(20) // "entregado" | "reintentar" | "rechazado" | "parcial"
+  observaciones String? @db.Text
+  deliveredBy  String?  @db.VarChar(60)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([clientId, fecha])
+  @@index([fecha])
+  @@map("delivery_status")
+}
+
 model User {
   id           Int      @id @default(autoincrement())
   username     String   @unique @db.VarChar(50)
@@ -342,6 +358,8 @@ model CierreCaja {
   responsable  String   @default("") @db.VarChar(60)
   emailSent    Boolean  @default(false)
   emailTo      String?  @db.VarChar(255)
+  chargedAt    DateTime?
+  chargedBy    String?  @db.VarChar(60)
   createdAt    DateTime @default(now())
 
   @@index([sucursal])
@@ -376,6 +394,110 @@ model WhatsAppMessage {
 
   @@index([chatId, timestamp])
   @@map("whatsapp_messages")
+}
+
+// Log of proactive notifications sent to clients (debt reminders, reactivation, etc.)
+// Print queue for automatic silent printing
+model PrintJob {
+  id        Int      @id @default(autoincrement())
+  tipo      String   @db.VarChar(30) // "cierre" | etc.
+  filename  String   @db.VarChar(255)
+  pdfBase64 String   @db.Text
+  sucursal  String?  @db.VarChar(10)
+  printed   Boolean  @default(false)
+  printedAt DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([printed])
+  @@index([createdAt])
+  @@map("print_jobs")
+}
+
+model NotificationLog {
+  id        Int      @id @default(autoincrement())
+  clientId  String   @db.VarChar(20)
+  tipo      String   @db.VarChar(30) // "deuda" | "reactivacion" | etc.
+  mensaje   String   @db.Text
+  telefono  String?  @db.VarChar(20)
+  enviadoPor String? @db.VarChar(60)
+  ok        Boolean  @default(true)
+  error     String?  @db.VarChar(255)
+  createdAt DateTime @default(now())
+
+  @@index([clientId])
+  @@index([tipo])
+  @@index([createdAt])
+  @@map("notification_log")
+}
+
+model QuickReply {
+  id        Int      @id @default(autoincrement())
+  shortcut  String   @unique @db.VarChar(30)
+  body      String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("quick_replies")
+}
+
+// Cuentas propias (bancos x CUITs)
+model CuentaBancaria {
+  id       Int      @id @default(autoincrement())
+  banco    String   @db.VarChar(60)
+  cuit     String   @db.VarChar(15)
+  alias    String   @db.VarChar(60) // nombre corto visible
+  activa   Boolean  @default(true)
+  createdAt DateTime @default(now())
+  cheques  Cheque[]
+
+  @@map("cuentas_bancarias")
+}
+
+// Cheque — propio emitido o de tercero recibido
+model Cheque {
+  id             Int      @id @default(autoincrement())
+  tipo           String   @db.VarChar(10) // "propio" | "tercero"
+  formato        String   @default("fisico") @db.VarChar(10) // "fisico" | "echeq"
+  numero         String   @db.VarChar(30)
+  banco          String   @db.VarChar(60)
+  monto          Decimal  @db.Decimal(14, 2)
+  fechaEmision   DateTime @db.Date
+  fechaCobro     DateTime @db.Date // fecha de cobro/vencimiento
+
+  // Propios
+  cuentaId       Int?
+  cuenta         CuentaBancaria? @relation(fields: [cuentaId], references: [id])
+
+  // Terceros
+  librador       String?  @db.VarChar(100) // emisor (cliente)
+  cuitLibrador   String?  @db.VarChar(15)
+  clienteCod     String?  @db.VarChar(20) // PunTouch Cliente cod
+
+  // Destino (si ya lo usaste): proveedor a quien se giro o endoso
+  proveedorCod   String?  @db.VarChar(20)
+  proveedorNombre String?  @db.VarChar(120)
+
+  // Estado
+  estado         String   @db.VarChar(20) // "en-cartera" | "en-circulacion" | "pagado" | "depositado" | "rechazado" | "anulado"
+  fechaEstado    DateTime @default(now()) // fecha del ultimo cambio de estado
+
+  observaciones  String?  @db.Text
+  usuario        String?  @db.VarChar(60) // quien lo cargo
+
+  // Reemplazo: cuando un cheque se canjea por otro
+  reemplazaId    Int?     @unique  // este cheque reemplaza a otro (el viejo)
+  reemplaza      Cheque?  @relation("ChequeReemplazo", fields: [reemplazaId], references: [id])
+  reemplazadoPor Cheque?  @relation("ChequeReemplazo")
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([tipo])
+  @@index([estado])
+  @@index([fechaCobro])
+  @@index([proveedorCod])
+  @@index([clienteCod])
+  @@map("cheques")
 }
 
 model ProductoProveedor {

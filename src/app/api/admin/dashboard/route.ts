@@ -202,7 +202,50 @@ export async function GET(req: NextRequest) {
         ${ANULADO_FILTER}
     `;
 
-    // ── 6. Horarios pico ──
+    // ── 6a. Comparativo por sucursal (desglose) ──
+    const comparativoSucursalesQuery = `
+      SELECT
+        LTRIM(RTRIM(t.Sucursal)) AS sucursal,
+        SUM(t.Impo) AS ventas,
+        SUM(t.Impo - CASE WHEN t.Costo >= 999999 THEN t.Cant * ISNULL(s.Costo, 0) ELSE t.Costo END) AS ganancia,
+        COUNT(DISTINCT t.Boleta) AS cantTickets
+      FROM [${dbTransas}].dbo.Transas t
+      OUTER APPLY (SELECT TOP 1 s.Costo FROM [${dbProd}].dbo.Stock s WHERE s.CodProducto = t.Producto AND LTRIM(RTRIM(s.Deposito)) = '0' AND (s.TalleColor IS NULL OR LTRIM(RTRIM(s.TalleColor)) = '') AND s.Costo > 0) s
+      WHERE t.Tipo = 'I'
+        AND t.Fechora >= @desde AND t.Fechora < @hasta
+        ${sucFilter}
+        ${ANULADO_FILTER}
+        AND t.Cant > 0
+      GROUP BY LTRIM(RTRIM(t.Sucursal))
+      ORDER BY SUM(t.Impo) DESC
+    `;
+
+    // ── 6b. Ranking productos por margen ──
+    const topProductosMargenQuery = `
+      SELECT TOP 20
+        LTRIM(RTRIM(t.Producto)) AS sku,
+        LTRIM(RTRIM(ISNULL(p.Nombre, ''))) AS nombre,
+        LTRIM(RTRIM(ISNULL(m.[Desc], ''))) AS marca,
+        SUM(t.Cant) AS cantidad,
+        SUM(t.Impo) AS totalVenta,
+        SUM(CASE WHEN t.Costo >= 999999 THEN t.Cant * ISNULL(s.Costo, 0) ELSE t.Costo END) AS totalCosto,
+        SUM(t.Impo - CASE WHEN t.Costo >= 999999 THEN t.Cant * ISNULL(s.Costo, 0) ELSE t.Costo END) AS ganancia
+      FROM [${dbTransas}].dbo.Transas t
+      LEFT JOIN [${dbProd}].dbo.Productos p ON p.Cod = t.Producto
+      LEFT JOIN [${dbProd}].dbo.Marcas m ON m.Cod = p.Marca
+      OUTER APPLY (SELECT TOP 1 s.Costo FROM [${dbProd}].dbo.Stock s WHERE s.CodProducto = t.Producto AND LTRIM(RTRIM(s.Deposito)) = '0' AND (s.TalleColor IS NULL OR LTRIM(RTRIM(s.TalleColor)) = '') AND s.Costo > 0) s
+      WHERE t.Tipo = 'I'
+        AND t.Fechora >= @desde AND t.Fechora < @hasta
+        ${sucFilter}
+        ${ANULADO_FILTER}
+        AND t.Cant > 0
+        AND t.Impo > 0
+      GROUP BY LTRIM(RTRIM(t.Producto)), LTRIM(RTRIM(ISNULL(p.Nombre, ''))), LTRIM(RTRIM(ISNULL(m.[Desc], '')))
+      HAVING SUM(t.Impo) > 0
+      ORDER BY ganancia DESC
+    `;
+
+    // ── 7. Horarios pico ──
     const horariosPicoQuery = `
       SELECT
         CAST(SUBSTRING(t.Fechora, 9, 2) AS INT) AS hora,
@@ -229,6 +272,8 @@ export async function GET(req: NextRequest) {
       compActualRes,
       compAnteriorRes,
       horariosPicoRes,
+      topProductosMargenRes,
+      comparativoSucursalesRes,
     ] = await Promise.all([
       pool.request().input("desde", desde).input("hasta", hasta).query(ventasDiariasQuery),
       pool.request().input("desdeAnt", desdeAnterior).input("hastaAnt", hastaAnterior).query(ventasDiariasAnteriorQuery),
@@ -239,6 +284,8 @@ export async function GET(req: NextRequest) {
       pool.request().input("desde", desde).input("hasta", hasta).query(comparativoActualQuery),
       pool.request().input("desdeAnt", desdeAnterior).input("hastaAnt", hastaAnterior).query(comparativoAnteriorQuery),
       pool.request().input("desde", desde).input("hasta", hasta).query(horariosPicoQuery),
+      pool.request().input("desde", desde).input("hasta", hasta).query(topProductosMargenQuery),
+      pool.request().input("desde", desde).input("hasta", hasta).query(comparativoSucursalesQuery),
     ]);
 
     // ── Format: ventas diarias ──
@@ -353,6 +400,34 @@ export async function GET(req: NextRequest) {
       .sort(([a], [b]) => a - b)
       .map(([hora, dias]) => ({ hora, ...dias }));
 
+    // ── Format: top productos por margen ──
+    const topProductosMargen = topProductosMargenRes.recordset.map((r: { sku: string; nombre: string; marca: string; cantidad: number; totalVenta: number; totalCosto: number; ganancia: number }) => {
+      const totalVenta = Number(r.totalVenta) || 0;
+      const ganancia = Number(r.ganancia) || 0;
+      return {
+        sku: r.sku,
+        nombre: r.nombre,
+        marca: r.marca,
+        cantidad: Number(r.cantidad) || 0,
+        totalVenta,
+        totalCosto: Number(r.totalCosto) || 0,
+        ganancia,
+        margen: totalVenta > 0 ? ((ganancia / totalVenta) * 100).toFixed(1) : "0",
+      };
+    });
+
+    const comparativoSucursales = comparativoSucursalesRes.recordset.map((r: { sucursal: string; ventas: number; ganancia: number; cantTickets: number }) => {
+      const ventas = Number(r.ventas) || 0;
+      const ganancia = Number(r.ganancia) || 0;
+      return {
+        sucursal: r.sucursal,
+        ventas,
+        ganancia,
+        cantTickets: Number(r.cantTickets) || 0,
+        margen: ventas > 0 ? ((ganancia / ventas) * 100).toFixed(1) : "0",
+      };
+    });
+
     return NextResponse.json({
       ventasDiarias,
       ventasDiariasMesAnterior,
@@ -361,6 +436,8 @@ export async function GET(req: NextRequest) {
       empleados,
       comparativo,
       horariosPico,
+      topProductosMargen,
+      comparativoSucursales,
     });
   } catch (error) {
     console.error("Dashboard API error:", error);

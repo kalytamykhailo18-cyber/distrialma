@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { useState, useRef, useEffect } from "react";
 import { useCart } from "./CartProvider";
-import { isStaffUser } from "@/lib/permissions";
+import { isStaffUser, hasPermission } from "@/lib/permissions";
 import {
   HiOutlineShoppingCart, HiOutlineUser, HiChevronDown, HiX, HiMenu,
   HiOutlineCube, HiOutlineCog, HiOutlineViewGrid, HiOutlineTag,
@@ -47,8 +47,9 @@ export default function Navbar() {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const { totalItems } = useCart();
 
-  const user = session?.user as { role?: string; name?: string } | undefined;
+  const user = session?.user as { role?: string; name?: string; permissions?: string[] } | undefined;
   const role = user?.role;
+  const permissions = user?.permissions;
   const isStaff = isStaffUser(role);
 
   // Close dropdown on outside click
@@ -67,7 +68,6 @@ export default function Navbar() {
   const NAV_TABS = isStaff
     ? [
         { href: "/productos", label: "Productos", match: "/productos" },
-        { href: "/admin/dashboard", label: "Dashboard", match: "/admin" },
       ]
     : session?.user
     ? [
@@ -114,9 +114,22 @@ export default function Navbar() {
     </>
   );
 
-  const menuItems = (!session?.user || isStaff) ? [] : [
-    { href: "/lista-precios", label: "Lista Precios", iconKey: "lista-precios" },
+  const STAFF_MENU_ALL: { href: string; label: string; iconKey: string; perm: string }[] = [
+    { href: "/admin/pedidos", label: "Pedidos", iconKey: "pedidos", perm: "pedidos" },
+    { href: "/admin/compras", label: "Ingresos", iconKey: "compras", perm: "compras" },
+    { href: "/admin/picking", label: "Picking", iconKey: "picking", perm: "picking" },
+    { href: "/admin/reparto", label: "Reparto", iconKey: "reparto", perm: "reparto" },
+    { href: "/admin/cierre-caja", label: "Cierre Caja", iconKey: "informes", perm: "cierre-caja" },
+    { href: "/admin/movimientos", label: "Movimientos", iconKey: "compras", perm: "movimientos" },
+    { href: "/admin/precios", label: "Precios", iconKey: "precios", perm: "costeo" },
+    { href: "/admin/dashboard", label: "Dashboard", iconKey: "informes", perm: "dashboard" },
   ];
+
+  const menuItems = !session?.user ? [] : isStaff
+    ? STAFF_MENU_ALL.filter((item) => hasPermission(role, permissions, item.perm as Parameters<typeof hasPermission>[2]))
+    : [
+        { href: "/lista-precios", label: "Lista Precios", iconKey: "lista-precios" },
+      ];
 
   return (
     <nav className="bg-white shadow-md border-b border-gray-200 sticky top-0 z-40">
@@ -145,12 +158,6 @@ export default function Navbar() {
 
           {/* User menu */}
           {session?.user ? (
-            isStaff ? (
-              <span className="flex items-center gap-1.5 text-sm text-gray-500 px-3 py-1.5">
-                <HiOutlineUser className="w-4 h-4" />
-                <span className="max-w-[120px] truncate">{session.user.name}</span>
-              </span>
-            ) : (
               <div className="relative" ref={dropdownRef}>
                 <button
                   onClick={() => setDropdownOpen(!dropdownOpen)}
@@ -193,7 +200,6 @@ export default function Navbar() {
                   </button>
                 </div>
               </div>
-            )
           ) : (
             <Link
               href="/login"
@@ -237,45 +243,43 @@ export default function Navbar() {
           <div className="flex flex-col gap-3">
             {navLinks}
           </div>
-          {!isStaff && (
-            <div className="border-t pt-3 flex flex-col gap-1">
-              {session?.user && (
-                <span className="text-sm text-gray-500 font-medium px-2 mb-1">{session.user.name}</span>
-              )}
-              {menuItems.map((item) => {
-                const Icon = ICON_MAP[item.iconKey];
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    onClick={() => setMenuOpen(false)}
-                    className="flex items-center gap-2.5 text-sm text-gray-600 hover:text-brand-600 hover:bg-gray-50 px-2 py-1.5 rounded-lg transition-colors"
-                  >
-                    {Icon && <Icon className="w-4 h-4 text-gray-400" />}
-                    {item.label}
-                  </Link>
-                );
-              })}
-              {session?.user ? (
-                <button
-                  onClick={() => { setSigningOut(true); signOut(); setMenuOpen(false); }}
-                  disabled={signingOut}
-                  className="flex items-center gap-2.5 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50 text-left px-2 py-1.5 rounded-lg transition-colors"
-                >
-                  <HiOutlineLogout className="w-4 h-4" />
-                  {signingOut ? "Saliendo..." : "Salir"}
-                </button>
-              ) : (
+          <div className="border-t pt-3 flex flex-col gap-1">
+            {session?.user && (
+              <span className="text-sm text-gray-500 font-medium px-2 mb-1">{session.user.name}</span>
+            )}
+            {menuItems.map((item) => {
+              const Icon = ICON_MAP[item.iconKey];
+              return (
                 <Link
-                  href="/login"
-                  className="text-sm bg-brand-400 text-white px-4 py-2 rounded-lg hover:bg-brand-500 text-center mt-1"
+                  key={item.href}
+                  href={item.href}
                   onClick={() => setMenuOpen(false)}
+                  className="flex items-center gap-2.5 text-sm text-gray-600 hover:text-brand-600 hover:bg-gray-50 px-2 py-1.5 rounded-lg transition-colors"
                 >
-                  Ingresar
+                  {Icon && <Icon className="w-4 h-4 text-gray-400" />}
+                  {item.label}
                 </Link>
-              )}
-            </div>
-          )}
+              );
+            })}
+            {session?.user ? (
+              <button
+                onClick={() => { setSigningOut(true); signOut(); setMenuOpen(false); }}
+                disabled={signingOut}
+                className="flex items-center gap-2.5 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50 text-left px-2 py-1.5 rounded-lg transition-colors"
+              >
+                <HiOutlineLogout className="w-4 h-4" />
+                {signingOut ? "Saliendo..." : "Salir"}
+              </button>
+            ) : (
+              <Link
+                href="/login"
+                className="text-sm bg-brand-400 text-white px-4 py-2 rounded-lg hover:bg-brand-500 text-center mt-1"
+                onClick={() => setMenuOpen(false)}
+              >
+                Ingresar
+              </Link>
+            )}
+          </div>
         </div>
       </div>
     </nav>

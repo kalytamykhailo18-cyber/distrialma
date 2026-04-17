@@ -34,30 +34,40 @@ export async function GET(req: NextRequest) {
         nuevoInicio: true,
         cantVentas: true,
         createdAt: true,
+        chargedAt: true,
+        chargedBy: true,
       },
     });
 
     // Group by responsable
-    const byEmpleado = new Map<string, { nombre: string; cierres: number; totalDiferencia: number; diferencias: Array<{ id: number; fecha: string; sucursal: string; diferencia: number; ventas: number }> }>();
+    const byEmpleado = new Map<string, { nombre: string; cierres: number; totalDiferencia: number; totalPendiente: number; totalSobrante: number; diferencias: Array<{ id: number; fecha: string; sucursal: string; diferencia: number; ventas: number; chargedAt: string | null; chargedBy: string | null }> }>();
 
     for (const c of cierres) {
       const dif = Number(c.diferencia);
-      // Only count faltantes (negative). Positive differences are errors, skip them.
-      if (dif >= 0) continue;
+      // Skip exact zero
+      if (dif === 0) continue;
 
       const nombre = c.responsable || c.usuario || "Sin nombre";
       if (!byEmpleado.has(nombre)) {
-        byEmpleado.set(nombre, { nombre, cierres: 0, totalDiferencia: 0, diferencias: [] });
+        byEmpleado.set(nombre, { nombre, cierres: 0, totalDiferencia: 0, totalPendiente: 0, totalSobrante: 0, diferencias: [] });
       }
       const emp = byEmpleado.get(nombre)!;
       emp.cierres++;
-      emp.totalDiferencia += dif;
+      // Only faltantes (negative) count for totals/pendiente
+      if (dif < 0) {
+        emp.totalDiferencia += dif;
+        if (!c.chargedAt) emp.totalPendiente += dif;
+      } else {
+        emp.totalSobrante += dif;
+      }
       emp.diferencias.push({
         id: c.id,
         fecha: c.createdAt.toISOString(),
         sucursal: c.sucursal,
         diferencia: dif,
         ventas: c.cantVentas,
+        chargedAt: c.chargedAt ? c.chargedAt.toISOString() : null,
+        chargedBy: c.chargedBy,
       });
     }
 
@@ -73,18 +83,39 @@ export async function GET(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
-  if (!(await requireStaff())) {
+  const session = await requireStaff();
+  if (!session) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
   try {
-    const { id, diferencia } = await req.json();
+    const body = await req.json();
+    const { id, diferencia, charge, uncharge } = body;
     if (!id) return NextResponse.json({ error: "ID requerido" }, { status: 400 });
 
-    await prisma.cierreCaja.update({
-      where: { id },
-      data: { diferencia: parseFloat(diferencia) || 0 },
-    });
+    if (charge) {
+      const userName = (session.user as { name?: string })?.name || "admin";
+      await prisma.cierreCaja.update({
+        where: { id },
+        data: { chargedAt: new Date(), chargedBy: userName },
+      });
+      return NextResponse.json({ ok: true });
+    }
+
+    if (uncharge) {
+      await prisma.cierreCaja.update({
+        where: { id },
+        data: { chargedAt: null, chargedBy: null },
+      });
+      return NextResponse.json({ ok: true });
+    }
+
+    if (diferencia !== undefined) {
+      await prisma.cierreCaja.update({
+        where: { id },
+        data: { diferencia: parseFloat(diferencia) || 0 },
+      });
+    }
 
     return NextResponse.json({ ok: true });
   } catch (error) {

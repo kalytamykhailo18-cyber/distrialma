@@ -492,11 +492,50 @@ client.on("message", async (msg) => {
     return;
   }
 
-  // Image messages → acknowledge as transfer (only if not in recruitment)
+  // Image messages → save as transfer receipt (only if not in recruitment)
   if (msg.hasMedia && msg.type === "image") {
     botReplying.add(chatId);
     try {
+      // Download and save the image
+      const media = await msg.downloadMedia();
+      if (media) {
+        const phoneNumber = chatId.replace("@c.us", "").replace("@lid", "");
+        const clientInfo = await findClientByPhone(phoneNumber).catch(() => null);
+        const contactName = (await msg.getContact().catch(() => null))?.pushname || clientInfo?.nombre || phoneNumber;
+        const ts = new Date();
+        const dateStr = ts.toISOString().slice(0, 10);
+        const timeStr = ts.toTimeString().slice(0, 8).replace(/:/g, "-");
+        const safeName = String(contactName).replace(/[^a-zA-Z0-9]/g, "_").slice(0, 40);
+        const ext = (media.mimetype?.split("/")[1] || "jpg").split(";")[0];
+        const dir = `./session/transferencias/${dateStr}`;
+        try { fs.mkdirSync(dir, { recursive: true }); } catch {}
+        const filename = `${dir}/${timeStr}_${safeName}.${ext}`;
+        try {
+          fs.writeFileSync(filename, Buffer.from(media.data, "base64"));
+          console.log(`[TRANSFER] Saved: ${filename}`);
+        } catch (e) { console.error("[TRANSFER] save error:", e.message); }
+
+        // Store metadata in DB so it appears in inbox
+        try {
+          await prisma.whatsAppMessage.create({
+            data: {
+              chatId,
+              direction: "in",
+              body: `[Imagen] ${filename.replace("./session/", "")}`,
+              sender: "contact",
+              mediaType: media.mimetype || "image",
+            },
+          });
+          await prisma.whatsAppChat.upsert({
+            where: { chatId },
+            create: { chatId, contactName: String(contactName), contactPhone: phoneNumber, lastMessage: "[Imagen — posible transferencia]", lastMessageAt: new Date(), unread: 1 },
+            update: { lastMessage: "[Imagen — posible transferencia]", lastMessageAt: new Date(), unread: { increment: 1 } },
+          });
+        } catch (e) { console.error("[TRANSFER] db error:", e.message); }
+      }
       await msg.reply("Recibido, aguardá un momento que verificamos la transferencia y te confirmamos.");
+    } catch (e) {
+      console.error("[TRANSFER] error:", e.message);
     } finally {
       setTimeout(() => botReplying.delete(chatId), 2000);
     }
@@ -622,12 +661,18 @@ const httpServer = http.createServer(async (req, res) => {
     req.on("data", (c) => body += c);
     req.on("end", async () => {
       try {
-        const { chatId, message } = JSON.parse(body);
+        const { chatId, message, addToContext, sender } = JSON.parse(body);
         if (!chatId || !message) { res.writeHead(400); res.end('{"error":"chatId and message required"}'); return; }
         inboxReplying.add(chatId);
         await client.sendMessage(chatId, message);
-        storeMessage(chatId, "out", message, "human");
+        storeMessage(chatId, "out", message, sender || "human");
         console.log(`[INBOX] ${chatId}: ${message.substring(0, 60)}`);
+        // If requested, seed conversation so Claude has context when the client replies
+        if (addToContext) {
+          const existing = conversations.get(chatId) || [];
+          existing.push({ role: "assistant", content: message });
+          conversations.set(chatId, existing);
+        }
         setTimeout(() => inboxReplying.delete(chatId), 10000);
         res.writeHead(200); res.end('{"ok":true}');
       } catch (e) {

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useCategories } from "./CategoriesProvider";
-import { HiMenu } from "react-icons/hi";
+import { HiChevronDown } from "react-icons/hi";
 
 export default function CategorySidebar({
   activeId,
@@ -80,16 +80,7 @@ export default function CategorySidebar({
     }
   }, [brands]);
 
-  useEffect(() => {
-    if (open) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "";
-    }
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, [open]);
+  // No longer needed — mobile uses inline collapsible, not a full-screen drawer
 
   const filteredCats = useMemo(() => {
     if (!filter.trim()) return categories;
@@ -215,40 +206,24 @@ export default function CategorySidebar({
 
   return (
     <>
-      {/* Mobile toggle button */}
-      <button
-        onClick={() => setOpen(true)}
-        className="md:hidden fixed bottom-4 left-4 z-30 flex items-center gap-2 px-4 py-3 bg-brand-400 text-white rounded-full shadow-lg text-sm font-medium"
-      >
-        <HiMenu className="w-5 h-5" />
-        Filtros
-      </button>
-
-      {/* Mobile overlay */}
-      <div
-        className={`md:hidden fixed inset-0 bg-black/50 z-40 transition-opacity duration-300 ${
-          open ? "opacity-100" : "opacity-0 pointer-events-none"
-        }`}
-        onClick={() => setOpen(false)}
-      />
-
-      {/* Mobile drawer */}
-      <aside
-        className={`md:hidden fixed top-0 left-0 h-full w-72 bg-white z-50 shadow-xl transform transition-transform duration-300 ease-in-out overflow-y-auto ${
-          open ? "translate-x-0" : "-translate-x-full"
-        }`}
-      >
-        <div className="flex items-center justify-between px-4 py-4 border-b">
-          <h2 className="font-semibold text-gray-900 text-lg">Filtros</h2>
-          <button
-            onClick={() => setOpen(false)}
-            className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-500 text-lg"
-          >
-            ✕
-          </button>
+      {/* Mobile: inline collapsible */}
+      <div className="md:hidden mb-4">
+        <button
+          onClick={() => setOpen(!open)}
+          className="w-full flex items-center justify-between px-4 py-3 bg-white border rounded-xl shadow-sm text-sm font-medium text-gray-700 transition-colors duration-200 hover:bg-gray-50"
+        >
+          <span>{tab === "categorias" ? "Categorías" : "Marcas"}</span>
+          <HiChevronDown className={`w-4 h-4 transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${open ? "rotate-180" : ""}`} />
+        </button>
+        <div
+          className="overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)]"
+          style={{ maxHeight: open ? 400 : 0, opacity: open ? 1 : 0 }}
+        >
+          <div className="bg-white border border-t-0 rounded-b-xl shadow-sm">
+            {sidebarContent}
+          </div>
         </div>
-        {sidebarContent}
-      </aside>
+      </div>
 
       {/* Desktop static sidebar */}
       <div className="hidden md:block">

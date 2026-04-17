@@ -196,7 +196,7 @@ export default function CombosPage() {
       </Stagger>
 
       {/* Form */}
-      <Stagger delay={50}>
+      <Stagger delay={50} zIndex={results.length > 0 ? 60 : undefined}>
         <div className="bg-white rounded-xl border shadow-sm p-4 mb-6">
           <h2 className="text-sm font-medium text-gray-700 mb-3">
             {editId ? "Editar combo" : "Crear combo"}
@@ -228,7 +228,7 @@ export default function CombosPage() {
           />
 
           {/* Product search */}
-          <div className="relative mb-3">
+          <div className="relative mb-3" style={{ zIndex: results.length > 0 ? 60 : "auto" }}>
             <input
               type="text"
               value={search}
@@ -238,7 +238,7 @@ export default function CombosPage() {
             />
             {searching && <span className="absolute right-3 top-2.5 text-gray-400 text-xs">Buscando...</span>}
             {results.length > 0 && (
-              <div className="absolute z-10 w-full mt-1 bg-white border rounded-xl shadow-lg max-h-48 overflow-y-auto">
+              <div className="absolute left-0 right-0 z-50 bg-white border rounded-xl shadow-lg mt-1 max-h-48 overflow-y-auto">
                 {results.map((p) => {
                   const added = items.some((i) => i.sku === p.sku);
                   return (

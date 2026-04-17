@@ -6,17 +6,23 @@ import { useRouter } from "next/navigation";
 import { formatPrice } from "@/lib/utils";
 import { hasPermission } from "@/lib/permissions";
 import { FaWhatsapp } from "react-icons/fa";
-import { HiOutlineDocumentDownload } from "react-icons/hi";
+import { HiOutlineDocumentDownload, HiOutlineCheck, HiOutlineRefresh, HiOutlineX, HiOutlineTruck } from "react-icons/hi";
 import { PageTransition, Stagger, staggerStyle, springBtn, hoverRow, LoadingCenter } from "@/components/AnimateIn";
 
 interface Client {
   cod: string;
   nombre: string;
   address: string;
+  localidad: string;
+  zona: string;
   telefono: string;
   hasOrder: boolean;
   status: "facturado" | "pendiente" | "none";
   orderCount: number;
+  totalPlata: number;
+  totalMercaderia: number;
+  facturadoPlata: number;
+  facturadoMercaderia: number;
   lastOrderTotal: number;
   lastOrderDate: string | null;
 }
@@ -36,6 +42,65 @@ export default function RepartoPage() {
   const [loading, setLoading] = useState(true);
   const [selectedDay, setSelectedDay] = useState<string>("");
   const [filter, setFilter] = useState("");
+  const [deliveryStatuses, setDeliveryStatuses] = useState<Record<string, { estado: string; observaciones: string | null; deliveredBy: string | null }>>({});
+  const [showDeliveryOnly, setShowDeliveryOnly] = useState<"all" | "pending" | "done">("all");
+  const [sortBy, setSortBy] = useState<"nombre" | "zona" | "estado">("nombre");
+
+  // Today's date for delivery tracking
+  const todayDate = new Date().toISOString().slice(0, 10);
+
+  async function loadDeliveryStatuses() {
+    try {
+      const res = await fetch(`/api/reparto/status?fecha=${todayDate}`);
+      const d = await res.json();
+      const map: Record<string, { estado: string; observaciones: string | null; deliveredBy: string | null }> = {};
+      for (const s of (d.statuses || [])) {
+        map[s.clientId] = { estado: s.estado, observaciones: s.observaciones, deliveredBy: s.deliveredBy };
+      }
+      setDeliveryStatuses(map);
+    } catch {}
+  }
+
+  async function setDeliveryStatus(clientId: string, estado: string) {
+    const existing = deliveryStatuses[clientId];
+    // If clicking the same status again, undo
+    if (existing?.estado === estado) {
+      await fetch(`/api/reparto/status?clientId=${clientId}&fecha=${todayDate}`, { method: "DELETE" });
+    } else {
+      await fetch("/api/reparto/status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clientId, fecha: todayDate, estado }),
+      });
+
+      // Send WhatsApp notification to client
+      const client = data?.clients.find((c) => c.cod === clientId);
+      if (client?.telefono) {
+        const nombre = client.nombre.split(" ")[0]; // first name
+        let msg = "";
+        if (estado === "entregado") {
+          msg = `Hola ${nombre}! Tu pedido de Distrialma fue entregado. Gracias por tu compra! Cualquier consulta estamos a disposicion.\n\n_Este es un mensaje automatico_`;
+        } else if (estado === "reintentar") {
+          const hora = new Date().toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Argentina/Buenos_Aires" });
+          msg = `Hola ${nombre}, pasamos por tu domicilio a las ${hora} y no pudimos entregar tu pedido de Distrialma. Vamos a reintentar la entrega. Si necesitas coordinar un horario, avisanos.\n\n_Este es un mensaje automatico_`;
+        }
+        if (msg) {
+          try {
+            await fetch("/api/admin/notificaciones/send", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                recipients: [{ cod: clientId, nombre: client.nombre, telefono: client.telefono, saldo: 0 }],
+                message: msg,
+                tipo: "reparto",
+              }),
+            });
+          } catch { /* silent */ }
+        }
+      }
+    }
+    loadDeliveryStatuses();
+  }
 
   const user = session?.user as { role?: string; permissions?: string[] } | undefined;
   const allowed = hasPermission(user?.role, user?.permissions, "reparto");
@@ -52,8 +117,9 @@ export default function RepartoPage() {
   useEffect(() => {
     if (status === "authenticated" && allowed) {
       loadData(selectedDay);
+      loadDeliveryStatuses();
     }
-  }, [status, allowed, selectedDay]);
+  }, [status, allowed, selectedDay]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function loadData(day: string) {
     setLoading(true);
@@ -189,11 +255,58 @@ export default function RepartoPage() {
     doc.save(`Reparto-${selectedDay}-${new Date().toISOString().slice(0, 10)}.pdf`);
   }
 
-  const filtered = data?.clients.filter((c) => {
-    if (!filter.trim()) return true;
-    const term = filter.toLowerCase();
-    return c.nombre.toLowerCase().includes(term) || c.cod.includes(term);
+  const isTodaySelected = selectedDay === data?.today;
+  const filteredRaw = data?.clients.filter((c) => {
+    if (filter.trim()) {
+      const term = filter.toLowerCase();
+      if (!(c.nombre.toLowerCase().includes(term) || c.cod.includes(term) || (c.zona || "").toLowerCase().includes(term) || (c.localidad || "").toLowerCase().includes(term))) return false;
+    }
+    if (isTodaySelected && showDeliveryOnly !== "all") {
+      const status = deliveryStatuses[c.cod];
+      if (showDeliveryOnly === "pending" && status) return false;
+      if (showDeliveryOnly === "done" && !status) return false;
+    }
+    return true;
   }) || [];
+
+  const filtered = [...filteredRaw].sort((a, b) => {
+    if (sortBy === "zona") {
+      const za = a.zona || "zzz";
+      const zb = b.zona || "zzz";
+      if (za !== zb) return za.localeCompare(zb);
+      return a.nombre.localeCompare(b.nombre);
+    }
+    if (sortBy === "estado") {
+      const order = { pendiente: 0, facturado: 1, none: 2 };
+      if (a.status !== b.status) return order[a.status] - order[b.status];
+      return a.nombre.localeCompare(b.nombre);
+    }
+    return a.nombre.localeCompare(b.nombre);
+  });
+
+  // Group by zone when sortBy === "zona"
+  const zoneGroups = sortBy === "zona"
+    ? filtered.reduce((acc: { zona: string; clients: Client[] }[], c) => {
+        const key = c.zona || "Sin zona";
+        const existing = acc.find((g) => g.zona === key);
+        if (existing) existing.clients.push(c);
+        else acc.push({ zona: key, clients: [c] });
+        return acc;
+      }, [])
+    : null;
+
+  // Delivery progress stats (only for today)
+  // Base the progress on clients that actually have something to deliver
+  // (status facturado or pendiente), not on the total clients of the day.
+  const clientsToDeliver = data?.clients.filter((c) => c.status === "facturado" || c.status === "pendiente") || [];
+  const toDeliverIds = new Set(clientsToDeliver.map((c) => c.cod));
+  const deliveryProgress = isTodaySelected ? {
+    totalClientes: data?.clients.length || 0,
+    total: clientsToDeliver.length,
+    entregados: Object.entries(deliveryStatuses).filter(([cod, s]) => s.estado === "entregado" && toDeliverIds.has(cod)).length,
+    reintentar: Object.entries(deliveryStatuses).filter(([cod, s]) => s.estado === "reintentar" && toDeliverIds.has(cod)).length,
+    rechazados: Object.entries(deliveryStatuses).filter(([cod, s]) => s.estado === "rechazado" && toDeliverIds.has(cod)).length,
+  } : null;
 
   return (
     <PageTransition>
@@ -249,16 +362,102 @@ export default function RepartoPage() {
           </Stagger>
         )}
 
-        {/* Search + Export */}
+        {/* Money & merchandise summary */}
+        {data && (() => {
+          const totalPlataFacturado = data.clients.reduce((s, c) => s + (c.facturadoPlata || 0), 0);
+          const totalMercaderiaFacturado = data.clients.reduce((s, c) => s + (c.facturadoMercaderia || 0), 0);
+          const totalPlataPedidosWeb = data.clients
+            .filter((c) => c.status === "pendiente")
+            .reduce((s, c) => s + (c.totalPlata || 0), 0);
+          const totalMercaderiaPedidosWeb = data.clients
+            .filter((c) => c.status === "pendiente")
+            .reduce((s, c) => s + (c.totalMercaderia || 0), 0);
+          if (totalPlataFacturado === 0 && totalPlataPedidosWeb === 0) return null;
+          return (
+            <Stagger delay={85}>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+                <div className="bg-white border-2 border-green-300 rounded-xl p-3 shadow-sm">
+                  <div className="text-xs text-green-700 font-semibold mb-1">Facturado (a repartir)</div>
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="text-xl font-bold text-green-700">{formatPrice(totalPlataFacturado)}</span>
+                    <span className="text-sm text-gray-600">{totalMercaderiaFacturado.toLocaleString("es-AR", { maximumFractionDigits: 1 })} unid/kg</span>
+                  </div>
+                </div>
+                <div className="bg-white border-2 border-yellow-300 rounded-xl p-3 shadow-sm">
+                  <div className="text-xs text-yellow-700 font-semibold mb-1">Pedidos web (sin facturar)</div>
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="text-xl font-bold text-yellow-700">{formatPrice(totalPlataPedidosWeb)}</span>
+                    <span className="text-sm text-gray-600">{totalMercaderiaPedidosWeb.toLocaleString("es-AR", { maximumFractionDigits: 1 })} unid/kg</span>
+                  </div>
+                </div>
+              </div>
+            </Stagger>
+          );
+        })()}
+
+        {/* Delivery progress bar (only when today is selected) */}
+        {isTodaySelected && deliveryProgress && deliveryProgress.total > 0 && (
+          <Stagger delay={90}>
+            <div className="bg-white border rounded-xl p-3 mb-4 shadow-sm">
+              <div className="flex items-center gap-2 mb-2">
+                <HiOutlineTruck className="w-4 h-4 text-brand-500" />
+                <span className="text-sm font-semibold text-gray-700">Entregas de hoy</span>
+                <span className="ml-auto text-xs text-gray-500">
+                  <strong className="text-gray-900">{deliveryProgress.entregados + deliveryProgress.reintentar + deliveryProgress.rechazados} / {deliveryProgress.total}</strong>
+                  <span className="ml-2 text-gray-400">a entregar</span>
+                  <span className="ml-2 text-gray-400">({deliveryProgress.totalClientes} clientes del dia)</span>
+                </span>
+              </div>
+              <div className="h-2 bg-gray-100 rounded-full overflow-hidden flex">
+                {deliveryProgress.entregados > 0 && (
+                  <div className="bg-green-500 transition-all duration-300" style={{ width: `${(deliveryProgress.entregados / deliveryProgress.total) * 100}%` }} />
+                )}
+                {deliveryProgress.reintentar > 0 && (
+                  <div className="bg-amber-400 transition-all duration-300" style={{ width: `${(deliveryProgress.reintentar / deliveryProgress.total) * 100}%` }} />
+                )}
+                {deliveryProgress.rechazados > 0 && (
+                  <div className="bg-red-500 transition-all duration-300" style={{ width: `${(deliveryProgress.rechazados / deliveryProgress.total) * 100}%` }} />
+                )}
+              </div>
+              <div className="flex flex-wrap gap-3 mt-2 text-xs">
+                <span className="text-green-700"><span className="inline-block w-2 h-2 rounded-full bg-green-500 mr-1" />Entregados: <strong>{deliveryProgress.entregados}</strong></span>
+                <span className="text-amber-700"><span className="inline-block w-2 h-2 rounded-full bg-amber-400 mr-1" />Reintentar: <strong>{deliveryProgress.reintentar}</strong></span>
+                <span className="text-red-700"><span className="inline-block w-2 h-2 rounded-full bg-red-500 mr-1" />Rechazados: <strong>{deliveryProgress.rechazados}</strong></span>
+                <span className="text-gray-500 ml-auto">Pendientes: <strong>{deliveryProgress.total - deliveryProgress.entregados - deliveryProgress.reintentar - deliveryProgress.rechazados}</strong></span>
+              </div>
+            </div>
+          </Stagger>
+        )}
+
+        {/* Search + Export + delivery filter */}
         <Stagger delay={100}>
-          <div className="flex gap-2 mb-4">
+          <div className="flex flex-wrap gap-2 mb-4">
             <input
               type="text"
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
               placeholder="Buscar cliente..."
-              className="flex-1 px-4 py-2 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
+              className="flex-1 min-w-[150px] px-4 py-2 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
             />
+            {isTodaySelected && (
+              <div className="flex gap-1">
+                {[{k: "all", l: "Todos"}, {k: "pending", l: "Pendientes"}, {k: "done", l: "Entregados"}].map((o) => (
+                  <button key={o.k} onClick={() => setShowDeliveryOnly(o.k as "all" | "pending" | "done")}
+                    className={`px-3 py-2 rounded-lg text-xs font-medium ${springBtn} ${showDeliveryOnly === o.k ? "bg-brand-500 text-white" : "bg-white border text-gray-600 hover:bg-gray-50"}`}>
+                    {o.l}
+                  </button>
+                ))}
+              </div>
+            )}
+            <div className="flex items-center gap-1 bg-white border rounded-lg px-2">
+              <span className="text-xs text-gray-500 hidden sm:inline">Orden:</span>
+              {[{k: "nombre", l: "Nombre"}, {k: "zona", l: "Zona"}, {k: "estado", l: "Estado"}].map((o) => (
+                <button key={o.k} onClick={() => setSortBy(o.k as "nombre" | "zona" | "estado")}
+                  className={`px-2 py-1.5 rounded text-xs font-medium ${springBtn} ${sortBy === o.k ? "bg-brand-500 text-white" : "text-gray-600 hover:bg-gray-50"}`}>
+                  {o.l}
+                </button>
+              ))}
+            </div>
             {filtered.length > 0 && (
               <button
                 onClick={exportPDF}
@@ -277,76 +476,120 @@ export default function RepartoPage() {
             <LoadingCenter />
           ) : filtered.length === 0 ? (
             <p className="text-gray-400">No hay clientes para {selectedDay}.</p>
-          ) : (
-            <div className="space-y-2">
-              {filtered.map((client, i) => (
-                <div
-                  key={client.cod}
-                  style={staggerStyle(true, i)}
-                  className={`rounded-lg border p-3 flex items-center gap-3 shadow-sm ${hoverRow} ${
-                    client.status === "facturado"
-                      ? "bg-green-50 border-green-200"
-                      : client.status === "pendiente"
-                      ? "bg-yellow-50 border-yellow-200"
-                      : "bg-red-50 border-red-200"
-                  }`}
-                >
-                  {/* Semaforo */}
-                  <div className={`w-4 h-4 rounded-full shrink-0 ${
-                    client.status === "facturado"
-                      ? "bg-green-500"
-                      : client.status === "pendiente"
-                      ? "bg-yellow-400"
-                      : "bg-red-500"
-                  }`} />
-
-                  {/* Client info */}
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-gray-900 text-sm">{client.nombre}</p>
-                    <div className="flex flex-wrap gap-x-3 text-xs text-gray-500">
-                      {client.address && <span>{client.address}</span>}
-                      {client.telefono && (() => {
-                        let num = client.telefono.replace(/\D/g, "");
-                        // Remove leading 54 or 549 if already included
-                        if (num.startsWith("549")) num = num.slice(3);
-                        else if (num.startsWith("54")) num = num.slice(2);
-                        const waLink = `https://api.whatsapp.com/send?phone=549${num}`;
-                        return (
-                          <a href={waLink}
-                             target="_blank" rel="noopener noreferrer"
-                             className="text-green-600 hover:underline flex items-center gap-1">
-                            <FaWhatsapp className="w-3 h-3" />
-                            {client.telefono}
-                          </a>
-                        );
-                      })()}
-                    </div>
+          ) : sortBy === "zona" && zoneGroups ? (
+            <div className="space-y-4">
+              {zoneGroups.map((group, gi) => (
+                <div key={group.zona} className="space-y-2">
+                  <div className="flex items-center gap-2 px-2 py-1 bg-brand-100 rounded-lg">
+                    <span className="text-sm font-semibold text-brand-700">📍 {group.zona}</span>
+                    <span className="text-xs text-gray-500">({group.clients.length})</span>
                   </div>
-
-                  {/* Order status */}
-                  <div className="text-right shrink-0">
-                    {client.status === "facturado" ? (
-                      <>
-                        <p className="text-sm font-bold text-green-700">{formatPrice(client.lastOrderTotal)}</p>
-                        <p className="text-xs text-green-600">{client.lastOrderDate}</p>
-                        <p className="text-xs text-green-500 font-medium">Facturado</p>
-                      </>
-                    ) : client.status === "pendiente" ? (
-                      <>
-                        <p className="text-sm font-bold text-yellow-700">{formatPrice(client.lastOrderTotal)}</p>
-                        <p className="text-xs text-yellow-600">{client.lastOrderDate}</p>
-                        <p className="text-xs text-yellow-500 font-medium">Pedido web</p>
-                      </>
-                    ) : (
-                      <p className="text-xs font-medium text-red-600">Sin pedido</p>
-                    )}
-                  </div>
+                  {group.clients.map((client, i) => renderClient(client, gi * 100 + i))}
                 </div>
               ))}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {filtered.map((client, i) => renderClient(client, i))}
             </div>
           )}
         </Stagger>
       </div>
     </PageTransition>
   );
+
+  function renderClient(client: Client, i: number) {
+    const delivery = deliveryStatuses[client.cod];
+    const isEntregado = delivery?.estado === "entregado";
+    const isReintentar = delivery?.estado === "reintentar";
+    const isRechazado = delivery?.estado === "rechazado";
+    return (
+      <div
+        key={client.cod}
+        style={staggerStyle(true, i)}
+        className={`rounded-xl border-2 p-3 shadow-sm transition-all duration-200 ${hoverRow} ${
+          isEntregado ? "bg-green-100 border-green-400 opacity-75"
+          : isReintentar ? "bg-amber-50 border-amber-300"
+          : isRechazado ? "bg-red-100 border-red-400"
+          : client.status === "facturado" ? "bg-green-50 border-green-200"
+          : client.status === "pendiente" ? "bg-yellow-50 border-yellow-200"
+          : "bg-red-50 border-red-200"
+        }`}
+      >
+        <div className="flex items-center gap-3">
+          <div className={`w-4 h-4 rounded-full shrink-0 ${
+            client.status === "facturado" ? "bg-green-500"
+            : client.status === "pendiente" ? "bg-yellow-400"
+            : "bg-red-500"
+          }`} />
+          <div className="flex-1 min-w-0">
+            <p className="font-medium text-gray-900 text-sm">{client.nombre}</p>
+            <div className="flex flex-wrap gap-x-3 text-xs text-gray-500">
+              {client.address && <span>{client.address}</span>}
+              {client.localidad && <span className="text-gray-400">{client.localidad}</span>}
+              {client.telefono && (() => {
+                let num = client.telefono.replace(/\D/g, "");
+                if (num.startsWith("549")) num = num.slice(3);
+                else if (num.startsWith("54")) num = num.slice(2);
+                const waLink = `https://api.whatsapp.com/send?phone=549${num}`;
+                return (
+                  <a href={waLink} target="_blank" rel="noopener noreferrer"
+                     className="text-green-600 hover:underline flex items-center gap-1">
+                    <FaWhatsapp className="w-3 h-3" />
+                    {client.telefono}
+                  </a>
+                );
+              })()}
+            </div>
+          </div>
+          <div className="text-right shrink-0">
+            {client.status === "facturado" ? (
+              <>
+                <p className="text-sm font-bold text-green-700">{formatPrice(client.facturadoPlata || client.totalPlata)}</p>
+                <p className="text-xs text-green-600">{(client.facturadoMercaderia || client.totalMercaderia).toLocaleString("es-AR", { maximumFractionDigits: 1 })} unid/kg {client.orderCount > 1 ? `· ${client.orderCount} boletas` : ""}</p>
+                <p className="text-xs text-green-500 font-medium">Facturado</p>
+              </>
+            ) : client.status === "pendiente" ? (
+              <>
+                <p className="text-sm font-bold text-yellow-700">{formatPrice(client.totalPlata)}</p>
+                <p className="text-xs text-yellow-600">{client.totalMercaderia.toLocaleString("es-AR", { maximumFractionDigits: 1 })} unid/kg {client.orderCount > 1 ? `· ${client.orderCount} pedidos` : ""}</p>
+                <p className="text-xs text-yellow-500 font-medium">Pedido web</p>
+              </>
+            ) : (
+              <p className="text-xs font-medium text-red-600">Sin pedido</p>
+            )}
+          </div>
+        </div>
+
+        {isTodaySelected && (
+          <div className="mt-2 pt-2 border-t border-black/5 flex gap-2">
+            <button onClick={() => setDeliveryStatus(client.cod, "entregado")}
+              className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-xs font-semibold transition-all ${springBtn} ${
+                isEntregado ? "bg-green-600 text-white shadow-md" : "bg-white border-2 border-green-300 text-green-700 hover:bg-green-50"
+              }`}>
+              <HiOutlineCheck className="w-4 h-4" />
+              Entregado
+            </button>
+            <button onClick={() => setDeliveryStatus(client.cod, "reintentar")}
+              className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-xs font-semibold transition-all ${springBtn} ${
+                isReintentar ? "bg-amber-500 text-white shadow-md" : "bg-white border-2 border-amber-300 text-amber-700 hover:bg-amber-50"
+              }`}>
+              <HiOutlineRefresh className="w-4 h-4" />
+              Reintentar
+            </button>
+            <button onClick={() => setDeliveryStatus(client.cod, "rechazado")}
+              className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-xs font-semibold transition-all ${springBtn} ${
+                isRechazado ? "bg-red-600 text-white shadow-md" : "bg-white border-2 border-red-300 text-red-700 hover:bg-red-50"
+              }`}>
+              <HiOutlineX className="w-4 h-4" />
+              Rechazado
+            </button>
+          </div>
+        )}
+        {delivery?.deliveredBy && (
+          <div className="mt-1 text-xs text-gray-400 text-right">Por {delivery.deliveredBy}</div>
+        )}
+      </div>
+    );
+  }
 }

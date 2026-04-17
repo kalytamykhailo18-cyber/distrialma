@@ -51,18 +51,22 @@ const MENU_CATEGORIES: MenuCategory[] = [
   {
     label: "Caja", icon: HiOutlineClipboardList, items: [
       { href: "/admin/cierre-caja", label: "Cierre Caja", perm: "informes" },
+      { href: "/admin/resumen-empleado", label: "Descuentos Empleados", perm: "informes" },
+      { href: "/admin/cheques", label: "Cheques", perm: "cheques" },
       { href: "/admin/informes", label: "Informes", perm: "informes" },
     ],
   },
   {
     label: "Reportes", icon: HiOutlineChartBar, items: [
-      { href: "/admin/dashboard", label: "Dashboard", perm: "informes" },
-      { href: "/admin/resumen-productos", label: "Resumen Prod.", perm: "informes" },
+      { href: "/admin/dashboard", label: "Dashboard", perm: "dashboard" },
+      { href: "/admin/resumen-productos", label: "Resumen Prod.", perm: "dashboard" },
     ],
   },
   {
     label: "WhatsApp", icon: HiOutlineChat, items: [
       { href: "/admin/inbox", label: "Inbox", perm: "informes" },
+      { href: "/admin/notificaciones", label: "Deudas", perm: "notificaciones" },
+      { href: "/admin/notificaciones/reactivar", label: "Reactivar clientes", perm: "notificaciones" },
     ],
   },
   {
@@ -142,14 +146,28 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     if (status === "loading") return;
     if (!session?.user || !isStaff) { router.push("/login"); return; }
     if (!allowed) {
-      const firstPerm = permissions?.[0];
-      if (firstPerm) {
-        const entry = Object.entries(PAGE_PERMISSION_MAP).find(([, p]) => p === firstPerm);
-        if (entry) { router.push(entry[0]); return; }
+      // Redirect to first permitted page
+      for (const cat of MENU_CATEGORIES) {
+        for (const item of cat.items) {
+          if (hasPermission(role, permissions, item.perm as Parameters<typeof hasPermission>[2])) {
+            router.push(item.href); return;
+          }
+        }
       }
       router.push("/");
+      return;
     }
-  }, [session, status, router, allowed, isStaff, permissions]);
+    // If on /admin exactly and not admin role, redirect to first permitted page
+    if (pathname === "/admin" && role !== "admin") {
+      for (const cat of MENU_CATEGORIES) {
+        for (const item of cat.items) {
+          if (item.href !== "/admin" && hasPermission(role, permissions, item.perm as Parameters<typeof hasPermission>[2])) {
+            router.push(item.href); return;
+          }
+        }
+      }
+    }
+  }, [session, status, router, allowed, isStaff, permissions, pathname, role]);
 
   if (status === "loading" || !session?.user || !allowed) {
     return <div className="max-w-7xl mx-auto px-4 py-12 text-center text-gray-500">Cargando...</div>;
@@ -164,17 +182,29 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     <div className="flex h-[calc(100vh-57px)] overflow-hidden">
       {/* Mobile overlay */}
       <div
-        className={`fixed inset-0 z-40 lg:hidden transition-opacity duration-300 ${sidebarOpen ? "bg-black/30 opacity-100" : "opacity-0 pointer-events-none"}`}
+        className={`fixed inset-0 z-40 md:hidden transition-opacity duration-300 ${sidebarOpen ? "bg-black/30 opacity-100" : "opacity-0 pointer-events-none"}`}
         onClick={() => setSidebarOpen(false)}
       />
 
       {/* Sidebar */}
-      <aside className={`fixed lg:static inset-y-0 left-0 top-14 z-50 w-56 bg-white border-r flex flex-col transition-transform duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] ${sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}>
+      <aside className={`fixed md:static inset-y-0 left-0 top-14 z-50 w-56 bg-white border-r flex flex-col transition-transform duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] ${sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}>
         <div className="flex-1 overflow-y-auto py-2">
-          {visibleCategories.map((cat) => {
+          {(() => {
+            // Compute the single best-matching item (longest matching href) across all categories
+            const allItems = visibleCategories.flatMap((c) => c.items);
+            let bestMatchHref: string | null = null;
+            let bestMatchLen = -1;
+            for (const item of allItems) {
+              if (item.href === pathname) {
+                if (item.href.length > bestMatchLen) { bestMatchHref = item.href; bestMatchLen = item.href.length; }
+              } else if (item.href !== "/admin" && pathname.startsWith(item.href + "/")) {
+                if (item.href.length > bestMatchLen) { bestMatchHref = item.href; bestMatchLen = item.href.length; }
+              }
+            }
+            return visibleCategories.map((cat) => {
             const isExpanded = expandedCat === cat.label;
             const Icon = cat.icon;
-            const isActive = cat.items.some((item) => item.href === pathname || (item.href !== "/admin" && pathname.startsWith(item.href + "/")));
+            const isActive = cat.items.some((item) => item.href === bestMatchHref);
             return (
               <div key={cat.label}>
                 <button onClick={() => setExpandedCat(isExpanded ? null : cat.label)}
@@ -186,7 +216,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 <CollapsiblePanel open={isExpanded}>
                   <div className="ml-6 border-l pl-2 py-1">
                     {cat.items.map((item, i) => {
-                      const itemActive = item.href === pathname || (item.href !== "/admin" && pathname.startsWith(item.href + "/"));
+                      const itemActive = item.href === bestMatchHref;
                       return (
                         <Link key={item.href} href={item.href}
                           style={{ transitionDelay: isExpanded ? `${i * 30}ms` : "0ms" }}
@@ -199,7 +229,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 </CollapsiblePanel>
               </div>
             );
-          })}
+          });
+          })()}
         </div>
         {/* Logout */}
         <div className="border-t px-3 py-2">
@@ -215,7 +246,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
       {/* Mobile sidebar toggle */}
       <button onClick={() => setSidebarOpen(!sidebarOpen)}
-        className="fixed bottom-4 left-4 z-50 lg:hidden w-12 h-12 bg-brand-500 text-white rounded-full shadow-lg flex items-center justify-center">
+        className="fixed bottom-4 left-4 z-50 md:hidden w-12 h-12 bg-brand-500 text-white rounded-full shadow-lg flex items-center justify-center">
         {sidebarOpen ? <HiX className="w-6 h-6" /> : <HiMenu className="w-6 h-6" />}
       </button>
 

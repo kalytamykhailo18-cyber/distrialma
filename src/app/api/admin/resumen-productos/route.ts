@@ -34,6 +34,8 @@ export async function GET(req: Request) {
           LTRIM(RTRIM(ISNULL(pr.Nombre, ''))) AS nombre,
           LTRIM(RTRIM(ISNULL(m.[Desc], ''))) AS marca,
           LTRIM(RTRIM(ISNULL(r.[Desc], ''))) AS rubro,
+          LTRIM(RTRIM(ISNULL(pr.Unidad, ''))) AS unidad,
+          ISNULL(pr.FillerNum1, 0) AS pesoPorPieza,
           t.ListaPrecio AS lista,
           SUM(t.Cant) AS cantidad,
           SUM(t.Impo) AS totalVenta,
@@ -52,7 +54,8 @@ export async function GET(req: Request) {
           AND (t.Anulado IS NULL OR LTRIM(RTRIM(t.Anulado)) = '' OR t.Anulado = ' ')
           AND t.Cant > 0
         GROUP BY LTRIM(RTRIM(t.Producto)), LTRIM(RTRIM(ISNULL(pr.Nombre, ''))),
-          LTRIM(RTRIM(ISNULL(m.[Desc], ''))), LTRIM(RTRIM(ISNULL(r.[Desc], ''))), t.ListaPrecio
+          LTRIM(RTRIM(ISNULL(m.[Desc], ''))), LTRIM(RTRIM(ISNULL(r.[Desc], ''))),
+          LTRIM(RTRIM(ISNULL(pr.Unidad, ''))), ISNULL(pr.FillerNum1, 0), t.ListaPrecio
         ORDER BY SUM(t.Impo) DESC
       `);
 
@@ -127,7 +130,7 @@ export async function GET(req: Request) {
 
     // Group products: merge listas into one product row
     const productMap = new Map<string, {
-      sku: string; nombre: string; marca: string; rubro: string;
+      sku: string; nombre: string; marca: string; rubro: string; unidad: string; pesoPorPieza: number;
       listas: Record<number, { cantidad: number; totalVenta: number; ganancia: number }>;
       totalVenta: number; totalCosto: number; ganancia: number; cantidad: number;
     }>();
@@ -137,6 +140,7 @@ export async function GET(req: Request) {
       if (!productMap.has(key)) {
         productMap.set(key, {
           sku: row.sku, nombre: row.nombre, marca: row.marca, rubro: row.rubro,
+          unidad: row.unidad || "", pesoPorPieza: Number(row.pesoPorPieza) || 0,
           listas: {}, totalVenta: 0, totalCosto: 0, ganancia: 0, cantidad: 0,
         });
       }
@@ -155,6 +159,7 @@ export async function GET(req: Request) {
     const productos = Array.from(productMap.values()).map((p) => ({
       ...p,
       margen: p.totalVenta > 0 ? ((p.ganancia / p.totalVenta) * 100).toFixed(1) : "0",
+      unidadesAprox: p.unidad === "KG" && p.pesoPorPieza > 0 ? Math.round(p.cantidad / p.pesoPorPieza) : null,
       listas: Object.entries(p.listas).map(([lista, data]) => ({
         lista: Number(lista),
         listaName: LISTA_LABELS[Number(lista)] || `Lista ${lista}`,

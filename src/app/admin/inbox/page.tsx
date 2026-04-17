@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { HiSearch, HiPaperAirplane } from "react-icons/hi";
-import { PageTransition, Stagger, springBtn, hoverRow } from "@/components/AnimateIn";
+import Link from "next/link";
+import { HiSearch, HiPaperAirplane, HiOutlineUser, HiOutlineLocationMarker, HiOutlineCurrencyDollar, HiOutlineClipboardList, HiOutlineX, HiOutlineLightningBolt, HiOutlinePlus, HiOutlineTrash } from "react-icons/hi";
+import { formatPrice } from "@/lib/utils";
+import { PageTransition, Stagger, springBtn, hoverRow, CollapsiblePanel } from "@/components/AnimateIn";
 
 interface Chat {
   id: number;
@@ -21,6 +23,36 @@ interface Message {
   body: string;
   sender: string;
   timestamp: string;
+  mediaType?: string | null;
+}
+
+interface CustomerClient {
+  cod: string;
+  nombre: string;
+  cuit: string;
+  saldo: number;
+  calle: string;
+  localidad: string;
+  telefono: string;
+}
+
+interface CustomerOrder {
+  boleta: string;
+  fechora: string;
+  total: number;
+  items: number;
+}
+
+interface CustomerInfo {
+  found: boolean;
+  clients?: CustomerClient[];
+  orders?: CustomerOrder[];
+}
+
+interface QuickReply {
+  id: number;
+  shortcut: string;
+  body: string;
 }
 
 export default function InboxPage() {
@@ -35,6 +67,41 @@ export default function InboxPage() {
   const pollRef = useRef<ReturnType<typeof setInterval>>();
   const lastMsgCount = useRef(0);
   const userScrolled = useRef(false);
+  const [customer, setCustomer] = useState<CustomerInfo | null>(null);
+  const [customerLoading, setCustomerLoading] = useState(false);
+  const [customerOpen, setCustomerOpen] = useState(false);
+  const [quickReplies, setQuickReplies] = useState<QuickReply[]>([]);
+  const [qrOpen, setQrOpen] = useState(false);
+  const [qrManage, setQrManage] = useState(false);
+  const [newQrShortcut, setNewQrShortcut] = useState("");
+  const [newQrBody, setNewQrBody] = useState("");
+
+  async function loadQuickReplies() {
+    try {
+      const res = await fetch("/api/admin/quick-replies");
+      const d = await res.json();
+      setQuickReplies(d.replies || []);
+    } catch {}
+  }
+
+  async function saveQuickReply() {
+    if (!newQrShortcut.trim() || !newQrBody.trim()) return;
+    await fetch("/api/admin/quick-replies", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ shortcut: newQrShortcut, body: newQrBody }),
+    });
+    setNewQrShortcut("");
+    setNewQrBody("");
+    loadQuickReplies();
+  }
+
+  async function deleteQuickReply(id: number) {
+    await fetch(`/api/admin/quick-replies?id=${id}`, { method: "DELETE" });
+    loadQuickReplies();
+  }
+
+  useEffect(() => { loadQuickReplies(); }, []);
 
   async function loadChats() {
     try {
@@ -78,11 +145,32 @@ export default function InboxPage() {
     setSending(false);
   }
 
+  async function loadCustomer(phone: string) {
+    if (!phone) return;
+    setCustomer(null);
+    setCustomerLoading(true);
+    try {
+      const res = await fetch(`/api/admin/inbox/customer?phone=${encodeURIComponent(phone)}`);
+      const d = await res.json();
+      setCustomer(d);
+    } catch { setCustomer({ found: false }); }
+    setCustomerLoading(false);
+  }
+
   function selectChat(chatId: string) {
     setSelectedChat(chatId);
     userScrolled.current = false;
     lastMsgCount.current = 0;
+    setCustomerOpen(false);
     loadMessages(chatId);
+    // Load customer info based on chat's contactPhone
+    const chat = chats.find((c) => c.chatId === chatId);
+    if (chat) loadCustomer(chat.contactPhone || chatId);
+  }
+
+  function formatOrderDate(f: string): string {
+    if (!f || f.length < 8) return f;
+    return `${f.slice(6, 8)}/${f.slice(4, 6)}/${f.slice(0, 4)}`;
   }
 
   useEffect(() => { loadChats(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -152,15 +240,89 @@ export default function InboxPage() {
               <div className="w-8 h-8 rounded-full bg-brand-100 text-brand-600 flex items-center justify-center text-sm font-bold">
                 {(chats.find((c) => c.chatId === selectedChat)?.contactName || "?")[0].toUpperCase()}
               </div>
-              <div>
-                <div className="text-sm font-medium text-gray-900">
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium text-gray-900 truncate">
                   {chats.find((c) => c.chatId === selectedChat)?.contactName || selectedChat}
                 </div>
-                <div className="text-xs text-gray-400">
+                <div className="text-xs text-gray-400 truncate">
                   {chats.find((c) => c.chatId === selectedChat)?.contactPhone}
                 </div>
               </div>
+              <button
+                onClick={() => setCustomerOpen((v) => !v)}
+                className={`p-2 rounded-lg transition-colors ${springBtn} ${
+                  customer?.found ? "bg-green-100 text-green-700 hover:bg-green-200" : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                }`}
+                title={customer?.found ? `Cliente: ${customer.clients?.[0].nombre}` : "Ver info cliente"}
+              >
+                <HiOutlineUser className="w-4 h-4" />
+              </button>
             </Stagger>
+
+            {/* Customer info panel */}
+            <CollapsiblePanel open={customerOpen}>
+              <div className="bg-gradient-to-b from-green-50 to-white border-b border-green-200 px-4 py-3">
+                {customerLoading ? (
+                  <p className="text-xs text-gray-500">Buscando cliente...</p>
+                ) : !customer?.found ? (
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-gray-500">No es cliente registrado en PunTouch.</p>
+                    <button onClick={() => setCustomerOpen(false)} className={`text-gray-400 ${springBtn}`}>
+                      <HiOutlineX className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    {customer.clients && customer.clients.map((c) => (
+                      <div key={c.cod} className="mb-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <HiOutlineUser className="w-4 h-4 text-green-600 shrink-0" />
+                            <span className="text-sm font-semibold text-gray-900 truncate">{c.nombre}</span>
+                            <span className="text-xs text-gray-400">#{c.cod}</span>
+                          </div>
+                          <Link href={`/admin/dashboard/cliente?cod=${c.cod}`} target="_blank" className="text-xs text-brand-600 hover:underline shrink-0 ml-2">
+                            Ver perfil
+                          </Link>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-xs text-gray-600">
+                          {c.calle && (
+                            <span className="flex items-center gap-1">
+                              <HiOutlineLocationMarker className="w-3 h-3 text-gray-400" />
+                              {c.calle}{c.localidad ? ", " + c.localidad : ""}
+                            </span>
+                          )}
+                          <span className="flex items-center gap-1">
+                            <HiOutlineCurrencyDollar className={`w-3 h-3 ${c.saldo < 0 ? "text-red-500" : "text-green-500"}`} />
+                            <span className={`font-medium ${c.saldo < 0 ? "text-red-600" : "text-green-600"}`}>
+                              Saldo: {formatPrice(c.saldo)}
+                            </span>
+                          </span>
+                          {c.cuit && <span className="text-gray-400">CUIT: {c.cuit}</span>}
+                        </div>
+                      </div>
+                    ))}
+                    {customer.orders && customer.orders.length > 0 && (
+                      <div className="mt-2 pt-2 border-t border-green-200">
+                        <div className="flex items-center gap-1 mb-1">
+                          <HiOutlineClipboardList className="w-3 h-3 text-gray-400" />
+                          <span className="text-xs font-medium text-gray-700">Ultimas compras ({customer.orders.length})</span>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {customer.orders.slice(0, 6).map((o) => (
+                            <div key={o.boleta} className="bg-white border rounded px-2 py-1 text-xs">
+                              <span className="text-gray-500">{formatOrderDate(o.fechora)}</span>
+                              <span className="ml-2 text-gray-400">#{o.boleta}</span>
+                              <span className="ml-2 font-medium text-gray-900">{formatPrice(o.total)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </CollapsiblePanel>
 
             {/* Messages area */}
             <Stagger delay={120} className="flex-1 overflow-y-auto p-4 space-y-2">
@@ -176,7 +338,22 @@ export default function InboxPage() {
                     {msg.sender && msg.direction === "out" && (
                       <div className="text-xs font-medium mb-0.5 opacity-60">{msg.sender === "bot" ? "Bot" : "Agente"}</div>
                     )}
-                    <p className="whitespace-pre-wrap break-words">{msg.body}</p>
+                    {msg.mediaType?.startsWith("image") && msg.body.startsWith("[Imagen]") ? (
+                      (() => {
+                        const filePath = msg.body.replace("[Imagen] ", "").trim();
+                        const src = `/api/admin/inbox/media/${filePath}`;
+                        return (
+                          <a href={src} target="_blank" rel="noopener noreferrer" className="block">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={src} alt="Imagen enviada"
+                              className="max-w-full max-h-64 rounded-lg mb-1 border" />
+                            <div className="text-[11px] opacity-60">Abrir</div>
+                          </a>
+                        );
+                      })()
+                    ) : (
+                      <p className="whitespace-pre-wrap break-words">{msg.body}</p>
+                    )}
                     <div className="text-xs opacity-40 text-right mt-1">{formatTime(msg.timestamp)}</div>
                   </div>
                 </div>
@@ -184,8 +361,74 @@ export default function InboxPage() {
               <div ref={messagesEndRef} />
             </Stagger>
 
+            {/* Quick replies panel */}
+            <CollapsiblePanel open={qrOpen}>
+              <div className="bg-yellow-50 border-t border-yellow-200 px-3 py-2">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-semibold text-yellow-800">Respuestas rapidas</span>
+                  <div className="flex gap-1">
+                    <button onClick={() => setQrManage((v) => !v)} className={`text-xs text-yellow-700 hover:text-yellow-900 ${springBtn}`}>
+                      {qrManage ? "Listo" : "Administrar"}
+                    </button>
+                    <button onClick={() => setQrOpen(false)} className={`text-yellow-700 ${springBtn}`}>
+                      <HiOutlineX className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+                {qrManage ? (
+                  <div className="space-y-2">
+                    <div className="flex gap-2">
+                      <input type="text" value={newQrShortcut} onChange={(e) => setNewQrShortcut(e.target.value)}
+                        placeholder="Atajo (ej: saludo)"
+                        className="w-32 px-2 py-1 border border-yellow-300 rounded text-xs focus:outline-none focus:border-yellow-500" />
+                      <input type="text" value={newQrBody} onChange={(e) => setNewQrBody(e.target.value)}
+                        placeholder="Mensaje..."
+                        className="flex-1 px-2 py-1 border border-yellow-300 rounded text-xs focus:outline-none focus:border-yellow-500" />
+                      <button onClick={saveQuickReply} disabled={!newQrShortcut.trim() || !newQrBody.trim()}
+                        className={`px-3 py-1 bg-yellow-500 text-white rounded text-xs font-medium disabled:opacity-50 ${springBtn}`}>
+                        <HiOutlinePlus className="w-3 h-3" />
+                      </button>
+                    </div>
+                    <div className="space-y-1 max-h-40 overflow-y-auto">
+                      {quickReplies.length === 0 ? (
+                        <p className="text-xs text-gray-400">Sin respuestas rapidas. Agrega una arriba.</p>
+                      ) : quickReplies.map((qr) => (
+                        <div key={qr.id} className="flex items-center gap-2 text-xs bg-white rounded px-2 py-1 border border-yellow-100">
+                          <span className="font-mono font-bold text-yellow-700 shrink-0">/{qr.shortcut}</span>
+                          <span className="flex-1 text-gray-700 truncate">{qr.body}</span>
+                          <button onClick={() => deleteQuickReply(qr.id)} className={`text-red-400 hover:text-red-600 ${springBtn}`}>
+                            <HiOutlineTrash className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto">
+                    {quickReplies.length === 0 ? (
+                      <p className="text-xs text-gray-500">Sin respuestas rapidas. Tocá &quot;Administrar&quot; para agregar.</p>
+                    ) : quickReplies.map((qr) => (
+                      <button key={qr.id}
+                        onClick={() => { setReply(qr.body); setQrOpen(false); }}
+                        className={`px-2 py-1 bg-white border border-yellow-300 rounded-lg text-xs text-gray-700 hover:bg-yellow-100 hover:border-yellow-500 transition-colors ${springBtn}`}
+                        title={qr.body}>
+                        /{qr.shortcut}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </CollapsiblePanel>
+
             {/* Reply input */}
             <Stagger delay={180} className="p-3 bg-white border-t flex gap-2">
+              <button onClick={() => setQrOpen((v) => !v)}
+                className={`p-2 rounded-lg transition-colors ${springBtn} ${
+                  qrOpen ? "bg-yellow-200 text-yellow-800" : "bg-gray-100 text-gray-500 hover:bg-yellow-100"
+                }`}
+                title="Respuestas rapidas">
+                <HiOutlineLightningBolt className="w-5 h-5" />
+              </button>
               <input type="text" value={reply}
                 onChange={(e) => setReply(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendReply(); } }}

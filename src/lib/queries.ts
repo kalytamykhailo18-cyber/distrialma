@@ -127,7 +127,7 @@ export async function getProducts(opts: {
     LEFT JOIN [${db()}].dbo.Rubros r ON r.Cod = p.Rubro
     LEFT JOIN [${db()}].dbo.Marcas m ON m.Cod = p.Marca
     ${where}
-    ORDER BY p.Nombre
+    ORDER BY ${!categoryId && !brandId && !search && page === 1 ? "NEWID()" : "p.Nombre"}
     OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY
   `;
 

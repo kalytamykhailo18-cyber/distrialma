@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { formatPrice } from "@/lib/utils";
-import { HiSearch, HiPlus, HiTrash, HiChevronDown } from "react-icons/hi";
+import { HiSearch, HiPlus, HiTrash, HiChevronDown, HiOutlineDocumentDownload } from "react-icons/hi";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { PageTransition, Stagger, staggerStyle, springBtn, hoverRow, LoadingCenter, useDataReady, CollapsiblePanel } from "@/components/AnimateIn";
 
@@ -39,6 +39,35 @@ export default function ProveedoresProductosPage() {
   const [provDetail, setProvDetail] = useState<RepoProveedor | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [repoSort, setRepoSort] = useState<{ field: string; dir: "asc" | "desc" }>({ field: "sugerido", dir: "desc" });
+  // Manual quantity overrides — persisted per proveedor+sku in sessionStorage
+  const [qtyOverrides, setQtyOverrides] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const saved = sessionStorage.getItem("reposicion_qty_overrides");
+    if (saved) try { setQtyOverrides(JSON.parse(saved)); } catch {}
+  }, []);
+
+  function setOverride(provCod: string, sku: string, qty: number) {
+    const key = `${provCod}|${sku}`;
+    setQtyOverrides((prev) => {
+      const next = { ...prev };
+      if (qty === 0 || isNaN(qty)) delete next[key]; else next[key] = qty;
+      if (typeof window !== "undefined") sessionStorage.setItem("reposicion_qty_overrides", JSON.stringify(next));
+      return next;
+    });
+  }
+
+  function clearOverrides(provCod: string) {
+    setQtyOverrides((prev) => {
+      const next: Record<string, number> = {};
+      for (const k of Object.keys(prev)) {
+        if (!k.startsWith(provCod + "|")) next[k] = prev[k];
+      }
+      if (typeof window !== "undefined") sessionStorage.setItem("reposicion_qty_overrides", JSON.stringify(next));
+      return next;
+    });
+  }
 
   // Resumen tab
   const [resumenData, setResumenData] = useState<RepoProveedor[]>([]);
@@ -74,6 +103,90 @@ export default function ProveedoresProductosPage() {
   }
 
   useEffect(() => { loadData(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function exportExcel(prov: RepoProveedor) {
+    // Apply manual overrides to products
+    const products = prov.productos.map((p) => {
+      const key = `${prov.cod}|${p.sku}`;
+      if (key in qtyOverrides) {
+        const qty = qtyOverrides[key];
+        return { ...p, sugerido: qty, costoTotal: qty * p.costoUnit };
+      }
+      return p;
+    });
+    const adjustedTotal = products.reduce((s, p) => s + (p.sugerido > 0 ? p.costoTotal : 0), 0);
+    const effectiveProv = { ...prov, productos: products, totalSugerido: adjustedTotal };
+
+    const ExcelJS = (await import("exceljs")).default;
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet(effectiveProv.nombre.substring(0, 31));
+
+    // Title row
+    ws.mergeCells("A1:F1");
+    const titleCell = ws.getCell("A1");
+    titleCell.value = `Reposición — ${effectiveProv.nombre}`;
+    titleCell.font = { bold: true, size: 14 };
+    titleCell.alignment = { horizontal: "left" };
+
+    ws.mergeCells("A2:F2");
+    ws.getCell("A2").value = `${semanas} semanas — Total: $${effectiveProv.totalSugerido.toLocaleString("es-AR", { minimumFractionDigits: 2 })}`;
+    ws.getCell("A2").font = { size: 10, color: { argb: "FF666666" } };
+
+    // Headers
+    const headerRow = ws.addRow(["SKU", "Producto", "Unidad", "Stock", "Venta/sem", "Sugerido", "Costo unit.", "Costo total"]);
+    headerRow.eachCell((cell) => {
+      cell.font = { bold: true, size: 10, color: { argb: "FFFFFFFF" } };
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFB9A47" } };
+      cell.alignment = { horizontal: "center" };
+      cell.border = { bottom: { style: "thin", color: { argb: "FFDDDDDD" } } };
+    });
+
+    // Column widths
+    ws.getColumn(1).width = 10;
+    ws.getColumn(2).width = 45;
+    ws.getColumn(3).width = 8;
+    ws.getColumn(4).width = 12;
+    ws.getColumn(5).width = 12;
+    ws.getColumn(6).width = 12;
+    ws.getColumn(7).width = 14;
+    ws.getColumn(8).width = 14;
+
+    // Data
+    const sorted = [...effectiveProv.productos].sort((a, b) => b.sugerido - a.sugerido);
+    for (const p of sorted) {
+      const row = ws.addRow([
+        p.sku,
+        p.nombre,
+        p.unidad === "KG" ? "KG" : "UN",
+        p.stockActual,
+        p.ventaSemanal,
+        p.sugerido,
+        p.costoUnit,
+        p.costoTotal,
+      ]);
+      // Right-align numbers
+      for (let c = 4; c <= 8; c++) {
+        row.getCell(c).alignment = { horizontal: "right" };
+        if (c >= 7) row.getCell(c).numFmt = "#,##0.00";
+      }
+      // Highlight rows that need restock
+      if (p.sugerido > 0) {
+        row.eachCell((cell) => {
+          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFF0F0" } };
+        });
+      }
+      row.border = { bottom: { style: "thin", color: { argb: "FFEEEEEE" } } };
+    }
+
+    const buf = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `Reposicion-${effectiveProv.nombre.replace(/[^a-zA-Z0-9]/g, "_")}.xlsx`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 
   async function loadProvDetail(provCod: string) {
     if (expandedProv === provCod) { setExpandedProv(null); setProvDetail(null); return; }
@@ -230,7 +343,23 @@ export default function ProveedoresProductosPage() {
                           <span className="text-xs text-gray-400">{prov.cantProductos} productos</span>
                         </div>
                         <div className="flex items-center gap-2">
-                          {detail && <span className="text-sm font-bold text-brand-600">{fmt(detail.totalSugerido)}</span>}
+                          {detail && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); exportExcel(detail); }}
+                              className={`p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition-colors ${springBtn}`}
+                              title="Descargar Excel"
+                            >
+                              <HiOutlineDocumentDownload className="w-5 h-5" />
+                            </button>
+                          )}
+                          {detail && (() => {
+                            const adjTotal = detail.productos.reduce((s, p) => {
+                              const key = `${prov.cod}|${p.sku}`;
+                              const qty = key in qtyOverrides ? qtyOverrides[key] : p.sugerido;
+                              return s + (qty > 0 ? qty * p.costoUnit : 0);
+                            }, 0);
+                            return <span className="text-sm font-bold text-brand-600">{fmt(adjTotal)}</span>;
+                          })()}
                           <HiChevronDown className={`w-4 h-4 transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${isOpen ? "rotate-180 text-brand-600" : "text-gray-400"}`} />
                         </div>
                       </button>
@@ -238,6 +367,19 @@ export default function ProveedoresProductosPage() {
                         {detailLoading ? (
                           <div className="px-4 py-3 border-t"><LoadingCenter text="Cargando..." /></div>
                         ) : detail && (
+                          <>
+                          {(() => {
+                            const overrideCount = Object.keys(qtyOverrides).filter((k) => k.startsWith(prov.cod + "|")).length;
+                            if (overrideCount === 0) return null;
+                            return (
+                              <div className="flex items-center justify-between px-4 py-2 bg-blue-50 border-t border-blue-200 text-xs">
+                                <span className="text-blue-700 font-medium">{overrideCount} cantidad{overrideCount === 1 ? "" : "es"} modificada{overrideCount === 1 ? "" : "s"} manualmente</span>
+                                <button onClick={() => clearOverrides(prov.cod)} className={`text-blue-600 hover:text-red-600 font-medium ${springBtn}`}>
+                                  Restablecer sugeridos
+                                </button>
+                              </div>
+                            );
+                          })()}
                           <div className="overflow-x-auto max-h-[400px] overflow-y-auto border-t">
                             <table className="w-full text-sm">
                               <thead className="sticky top-0">
@@ -262,8 +404,13 @@ export default function ProveedoresProductosPage() {
                                   const av = (a as unknown as Record<string, number>)[repoSort.field] || 0;
                                   const bv = (b as unknown as Record<string, number>)[repoSort.field] || 0;
                                   return repoSort.dir === "desc" ? bv - av : av - bv;
-                                }).map((p, rowIdx) => (
-                                  <tr key={p.sku} className={`${hoverRow} ${p.sugerido > 0 ? "bg-red-50/50 hover:bg-red-50" : ""}`}
+                                }).map((p, rowIdx) => {
+                                  const overrideKey = `${prov.cod}|${p.sku}`;
+                                  const hasOverride = overrideKey in qtyOverrides;
+                                  const effectiveQty = hasOverride ? qtyOverrides[overrideKey] : p.sugerido;
+                                  const effectiveCost = effectiveQty * p.costoUnit;
+                                  return (
+                                  <tr key={p.sku} className={`${hoverRow} ${effectiveQty > 0 ? (hasOverride ? "bg-blue-50/50 hover:bg-blue-50" : "bg-red-50/50 hover:bg-red-50") : ""}`}
                                     style={staggerStyle(true, rowIdx, 50, 15)}>
                                     <td className="p-2 pl-4">
                                       <span className="text-gray-400 text-xs font-mono mr-1">{p.sku}</span>
@@ -271,13 +418,25 @@ export default function ProveedoresProductosPage() {
                                     </td>
                                     <td className={`text-right p-2 ${p.stockActual <= 0 ? "text-red-600 font-bold" : "text-gray-600"}`}>{p.stockActual.toLocaleString("es-AR", { maximumFractionDigits: 1 })} {p.unidad === "KG" ? "kg" : "u"}</td>
                                     <td className="text-right p-2 text-blue-600 font-medium">{p.ventaSemanal.toLocaleString("es-AR", { maximumFractionDigits: 1 })}</td>
-                                    <td className={`text-right p-2 font-bold ${p.sugerido > 0 ? "text-brand-600" : "text-gray-300"}`}>{p.sugerido > 0 ? p.sugerido.toLocaleString("es-AR", { maximumFractionDigits: 1 }) : "\u2014"}</td>
-                                    <td className="text-right p-2 pr-4 text-gray-700">{p.sugerido > 0 ? fmt(p.costoTotal) : ""}</td>
+                                    <td className="text-right p-2">
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        step={p.unidad === "KG" ? "0.1" : "1"}
+                                        value={hasOverride ? effectiveQty : (p.sugerido > 0 ? p.sugerido : "")}
+                                        onChange={(e) => setOverride(prov.cod, p.sku, parseFloat(e.target.value) || 0)}
+                                        placeholder="0"
+                                        className={`w-20 text-right px-2 py-1 border rounded text-sm font-bold focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 ${hasOverride ? "border-blue-400 text-blue-700 bg-blue-50" : "border-gray-300 text-brand-600"}`}
+                                      />
+                                    </td>
+                                    <td className="text-right p-2 pr-4 text-gray-700">{effectiveQty > 0 ? fmt(effectiveCost) : ""}</td>
                                   </tr>
-                                ))}
+                                  );
+                                })}
                               </tbody>
                             </table>
                           </div>
+                          </>
                         )}
                       </CollapsiblePanel>
                     </div>

@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { HiOutlineTrash, HiOutlinePlus, HiOutlineSearch, HiOutlineCamera, HiOutlineX } from "react-icons/hi";
+import { HiOutlineTrash, HiOutlinePlus, HiOutlineSearch, HiOutlineCamera, HiOutlineX, HiChevronUp, HiChevronDown } from "react-icons/hi";
 import { PageTransition, Stagger, springBtn, hoverRow } from "@/components/AnimateIn";
 
 interface Proveedor {
@@ -28,6 +28,7 @@ interface CartItem {
   isNewProduct: boolean;
   barcode?: string;
   newProductName?: string;
+  costo?: string;
 }
 
 export default function NuevoIngresoPage() {
@@ -311,6 +312,16 @@ export default function NuevoIngresoPage() {
     );
   }
 
+  function moveItem(index: number, direction: -1 | 1) {
+    const newIdx = index + direction;
+    if (newIdx < 0 || newIdx >= items.length) return;
+    setItems((prev) => {
+      const arr = [...prev];
+      [arr[index], arr[newIdx]] = [arr[newIdx], arr[index]];
+      return arr;
+    });
+  }
+
   async function handleSubmit() {
     if (!selectedProv) {
       setError("Seleccioná un proveedor");
@@ -348,6 +359,7 @@ export default function NuevoIngresoPage() {
             isNewProduct: i.isNewProduct,
             barcode: i.barcode,
             newProductName: i.newProductName,
+            costo: i.costo ? parseFloat(i.costo) : undefined,
           })),
         }),
       });
@@ -430,8 +442,7 @@ export default function NuevoIngresoPage() {
       </Stagger>
 
       {/* Product search */}
-      <Stagger delay={100}>
-      <div className="mb-4" ref={searchRef}>
+      <div className="mb-4 relative" ref={searchRef} style={{ zIndex: showResults ? 60 : "auto" }}>
         <label className="block text-sm font-medium text-gray-700 mb-1">
           Buscar producto
         </label>
@@ -507,7 +518,7 @@ export default function NuevoIngresoPage() {
         )}
 
         {showResults && searchResults.length > 0 && (
-          <div className="absolute z-30 bg-white border rounded-xl shadow-lg mt-1 max-h-60 overflow-y-auto w-full max-w-4xl">
+          <div className="absolute left-0 right-0 z-50 bg-white border rounded-xl shadow-lg mt-1 max-h-60 overflow-y-auto">
             {searchResults.map((p, idx) => (
               <button
                 key={p.sku}
@@ -534,7 +545,6 @@ export default function NuevoIngresoPage() {
           </div>
         )}
       </div>
-      </Stagger>
 
       {/* New product button */}
       <Stagger delay={150}>
@@ -593,17 +603,36 @@ export default function NuevoIngresoPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="text-gray-500 text-xs border-b">
-                <th className="text-left px-4 py-2">Producto</th>
-                <th className="text-left px-4 py-2 w-20">SKU</th>
-                <th className="text-right px-4 py-2 w-28">Cantidad</th>
-                <th className="text-center px-4 py-2 w-12"></th>
+                <th className="text-center px-1 py-2 w-10"></th>
+                <th className="text-left px-3 py-2">Producto</th>
+                <th className="text-right px-3 py-2 w-24">Cantidad</th>
+                {hasCosteo && <th className="text-right px-3 py-2 w-24">Costo</th>}
+                <th className="text-center px-1 py-2 w-10"></th>
               </tr>
             </thead>
             <tbody className="divide-y">
               {items.map((item, idx) => (
                 <tr key={idx} className={hoverRow}>
-                  <td className="px-4 py-2">
-                    <span className="text-gray-900">{item.productName}</span>
+                  <td className="px-1 py-2 text-center">
+                    <div className="flex flex-col items-center gap-0.5">
+                      <button
+                        onClick={() => moveItem(idx, -1)}
+                        disabled={idx === 0}
+                        className="text-gray-400 hover:text-gray-700 disabled:opacity-20 transition-colors"
+                      >
+                        <HiChevronUp className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => moveItem(idx, 1)}
+                        disabled={idx === items.length - 1}
+                        className="text-gray-400 hover:text-gray-700 disabled:opacity-20 transition-colors"
+                      >
+                        <HiChevronDown className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </td>
+                  <td className="px-3 py-2">
+                    <span className="text-gray-900 text-sm">{item.productName}</span>
                     {item.isNewProduct && (
                       <span className="ml-2 text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded">
                         Nuevo
@@ -614,11 +643,9 @@ export default function NuevoIngresoPage() {
                         CB: {item.barcode}
                       </span>
                     )}
+                    <div className="text-gray-400 text-xs">{item.isNewProduct ? "Producto nuevo" : `SKU ${item.sku}`}</div>
                   </td>
-                  <td className="px-4 py-2 text-gray-400 text-xs">
-                    {item.isNewProduct ? "—" : item.sku}
-                  </td>
-                  <td className="px-4 py-2">
+                  <td className="px-3 py-2">
                     <input
                       type="number"
                       min={item.unit === "KG" || /\bKG\b/i.test(item.productName) ? "0.001" : "1"}
@@ -632,7 +659,20 @@ export default function NuevoIngresoPage() {
                       className="w-full text-right px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
                     />
                   </td>
-                  <td className="px-4 py-2 text-center">
+                  {hasCosteo && (
+                    <td className="px-3 py-2">
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={item.costo || ""}
+                        onChange={(e) => setItems((prev) => prev.map((it, i) => i === idx ? { ...it, costo: e.target.value } : it))}
+                        placeholder="$"
+                        className="w-full text-right px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
+                      />
+                    </td>
+                  )}
+                  <td className="px-1 py-2 text-center">
                     <button
                       onClick={() => removeItem(idx)}
                       className="text-red-500 hover:text-red-700 transition-colors"
