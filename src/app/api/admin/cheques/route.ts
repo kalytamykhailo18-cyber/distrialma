@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireStaff } from "@/lib/api-auth";
+import { getPool, getDbName } from "@/lib/mssql";
 
 export const dynamic = "force-dynamic";
 
@@ -120,6 +121,29 @@ export async function POST(req: NextRequest) {
         where: { id: Number(reemplazaId) },
         data: { estado: "canjeado", fechaEstado: new Date() },
       });
+    }
+
+    // If propio cheque with proveedor, register payment (subtract from proveedor saldo)
+    if (tipo === "propio" && proveedorCod && parseFloat(monto) > 0) {
+      try {
+        const pool = await getPool();
+        const dbProd = getDbName("productos");
+        const provCodPadded = String(proveedorCod).padStart(7, " ");
+        await pool.request()
+          .input("cod", provCodPadded)
+          .input("monto", Math.round(parseFloat(monto) * 100) / 100)
+          .query(`UPDATE [${dbProd}].dbo.Proveedores SET Saldo = ISNULL(Saldo, 0) - @monto WHERE Cod = @cod`);
+
+        await prisma.supplierPayment.create({
+          data: {
+            proveedorCod: String(proveedorCod),
+            proveedorName: proveedorNombre || "",
+            monto: Math.round(parseFloat(monto) * 100) / 100,
+            concepto: `Cheque #${numero}`,
+            usuario: userName,
+          },
+        });
+      } catch (e) { console.error("Error registering cheque payment:", e); }
     }
 
     return NextResponse.json({ cheque });

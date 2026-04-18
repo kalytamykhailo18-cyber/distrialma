@@ -129,8 +129,13 @@ export default function ProveedoresPage() {
 
   async function handlePayment() {
     if (!payingProv || !payMonto) return;
-    // Parse Argentine format: 1.197.207,12 → 1197207.12
-    const monto = parseFloat(payMonto.replace(/\./g, "").replace(",", "."));
+    // Parse both formats: 1.197.207,12 (AR) or 3857323.4 (numeric keypad)
+    let montoStr = payMonto.trim();
+    if (montoStr.includes(",")) {
+      // Argentine format: dots are thousands, comma is decimal
+      montoStr = montoStr.replace(/\./g, "").replace(",", ".");
+    }
+    const monto = parseFloat(montoStr);
     if (isNaN(monto) || monto <= 0) {
       setPayError("Monto inválido");
       return;
@@ -514,18 +519,20 @@ export default function ProveedoresPage() {
       ) : (
         <Stagger delay={150} y={8}>
           <div className="bg-white rounded-xl border shadow-sm divide-y max-h-[60vh] overflow-y-auto">
-            {filtered.map((p, idx) => (
-              <div key={p.cod} style={staggerStyle(dataReady, idx)}>
-                <div className={`flex items-center justify-between px-4 py-2.5 ${hoverRow}`}>
-                  <button
-                    onClick={() => toggleProvEntries(p.cod)}
-                    className="flex items-center gap-1 text-left min-w-0"
-                  >
-                    <HiOutlineChevronDown className={`w-4 h-4 text-gray-400 shrink-0 transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${expandedProv === p.cod ? "rotate-0" : "-rotate-90"}`} />
-                    <span className="text-sm text-gray-900">{p.nombre}</span>
-                    <span className="text-xs text-gray-400 ml-2">#{p.cod}</span>
-                  </button>
-                  <div className="flex items-center gap-3">
+            {filtered.map((p, idx) => {
+              const isOpen = expandedProv === p.cod;
+              return (
+              <div key={p.cod} className={isOpen ? "bg-brand-50 border-l-4 border-l-brand-500 rounded-xl shadow-md my-1" : "bg-white border rounded-xl shadow-sm"} style={staggerStyle(dataReady, idx)}>
+                <button
+                  onClick={() => toggleProvEntries(p.cod)}
+                  className={`w-full px-4 py-2.5 flex items-center justify-between text-left ${hoverRow} ${isOpen ? "bg-brand-50" : ""}`}
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <HiOutlineChevronDown className={`w-4 h-4 shrink-0 transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${isOpen ? "rotate-0 text-brand-600" : "-rotate-90 text-gray-400"}`} />
+                    <span className={`text-sm font-medium truncate ${isOpen ? "text-brand-700" : "text-gray-900"}`}>{p.nombre}</span>
+                    <span className="text-xs text-gray-400">#{p.cod}</span>
+                  </div>
+                  <div className="flex items-center gap-3 shrink-0">
                     {hasCosteo && (
                       <>
                         <span
@@ -536,22 +543,22 @@ export default function ProveedoresPage() {
                           {p.saldo > 0 ? formatPrice(p.saldo) : "\u2014"}
                         </span>
                         {p.saldo > 0 && (
-                          <button
-                            onClick={() => { setPayingProv(p); setPayMonto(""); setPayConcepto(""); setPayError(""); }}
-                            className={`flex items-center gap-1 px-2 py-1 text-xs text-green-600 bg-green-50 border border-green-200 rounded-xl hover:bg-green-100 transition-colors ${springBtn}`}
+                          <span
+                            onClick={(e) => { e.stopPropagation(); setPayingProv(p); setPayMonto(""); setPayConcepto(""); setPayError(""); }}
+                            className={`flex items-center gap-1 px-2 py-1 text-xs text-green-600 bg-green-50 border border-green-200 rounded-xl hover:bg-green-100 transition-colors cursor-pointer ${springBtn}`}
                           >
                             <HiOutlineCash className="w-3.5 h-3.5" />
                             Pagar
-                          </button>
+                          </span>
                         )}
                       </>
                     )}
                   </div>
-                </div>
+                </button>
 
                 {/* Supplier history (entries + payments) */}
-                <CollapsiblePanel open={expandedProv === p.cod}>
-                  <div className="bg-gray-50 px-4 py-2 border-t">
+                <CollapsiblePanel open={isOpen}>
+                  <div className="bg-brand-50/50 px-4 py-2 border-t border-brand-200">
                     {/* Date range filter */}
                     <div className="flex items-center gap-2 mb-2 flex-wrap">
                       <label className="text-xs text-gray-500">Desde:</label>
@@ -710,7 +717,8 @@ export default function ProveedoresPage() {
                   </div>
                 </CollapsiblePanel>
               </div>
-            ))}
+              );
+            })}
             {filtered.length === 0 && (
               <p className="px-4 py-3 text-sm text-gray-400">Sin resultados</p>
             )}

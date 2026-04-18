@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { formatPrice } from "@/lib/utils";
 import { HiChevronDown } from "react-icons/hi";
-import { PageTransition, Stagger, staggerStyle, springBtn, hoverRow, LoadingCenter, CollapsiblePanel } from "@/components/AnimateIn";
+import { PageTransition, Stagger, staggerStyle, hoverRow, LoadingCenter, CollapsiblePanel } from "@/components/AnimateIn";
 
 interface OrderItem {
   sku: string;
@@ -128,17 +128,17 @@ export default function PedidosPage() {
 
                 <div className="space-y-2">
                   {dayOrders.map((order, i) => (
-                    <div key={order.boleta} className={`rounded-xl border shadow-sm ${hoverRow} ${expanded.has(order.boleta) ? "bg-white border-brand-400 shadow-md" : "bg-white"}`} style={staggerStyle(true, i)}>
+                    <div key={order.boleta} className={expanded.has(order.boleta) ? "bg-brand-50 border-l-4 border-l-brand-500 rounded-xl shadow-md my-1" : "bg-white border rounded-xl shadow-sm"} style={staggerStyle(true, i)}>
                       <button
                         onClick={() => toggleExpand(order.boleta)}
-                        className={`w-full px-3 sm:px-4 py-3 flex items-center justify-between text-left hover:bg-gray-50 ${springBtn}`}
+                        className={`w-full px-3 sm:px-4 py-2.5 flex items-center justify-between text-left ${hoverRow} ${expanded.has(order.boleta) ? "bg-brand-50" : ""}`}
                       >
                         <div className="flex-1 min-w-0">
                           <div className="flex flex-wrap items-center gap-1 sm:gap-3">
-                            <span className="text-sm font-medium text-gray-900">
+                            <span className="text-xs text-gray-400 font-mono">
                               #{order.nroped}
                             </span>
-                            <span className="text-sm text-gray-700 truncate">
+                            <span className={`text-sm font-medium truncate ${expanded.has(order.boleta) ? "text-brand-700" : "text-gray-900"}`}>
                               {order.clienteNombre}
                             </span>
                             {order.telefono && (
@@ -166,15 +166,15 @@ export default function PedidosPage() {
                             {formatPrice(order.total)}
                           </span>
                           <HiChevronDown
-                            className={`w-4 h-4 text-gray-400 transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${
-                              expanded.has(order.boleta) ? "rotate-180" : ""
+                            className={`w-4 h-4 transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${
+                              expanded.has(order.boleta) ? "rotate-180 text-brand-600" : "text-gray-400"
                             }`}
                           />
                         </div>
                       </button>
 
                       <CollapsiblePanel open={expanded.has(order.boleta)}>
-                        <div className="border-t bg-gray-50 px-2 sm:px-4 py-3">
+                        <div className="border-t border-brand-200 bg-brand-50/50 px-2 sm:px-4 py-3">
                           {order.facturado && (
                             <div className="flex flex-wrap gap-1 mb-3">
                               <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full font-medium">Precarga: {formatPrice(order.total)}</span>

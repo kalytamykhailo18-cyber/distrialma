@@ -397,6 +397,43 @@ model WhatsAppMessage {
 }
 
 // Log of proactive notifications sent to clients (debt reminders, reactivation, etc.)
+// Audit log for price/cost changes
+model PriceAudit {
+  id        Int      @id @default(autoincrement())
+  sku       String   @db.VarChar(10)
+  nombre    String   @db.VarChar(100)
+  campo     String   @db.VarChar(20) // "costo", "precio", "precio2", etc.
+  valorAnterior Decimal @db.Decimal(14, 2)
+  valorNuevo    Decimal @db.Decimal(14, 2)
+  origen    String   @db.VarChar(30) // "precios", "costeo", "masivos"
+  usuario   String   @db.VarChar(60)
+  createdAt DateTime @default(now())
+
+  @@index([sku])
+  @@index([createdAt])
+  @@map("price_audit")
+}
+
+// Backup of PunTouch pedidos (in case someone deletes them)
+model PedidoBackup {
+  id          Int       @id @default(autoincrement())
+  boleta      String    @unique @db.VarChar(20)
+  clienteCod  String    @db.VarChar(20)
+  clienteName String    @db.VarChar(120)
+  total       Decimal   @db.Decimal(14, 2)
+  fechora     String    @db.VarChar(20)
+  nroped      String?   @db.VarChar(20)
+  items       String    @db.Text // JSON array of items
+  active      Boolean   @default(true) // false = deleted from PunTouch
+  deletedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([active])
+  @@index([clienteCod])
+  @@map("pedido_backups")
+}
+
 // Print queue for automatic silent printing
 model PrintJob {
   id        Int      @id @default(autoincrement())

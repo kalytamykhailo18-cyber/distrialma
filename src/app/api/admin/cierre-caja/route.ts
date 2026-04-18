@@ -72,7 +72,9 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Write cierre + apertura to PunTouch
+    // Write cierre + apertura to PunTouch (with retry)
+    const MAX_RETRIES = 2;
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
       const pool = await getPool();
       const dbTransas = getDbName("transas");
@@ -125,7 +127,7 @@ export async function POST(req: NextRequest) {
              0, -@tarjeta, 0, @totalCaja, 0, @efectivo, @tarjeta, 0, @diferencia, @inicio,
              @retiros, 0, @totalVentas, @impoCos, @inicio, @nroCierre, 0,
              '', '', @obs, '', '', 0,
-             @obs, '', '', '', '', '',
+             '', '', '', '', '', '',
              '', '', '', '', '', '', '', '',
              '', '', '', '', '', '',
              0, 0, 0, 0, 0, 0,
@@ -167,10 +169,21 @@ export async function POST(req: NextRequest) {
         console.log("PunTouch apertura written:", nuevoInicioVal, "suc", suc);
       }
     } catch (e) {
-      console.error("Error writing cierre/apertura to PunTouch:", e);
+      console.error(`Error writing cierre/apertura to PunTouch (attempt ${attempt}/${MAX_RETRIES}):`, e);
+      if (attempt < MAX_RETRIES) {
+        console.log("Retrying in 3 seconds...");
+        await new Promise((r) => setTimeout(r, 3000));
+        continue;
+      }
+      return NextResponse.json({
+        error: "Error al escribir en PunTouch. El cierre NO se registró. Intente de nuevo.",
+        puntouchError: e instanceof Error ? e.message : "Error desconocido",
+      }, { status: 500 });
+    }
+    break; // success, exit retry loop
     }
 
-    // Send email via Resend API (non-blocking)
+    // Send email via Resend API (only if PunTouch succeeded)
     let emailSent = false;
     const resendKey = process.env.RESEND_API_KEY || "";
     if (emailTo && pdfBase64 && resendKey) {

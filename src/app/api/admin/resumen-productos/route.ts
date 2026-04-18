@@ -35,7 +35,7 @@ export async function GET(req: Request) {
           LTRIM(RTRIM(ISNULL(m.[Desc], ''))) AS marca,
           LTRIM(RTRIM(ISNULL(r.[Desc], ''))) AS rubro,
           LTRIM(RTRIM(ISNULL(pr.Unidad, ''))) AS unidad,
-          ISNULL(pr.FillerNum1, 0) AS pesoPorPieza,
+          ISNULL(CAST(NULLIF(LTRIM(RTRIM(pr.Palabra2)), '') AS FLOAT), 0) AS pesoPorPieza,
           t.ListaPrecio AS lista,
           SUM(t.Cant) AS cantidad,
           SUM(t.Impo) AS totalVenta,

@@ -72,6 +72,7 @@ export default function ChequesPage() {
   const [tab, setTab] = useState<"propio" | "tercero">("propio");
   const [estadoFiltro, setEstadoFiltro] = useState("");
   const [search, setSearch] = useState("");
+  const [cuentaFiltro, setCuentaFiltro] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [showCuentas, setShowCuentas] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -109,6 +110,7 @@ export default function ChequesPage() {
     const params = new URLSearchParams({ tipo: tab });
     if (estadoFiltro) params.set("estado", estadoFiltro);
     if (search) params.set("search", search);
+    if (cuentaFiltro) params.set("cuentaId", cuentaFiltro);
     try {
       const res = await fetch(`/api/admin/cheques?${params}`);
       const d = await res.json();
@@ -134,7 +136,7 @@ export default function ChequesPage() {
     } catch {}
   }
 
-  useEffect(() => { loadCheques(); }, [tab, estadoFiltro, search]); // eslint-disable-line
+  useEffect(() => { loadCheques(); }, [tab, estadoFiltro, search, cuentaFiltro]); // eslint-disable-line
   useEffect(() => { loadCuentas(); loadProveedores(); }, []);
 
   function resetForm() {
@@ -366,6 +368,15 @@ export default function ChequesPage() {
               placeholder="Buscar numero, banco, librador..."
               className="w-full pl-9 pr-3 py-2 border rounded-xl text-sm focus:outline-none focus:border-brand-500" />
           </div>
+          {tab === "propio" && cuentas.length > 0 && (
+            <select value={cuentaFiltro} onChange={(e) => setCuentaFiltro(e.target.value)}
+              className={`px-3 py-2 rounded-xl text-xs font-medium border ${cuentaFiltro ? "bg-brand-500 text-white border-brand-500" : "bg-white text-gray-600 border-gray-200"}`}>
+              <option value="">Todas las empresas</option>
+              {cuentas.map((cu) => (
+                <option key={cu.id} value={cu.id}>{cu.alias} (CUIT {cu.cuit})</option>
+              ))}
+            </select>
+          )}
           {(tab === "tercero" ? ["", "en-cartera", "depositado", "endosado", "rechazado"] : ["", "en-circulacion", "pagado", "rechazado"]).map((e) => (
             <button key={e || "all"} onClick={() => setEstadoFiltro(e)}
               className={`px-3 py-2 rounded-xl text-xs font-medium ${springBtn} ${estadoFiltro === e ? "bg-brand-500 text-white" : "bg-white border text-gray-600 hover:bg-gray-50"}`}>

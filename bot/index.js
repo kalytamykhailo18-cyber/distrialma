@@ -4,7 +4,7 @@ import qrcode from "qrcode-terminal";
 import Anthropic from "@anthropic-ai/sdk";
 import fs from "fs";
 import { PrismaClient } from "@prisma/client";
-import { searchProducts, searchByBrand, searchCombos, findClientByPhone, registerClient, formatPrice } from "./products.js";
+import { searchProducts, searchByBrand, searchCombos, findClientByPhone, registerClient, formatPrice, generatePriceListPDF } from "./products.js";
 
 const prisma = new PrismaClient();
 
@@ -56,10 +56,11 @@ Atendés clientes que escriben por WhatsApp. Tu personalidad: amable, breve, dir
 
 REGLAS IMPORTANTES:
 1. Si te preguntan por productos, usá la herramienta search_products para buscar en la base real. Nunca inventes productos ni precios.
-2. Mostrá siempre el precio Mayorista. Si hay precio Caja Cerrada, también mencionalo. Siempre agregá al final: "Stock sujeto a disponibilidad de sucursal." NUNCA muestres la cantidad de stock exacta (no digas "9 unidades" ni "22.6 kg"). Solo decí si hay o no hay disponibilidad.
+2. Mostrá siempre el precio Mayorista. Si hay precio Caja Cerrada, también mencionalo. Siempre aclará que los precios son con IVA incluido. Siempre agregá al final: "Stock sujeto a disponibilidad de sucursal." NUNCA muestres la cantidad de stock exacta (no digas "9 unidades" ni "22.6 kg"). Solo decí si hay o no hay disponibilidad.
 3. Si el producto exacto no existe, ofrecé alternativas similares de la misma categoría.
 3b. Si preguntan por combos, promos, packs u ofertas, usá la herramienta search_combos. Mostrá el nombre, los productos que incluye y el precio.
 3c. Cuando busques por marca, siempre incluí el link a la página de la marca que te devuelve la herramienta (ej: "Podés ver todos los productos de Tonadita acá: https://distrialma.com.ar/marca/123").
+3d. Si el cliente pide la lista de precios o un catalogo, SIEMPRE preguntale primero de que rubro o marca necesita (ej: "De que rubro necesitas la lista? Fiambres, bebidas, limpieza, lacteos..."). Cuando te diga el rubro o marca, usa send_price_list con ese filtro. NUNCA envies la lista completa sin filtro porque es muy pesada. Si insiste en que quiere todo, decile que puede ver todos los precios en distrialma.com.ar.
 4. Si el cliente quiere hacer un pedido, decile que entre a https://distrialma.com.ar y arme el pedido desde ahí. NO le des ningún número de teléfono para hacer pedidos. Cuando mostrás un producto, incluí el link directo: https://distrialma.com.ar/productos/{sku} (reemplazá {sku} por el código del producto que te devuelve la herramienta).
 5. Si te preguntan algo que no sabés (descuentos especiales, plazos, etc.), decí que un asesor lo va a contactar y no inventes. EXCEPCIÓN: si el cliente está registrado y pregunta por su cuenta o saldo, dale el saldo que tenés. Si pide el detalle de boletas o movimientos, decile que lo puede ver en distrialma.com.ar/mis-pedidos iniciando sesion con su usuario.
 6. No des información de otros clientes ni datos privados.
@@ -146,6 +147,20 @@ const TOOLS = [
         },
       },
       required: ["query"],
+    },
+  },
+  {
+    name: "send_price_list",
+    description: "Genera y envia una lista de precios en PDF al cliente por WhatsApp, filtrada por rubro o marca. SIEMPRE usar con filtro, NUNCA sin filtro (la lista completa es muy pesada y traba el sistema).",
+    input_schema: {
+      type: "object",
+      properties: {
+        filter: {
+          type: "string",
+          description: "Filtro OBLIGATORIO por rubro o marca (ej: 'fiambre', 'bebidas', 'limpieza', 'La Flor', 'lacteos')",
+        },
+      },
+      required: ["filter"],
     },
   },
   {
@@ -295,6 +310,24 @@ async function callClaude(chatId, userMessage, clientInfo, phoneNumber) {
                 link: `https://distrialma.com.ar/combos/${c.id}`,
               })),
             };
+          }
+        } else if (tu.name === "send_price_list") {
+          try {
+            const pdfPath = await generatePriceListPDF(tu.input.filter || null);
+            if (pdfPath) {
+              const fsSync = await import("fs");
+              const pdfData = fsSync.readFileSync(pdfPath);
+              const { MessageMedia } = pkg;
+              const media = new MessageMedia("application/pdf", pdfData.toString("base64"), "Lista-de-Precios-Distrialma.pdf");
+              await client.sendMessage(chatId, media, { caption: "Aca tenes la lista de precios actualizada de Distrialma." });
+              storeMessage(chatId, "out", "[PDF] Lista de precios enviada", "bot");
+              result = { sent: true, message: "Lista de precios enviada como PDF" };
+            } else {
+              result = { sent: false, message: "No se encontraron productos para generar la lista" };
+            }
+          } catch (e) {
+            console.error("Price list error:", e.message);
+            result = { sent: false, error: e.message };
           }
         } else if (tu.name === "register_client") {
           const reg = await registerClient({

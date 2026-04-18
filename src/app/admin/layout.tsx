@@ -30,7 +30,6 @@ const MENU_CATEGORIES: MenuCategory[] = [
       { href: "/admin/reparto", label: "Reparto", perm: "reparto" },
       { href: "/admin/picking", label: "Picking", perm: "picking" },
       { href: "/admin/dias-entrega", label: "Dias Entrega", perm: "dias-entrega" },
-      { href: "/admin/pedidosya", label: "PedidosYa", perm: "costeo" },
       { href: "/admin/vendedor", label: "Tomar Pedido", perm: "vendedor" },
     ],
   },
@@ -46,6 +45,7 @@ const MENU_CATEGORIES: MenuCategory[] = [
     label: "Precios", icon: HiOutlineCurrencyDollar, items: [
       { href: "/admin/precios", label: "Actualizar", perm: "costeo" },
       { href: "/admin/precios-masivos", label: "Masivos", perm: "costeo" },
+      { href: "/admin/pedidosya", label: "PedidosYa", perm: "costeo" },
     ],
   },
   {
@@ -71,6 +71,7 @@ const MENU_CATEGORIES: MenuCategory[] = [
   },
   {
     label: "Equipo", icon: HiOutlineUserGroup, items: [
+      { href: "/admin/clientes", label: "Clientes", perm: "clientes" },
       { href: "/admin/vendedores", label: "Vendedores", perm: "vendedores" },
       { href: "/admin/usuarios", label: "Usuarios", perm: "usuarios" },
     ],

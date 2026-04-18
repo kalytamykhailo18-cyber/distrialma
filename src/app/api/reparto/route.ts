@@ -136,6 +136,7 @@ export async function GET(req: NextRequest) {
         AND t.Cliente IN (${transPlaceholders})
         AND t.Fechora >= @since
         AND t.Fechora < @until
+        AND LTRIM(RTRIM(t.Sucursal)) = '7'
     `);
 
     // For clients with multiple delivery days, only show pending orders

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPool, getDbName } from "@/lib/mssql";
 import { requireStaff } from "@/lib/api-auth";
+import { prisma } from "@/lib/prisma";
 
 export async function GET(req: NextRequest) {
   if (!(await requireStaff())) {
@@ -52,9 +53,11 @@ export async function GET(req: NextRequest) {
 }
 
 export async function PUT(req: NextRequest) {
-  if (!(await requireStaff())) {
+  const session = await requireStaff();
+  if (!session) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
+  const userName = (session.user as { name?: string })?.name || "admin";
 
   try {
     const { sku, costo, precio, precio2, precio3, precio4, precio5 } = await req.json();
@@ -122,11 +125,37 @@ export async function PUT(req: NextRequest) {
       }
     }
 
+    // Read old values for audit
+    const oldResult = await pool.request().input("c", codPadded).query(
+      `SELECT ISNULL(Costo,0) AS costo, ISNULL(Precio,0) AS p1, ISNULL(Precio2,0) AS p2, ISNULL(Precio3,0) AS p3, ISNULL(Precio4,0) AS p4, ISNULL(Precio5,0) AS p5 FROM [${dbProd}].dbo.Stock WHERE CodProducto = @c AND LTRIM(RTRIM(Deposito)) = '0'`
+    );
+    const old = oldResult.recordset[0] || {};
+    // Get product name
+    const nameResult = await pool.request().input("c", codPadded).query(
+      `SELECT LTRIM(RTRIM(Nombre)) AS nombre FROM [${dbProd}].dbo.Productos WHERE Cod = @c`
+    );
+    const nombre = nameResult.recordset[0]?.nombre || sku;
+
     await request.query(`
       UPDATE [${dbProd}].dbo.Stock
       SET ${updates.join(", ")}
       WHERE CodProducto = @cod AND LTRIM(RTRIM(Deposito)) = '0'
     `);
+
+    // Audit log
+    const fields = [
+      { campo: "costo", oldVal: old.costo, newVal: costo },
+      { campo: "precio", oldVal: old.p1, newVal: precio },
+      { campo: "precio2", oldVal: old.p2, newVal: precio2 },
+      { campo: "precio3", oldVal: old.p3, newVal: precio3 },
+      { campo: "precio4", oldVal: old.p4, newVal: precio4 },
+      { campo: "precio5", oldVal: old.p5, newVal: precio5 },
+    ];
+    for (const f of fields) {
+      if (f.newVal !== undefined && f.newVal !== null && Math.abs(Number(f.newVal) - Number(f.oldVal || 0)) > 0.01) {
+        await prisma.priceAudit.create({ data: { sku, nombre, campo: f.campo, valorAnterior: Number(f.oldVal || 0), valorNuevo: Number(f.newVal), origen: "precios", usuario: userName } });
+      }
+    }
 
     return NextResponse.json({ ok: true });
   } catch (error) {

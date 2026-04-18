@@ -30,9 +30,9 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
           <span className="text-gray-400 text-sm">Sin imagen</span>
         )}
         {/* Stock semaphore */}
-        <div className="absolute top-2 right-2" title={product.stock <= 0 ? "Sin stock" : product.stock < 10 ? "Stock bajo" : "Disponible"}>
+        <div className="absolute top-2 right-2" title={product.stock <= 20 ? "Stock bajo" : product.stock <= 40 ? "Stock medio" : "Disponible"}>
           <div className={`w-3 h-3 rounded-full shadow-sm border border-white ${
-            product.stock <= 0 ? "bg-red-500" : product.stock < 10 ? "bg-yellow-400" : "bg-green-500"
+            product.stock <= 20 ? "bg-red-500" : product.stock <= 40 ? "bg-yellow-400" : "bg-green-500"
           }`} />
         </div>
       </div>

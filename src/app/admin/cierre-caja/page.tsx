@@ -182,7 +182,7 @@ export default function CierreCajaPage() {
     drawCard("Ventas", String(data.ventas.cantidad), 10, cw, [220, 252, 231]);
     drawCard("Efectivo", fmt(data.ventas.efectivo), 10 + cw + 3, cw, [219, 234, 254]);
     drawCard("Tarjeta", fmt(data.ventas.tarjeta), 10 + (cw + 3) * 2, cw, [254, 243, 199]);
-    drawCard("Deuda", fmt(data.ventas.deuda), 10 + (cw + 3) * 3, cw, [254, 226, 226]);
+    drawCard("Cta. Cte.", fmt(data.ventas.deuda), 10 + (cw + 3) * 3, cw, [254, 226, 226]);
     y += 24;
 
     doc.setFillColor(55, 65, 81);
@@ -245,7 +245,7 @@ export default function CierreCajaPage() {
       doc.setFontSize(9);
       doc.setTextColor(50, 50, 50);
     }
-    drawRowAt(rightX, colW, rightY, "Total deuda:", fmt(data.totalDeuda)); rightY += 7;
+    drawRowAt(rightX, colW, rightY, "Total Cta. Cte.:", fmt(data.totalDeuda)); rightY += 7;
     if (data.anuladas.cantidad > 0) {
       drawRowAt(rightX, colW, rightY, `Anuladas (${data.anuladas.cantidad}):`, fmt(data.anuladas.total)); rightY += 7;
     }
@@ -512,7 +512,7 @@ export default function CierreCajaPage() {
                   { label: "Ventas", value: String(data.ventas.cantidad), bg: "bg-green-50", border: "border-green-200", text: "text-green-700", sub: "text-green-600" },
                   { label: "Efectivo", value: fmt(data.ventas.efectivo), bg: "bg-blue-50", border: "border-blue-200", text: "text-blue-700", sub: "text-blue-600", small: true },
                   { label: "Tarjeta", value: fmt(data.ventas.tarjeta), bg: "bg-yellow-50", border: "border-yellow-200", text: "text-yellow-700", sub: "text-yellow-600", small: true },
-                  { label: "Deuda", value: fmt(data.ventas.deuda), bg: "bg-red-50", border: "border-red-200", text: "text-red-600", sub: "text-red-600", small: true },
+                  { label: "Cta. Cte.", value: fmt(data.ventas.deuda), bg: "bg-red-50", border: "border-red-200", text: "text-red-600", sub: "text-red-600", small: true },
                 ].map((card, i) => (
                   <div
                     key={card.label}
@@ -579,7 +579,7 @@ export default function CierreCajaPage() {
                     </div>
                   ))}
                   <div className="px-4 py-3 flex justify-between transition-colors duration-150 hover:bg-gray-50/60">
-                    <span className="text-sm text-gray-600">Total deuda</span>
+                    <span className="text-sm text-gray-600">Total Cta. Cte.</span>
                     <span className="text-sm font-medium">{fmt(data.totalDeuda)}</span>
                   </div>
                   <div className="px-4 py-3 flex justify-between bg-brand-50 border-t-2 border-brand-400">

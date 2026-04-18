@@ -39,7 +39,21 @@ export async function POST(req: NextRequest) {
 
     const results: Array<{ cod: string; phone: string; ok: boolean; error?: string }> = [];
 
+    // Check for duplicates in last 24 hours
+    const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const recentLogs = await prisma.notificationLog.findMany({
+      where: { tipo: notifType, ok: true, createdAt: { gte: since24h } },
+      select: { clientId: true },
+    });
+    const recentlySent = new Set(recentLogs.map((l) => l.clientId));
+
     for (const r of recipients) {
+      // Block duplicate within 24h
+      if (recentlySent.has(r.cod)) {
+        results.push({ cod: r.cod, phone: r.telefono, ok: false, error: "Ya contactado en las ultimas 24hs" });
+        continue;
+      }
+
       const chatId = toWaChatId(r.telefono || "");
       if (!chatId) {
         results.push({ cod: r.cod, phone: r.telefono, ok: false, error: "Telefono invalido" });

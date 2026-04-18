@@ -28,7 +28,7 @@ const TEMP_DIR = path.join(process.env.TEMP || "C:\\Temp", "distrialma-prints");
 
 // Secret for authentication — same as CRON_SECRET or first 16 chars of RESEND_API_KEY
 // Set this to match your server configuration
-const SECRET = process.env.PRINT_SECRET || "re_5wSDTNZc_3ZC";
+const SECRET = process.env.PRINT_SECRET || "re_5wSDTNZc_3ZCp";
 
 // Path to SumatraPDF (download from https://www.sumatrapdfreader.com/download-free-pdf-viewer)
 // If not found, will try Adobe Reader
@@ -55,7 +55,7 @@ function findPdfViewer() {
 }
 
 // ── Silent print ──
-function silentPrint(pdfPath) {
+async function silentPrint(pdfPath) {
   // Try methods in order: SumatraPDF → Adobe Reader → PowerShell (Windows built-in)
   const viewer = findPdfViewer();
 
@@ -76,13 +76,14 @@ function silentPrint(pdfPath) {
     }
   }
 
-  // Fallback: PowerShell Start-Process with -Verb Print (uses Windows default PDF handler)
+  // Fallback: use pdf-to-printer npm package (Windows native print API)
   try {
-    execSync(`powershell -Command "Start-Process -FilePath '${pdfPath.replace(/'/g, "''")}' -Verb Print -WindowStyle Hidden"`, { timeout: 30000 });
-    console.log(`  Printed: ${path.basename(pdfPath)} via PowerShell`);
+    const ptp = require("pdf-to-printer");
+    await ptp.print(pdfPath);
+    console.log(`  Printed: ${path.basename(pdfPath)} via pdf-to-printer`);
     return true;
   } catch (e) {
-    console.error(`  PowerShell print error: ${e.message}`);
+    console.error(`  pdf-to-printer error: ${e.message}`);
     return false;
   }
 }
@@ -108,12 +109,22 @@ function fetchJSON(url, options = {}) {
 
 // ── Main poll loop ──
 async function poll() {
+  const ts = () => new Date().toLocaleTimeString();
   try {
     const data = await fetchJSON(`${SERVER_URL}/api/admin/print-queue?secret=${encodeURIComponent(SECRET)}`);
 
-    if (!data.jobs || data.jobs.length === 0) return;
+    if (data.error) {
+      console.error(`[${ts()}] Server error: ${data.error}`);
+      return;
+    }
 
-    console.log(`[${new Date().toLocaleTimeString()}] ${data.jobs.length} job(s) pending`);
+    if (!data.jobs || data.jobs.length === 0) {
+      // Uncomment next line for verbose polling logs:
+      // console.log(`[${ts()}] No pending jobs`);
+      return;
+    }
+
+    console.log(`[${ts()}] ${data.jobs.length} job(s) pending`);
 
     // Ensure temp directory exists
     if (!fs.existsSync(TEMP_DIR)) fs.mkdirSync(TEMP_DIR, { recursive: true });
@@ -126,7 +137,7 @@ async function poll() {
       fs.writeFileSync(pdfPath, pdfBuffer);
 
       // Print it
-      const printed = silentPrint(pdfPath);
+      const printed = await silentPrint(pdfPath);
 
       if (printed) {
         // Mark as printed on the server
@@ -145,10 +156,7 @@ async function poll() {
       try { fs.unlinkSync(pdfPath); } catch {}
     }
   } catch (e) {
-    // Silent on connection errors (server might be temporarily unreachable)
-    if (!e.message.includes("Timeout") && !e.message.includes("ECONNREFUSED")) {
-      console.error(`[${new Date().toLocaleTimeString()}] Error: ${e.message}`);
-    }
+    console.error(`[${ts()}] Poll error: ${e.message}`);
   }
 }
 

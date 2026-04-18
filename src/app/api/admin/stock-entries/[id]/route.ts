@@ -169,9 +169,11 @@ export async function PUT(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  if (!(await requireStaff())) {
+  const session = await requireStaff();
+  if (!session) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
+  const userName = (session.user as { name?: string })?.name || "admin";
 
   try {
     const id = parseInt(params.id);
@@ -287,11 +289,23 @@ export async function PUT(
                   ELSE Precio5 END`;
         }
 
+        // Read old values for audit log
+        const oldVals = await new sql.Request(tx).input("cod", codPadded).query(`
+          SELECT ISNULL(Costo,0) AS costo, ISNULL(Precio,0) AS p1, ISNULL(Precio2,0) AS p2, ISNULL(Precio3,0) AS p3, ISNULL(Precio4,0) AS p4, ISNULL(Precio5,0) AS p5
+          FROM [${dbProd}].dbo.Stock WHERE LTRIM(RTRIM(CodProducto)) = LTRIM(RTRIM(@cod)) AND LTRIM(RTRIM(Deposito)) = '0' AND (TalleColor IS NULL OR LTRIM(RTRIM(TalleColor)) = '')
+        `);
+        const old = oldVals.recordset[0] || { costo: 0, p1: 0, p2: 0, p3: 0, p4: 0, p5: 0 };
+
         await req.query(`
           UPDATE [${dbProd}].dbo.Stock
           SET Costo = @costo${priceUpdates}
           WHERE LTRIM(RTRIM(CodProducto)) = LTRIM(RTRIM(@cod)) AND LTRIM(RTRIM(Deposito)) = '0' AND (TalleColor IS NULL OR LTRIM(RTRIM(TalleColor)) = '')
         `);
+
+        // Audit log
+        if (Math.abs(costo - Number(old.costo)) > 0.01) {
+          await prisma.priceAudit.create({ data: { sku: item.sku, nombre: item.productName || "", campo: "costo", valorAnterior: Number(old.costo), valorNuevo: costo, origen: "costeo", usuario: userName } });
+        }
 
         // Mark item as costeado in PostgreSQL
         await prisma.stockEntryItem.update({

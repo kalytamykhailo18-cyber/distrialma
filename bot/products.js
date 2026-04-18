@@ -333,3 +333,128 @@ export async function searchCombos(query) {
 export function formatPrice(n) {
   return "$" + Number(n).toLocaleString("es-AR", { maximumFractionDigits: 0 });
 }
+
+/**
+ * Generate a price list PDF (no images, lightweight).
+ * Returns the file path to the generated PDF.
+ */
+export async function generatePriceListPDF(rubro = null) {
+  const pool = await getPool();
+
+  let where = `WHERE (p.DeBaja = 0 OR p.DeBaja IS NULL)
+    AND LTRIM(RTRIM(s.Deposito)) = '0'
+    AND s.Precio2 > 0
+    AND (s.TalleColor IS NULL OR LTRIM(RTRIM(s.TalleColor)) = '')`;
+
+  if (rubro) {
+    where += ` AND (LTRIM(RTRIM(r.[Desc])) LIKE '%${rubro.replace(/'/g, "''")}%' OR LTRIM(RTRIM(m.[Desc])) LIKE '%${rubro.replace(/'/g, "''")}%')`;
+  }
+
+  const result = await pool.request().query(`
+    SELECT
+      LTRIM(RTRIM(p.Nombre)) AS nombre,
+      LTRIM(RTRIM(ISNULL(r.[Desc], ''))) AS rubro,
+      LTRIM(RTRIM(ISNULL(m.[Desc], ''))) AS marca,
+      LTRIM(RTRIM(ISNULL(p.Unidad, ''))) AS unidad,
+      s.Precio2 AS mayorista,
+      s.Precio4 AS cajaCerrada
+    FROM [${dbProd()}].dbo.Productos p
+    JOIN [${dbProd()}].dbo.Stock s ON s.CodProducto = p.Cod
+    LEFT JOIN [${dbProd()}].dbo.Rubros r ON r.Cod = p.Rubro
+    LEFT JOIN [${dbProd()}].dbo.Marcas m ON m.Cod = p.Marca
+    ${where}
+    ORDER BY LTRIM(RTRIM(ISNULL(r.[Desc], ''))), LTRIM(RTRIM(p.Nombre))
+  `);
+
+  let products = result.recordset;
+  if (products.length === 0) return null;
+  // Safety: cap at 500 products max to avoid huge PDFs that crash WhatsApp
+  if (products.length > 500) products = products.slice(0, 500);
+
+  const { jsPDF } = await import("jspdf");
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+  const w = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  let y = 15;
+  const fecha = new Date().toLocaleDateString("es-AR", { timeZone: "America/Argentina/Buenos_Aires" });
+
+  // Header
+  doc.setFillColor(251, 154, 71);
+  doc.rect(0, 0, w, 20, "F");
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(14);
+  doc.setFont("helvetica", "bold");
+  doc.text("Distrialma — Lista de Precios", 14, 13);
+  doc.setFontSize(8);
+  doc.setFont("helvetica", "normal");
+  doc.text(`${fecha} — ${products.length} productos — Precios sujetos a cambio sin previo aviso`, w - 14, 13, { align: "right" });
+  y = 25;
+
+  // Table header
+  const drawHeader = () => {
+    doc.setFillColor(55, 65, 81);
+    doc.rect(10, y, w - 20, 7, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "bold");
+    doc.text("Producto", 14, y + 5);
+    doc.text("Marca", 100, y + 5);
+    doc.text("Mayorista", 145, y + 5, { align: "right" });
+    doc.text("Caja Cerr.", w - 14, y + 5, { align: "right" });
+    y += 12;
+    doc.setTextColor(50, 50, 50);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7);
+  };
+  drawHeader();
+
+  let lastRubro = "";
+  for (const p of products) {
+    if (y > pageH - 15) { doc.addPage(); y = 15; drawHeader(); }
+
+    // Rubro separator
+    if (p.rubro && p.rubro !== lastRubro) {
+      lastRubro = p.rubro;
+      if (y > pageH - 20) { doc.addPage(); y = 15; drawHeader(); }
+      doc.setFillColor(245, 245, 245);
+      doc.rect(10, y - 2, w - 20, 6, "F");
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(100, 100, 100);
+      doc.text(p.rubro, 14, y + 2);
+      y += 7;
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(7);
+      doc.setTextColor(50, 50, 50);
+    }
+
+    doc.text(p.nombre.substring(0, 50), 14, y);
+    doc.text((p.marca || "").substring(0, 20), 100, y);
+    doc.setFont("helvetica", "bold");
+    doc.text(formatPrice(p.mayorista), 145, y, { align: "right" });
+    if (p.cajaCerrada > 0) {
+      doc.text(formatPrice(p.cajaCerrada), w - 14, y, { align: "right" });
+    }
+    doc.setFont("helvetica", "normal");
+    doc.setDrawColor(240, 240, 240);
+    doc.line(10, y + 1.5, w - 10, y + 1.5);
+    y += 4.5;
+  }
+
+  // Footer on all pages
+  const pc = doc.getNumberOfPages();
+  for (let pg = 1; pg <= pc; pg++) {
+    doc.setPage(pg);
+    doc.setTextColor(160, 160, 160);
+    doc.setFontSize(6);
+    doc.text(`Pagina ${pg}/${pc} — distrialma.com.ar — Precios al ${fecha}`, w / 2, pageH - 6, { align: "center" });
+  }
+
+  const dir = "./session/listas";
+  const fs = await import("fs");
+  try { fs.mkdirSync(dir, { recursive: true }); } catch {}
+  const filename = `${dir}/lista-precios-${fecha.replace(/\//g, "-")}.pdf`;
+  const buffer = Buffer.from(doc.output("arraybuffer"));
+  fs.writeFileSync(filename, buffer);
+  return filename;
+}

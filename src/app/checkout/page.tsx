@@ -27,6 +27,7 @@ export default function CheckoutPage() {
   const [sending, setSending] = useState(false);
   const [showDisclaimer, setShowDisclaimer] = useState(false);
   const [pendingAction, setPendingAction] = useState<"order" | "whatsapp" | null>(null);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -244,29 +245,26 @@ export default function CheckoutPage() {
               <h3 className="text-lg font-semibold text-gray-900">Condiciones del pedido</h3>
             </div>
 
-            <ol className="space-y-3 text-sm text-gray-700 mb-6">
-              <li className="flex gap-2">
-                <span className="font-semibold text-brand-600 shrink-0">1.</span>
-                <span>Precios de productos pasibles sujeto a facturación final.</span>
-              </li>
-              <li className="flex gap-2">
-                <span className="font-semibold text-brand-600 shrink-0">2.</span>
-                <span>Precios en efectivo. Consulte costos por otros medios de pago.</span>
-              </li>
-              <li className="flex gap-2">
-                <span className="font-semibold text-brand-600 shrink-0">3.</span>
-                <span>Aplican condiciones de entrega y disponibilidad.</span>
-              </li>
-              <li className="flex gap-2">
-                <span className="font-semibold text-brand-600 shrink-0">4.</span>
-                <span>Sujeto a cierre de horario de pedidos.</span>
-              </li>
-            </ol>
+            <div className="text-xs text-gray-600 space-y-2 mb-4 max-h-48 overflow-y-auto bg-gray-50 rounded-lg p-3">
+              <p>Los precios son orientativos y podrán variar a criterio del Vendedor.</p>
+              <p>En caso de existir alguna actualización y/o variación en los precios entre la fecha en que fue realizado el pedido por parte del Comprador y la fecha de entrega, se tomará como precio válido aquel correspondiente a la fecha de emisión de la factura.</p>
+              <p>Los productos vendidos por peso se facturarán según su peso real y al precio por unidad de medida vigente al momento de la facturación.</p>
+              <p>En el sitio web, los precios pueden visualizarse —a elección del Comprador— con o sin Impuesto al Valor Agregado (IVA), únicamente a modo orientativo.</p>
+              <p>El importe puede cambiar sujeto a la variación del precio del producto y/o stock disponible.</p>
+              <p>Los precios no contemplan percepciones a cuenta de impuestos nacionales ni provinciales.</p>
+            </div>
+
+            <label className="flex items-start gap-2 mb-4 cursor-pointer">
+              <input type="checkbox" checked={acceptedTerms} onChange={(e) => setAcceptedTerms(e.target.checked)}
+                className="w-4 h-4 mt-0.5 rounded border-gray-300 text-brand-500 focus:ring-brand-500" />
+              <span className="text-sm text-gray-700">Acepto las condiciones del pedido</span>
+            </label>
 
             <div className="flex gap-3">
               <button
                 onClick={() => {
                   setShowDisclaimer(false);
+                  setAcceptedTerms(false);
                   setPendingAction(null);
                 }}
                 className={`flex-1 py-2.5 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 ${springBtn}`}
@@ -276,6 +274,7 @@ export default function CheckoutPage() {
               <button
                 onClick={async () => {
                   setShowDisclaimer(false);
+                  setAcceptedTerms(false);
                   if (pendingAction === "whatsapp") {
                     handleWhatsApp();
                   } else if (pendingAction === "order") {
@@ -301,7 +300,7 @@ export default function CheckoutPage() {
                   }
                   setPendingAction(null);
                 }}
-                disabled={sending}
+                disabled={sending || !acceptedTerms}
                 className={`flex-1 py-2.5 bg-brand-400 text-white rounded-lg text-sm font-medium hover:bg-brand-500 disabled:opacity-50 ${springBtn}`}
               >
                 Aceptar y enviar
