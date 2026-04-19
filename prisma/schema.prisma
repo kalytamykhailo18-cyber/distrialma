@@ -550,3 +550,27 @@ model ProductoProveedor {
   @@index([sku])
   @@map("producto_proveedor")
 }
+
+// POS Web terminal configuration
+model PosTerminal {
+  id              Int      @id @default(autoincrement())
+  nombre          String   @db.VarChar(60)
+  sucursal        String   @db.VarChar(10)
+  sucursalNombre  String   @db.VarChar(60)
+  listas          String   @db.VarChar(30)  // comma-separated list numbers: "1" or "2,3,4"
+  cuit            String   @db.VarChar(20)
+  razonSocial     String   @db.VarChar(120)
+  direccion       String   @db.VarChar(200)
+  aliasBanco      String   @db.VarChar(60)  @default("")
+  formatoImpresion String  @db.VarChar(10)  // "ticket" or "a4"
+  flujo           String   @db.VarChar(10)  // "directo" or "pendiente"
+  permisoAnular   Boolean  @default(false)
+  permisoPrecio   Boolean  @default(false)
+  permisoDevolver Boolean  @default(true)
+  requiereCliente Boolean  @default(false)
+  activa          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("pos_terminales")
+}
