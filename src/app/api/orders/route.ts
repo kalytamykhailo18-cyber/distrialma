@@ -347,6 +347,32 @@ export async function POST(req: NextRequest) {
       console.error("Error saving precarga snapshot:", archiveErr);
     }
 
+    // Instant backup to PedidoBackup (so it persists even if deleted from PunTouch before cron runs)
+    try {
+      await prisma.pedidoBackup.upsert({
+        where: { boleta: boletaCod.trim() },
+        update: {},
+        create: {
+          boleta: boletaCod.trim(),
+          clienteCod: client.cod.trim(),
+          clienteName: client.nombre,
+          total: totalImpo,
+          fechora: fechora,
+          nroped: nextNroped,
+          items: JSON.stringify(expandedItems.map((ei) => ({
+            sku: ei.sku.trim(),
+            name: ei.name,
+            cant: ei.cant,
+            price: ei.price,
+            listaPrecio: ei.listaPrecio,
+          }))),
+          active: true,
+        },
+      });
+    } catch (backupErr) {
+      console.error("Error saving instant PedidoBackup:", backupErr);
+    }
+
     return NextResponse.json({
       ok: true,
       nroped: nextNroped,

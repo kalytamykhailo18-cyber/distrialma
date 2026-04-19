@@ -104,28 +104,56 @@ export async function GET(req: NextRequest) {
         notas: p.notas,
       }));
 
-      // Also check archived web orders from PostgreSQL
+      // Also check archived web orders from PostgreSQL (both PedidoBackup and ArchivedOrder)
       const { PrismaClient } = await import("@prisma/client");
       const prismaLocal = new PrismaClient();
-      const archivedWeb = await prismaLocal.pedidoBackup.findMany({
-        where: { clienteCod: cod },
-        orderBy: { createdAt: "desc" },
-        take: 20,
-      });
+      const [backups, archivedOrders] = await Promise.all([
+        prismaLocal.pedidoBackup.findMany({
+          where: { clienteCod: cod },
+          orderBy: { createdAt: "desc" },
+          take: 20,
+        }),
+        prismaLocal.archivedOrder.findMany({
+          where: { clienteCod: { in: [cod, cod.padStart(7, " ")] } },
+          orderBy: { archivedAt: "desc" },
+          take: 20,
+          include: { items: true },
+        }),
+      ]);
       await prismaLocal.$disconnect();
 
-      const pedidosArchivados = archivedWeb.map((a) => {
-        const items = JSON.parse(a.items || "[]");
-        return {
+      // Merge both sources, deduplicate by boleta
+      const seenBoletas = new Set<string>();
+      const pedidosArchivados: Array<{ boleta: string; nroped: string; total: number; fecha: string; hora: string; items: unknown[]; active: boolean }> = [];
+
+      for (const a of backups) {
+        if (seenBoletas.has(a.boleta)) continue;
+        seenBoletas.add(a.boleta);
+        pedidosArchivados.push({
           boleta: a.boleta,
           nroped: a.nroped || "",
           total: Number(a.total),
           fecha: a.fechora.length >= 8 ? `${a.fechora.slice(6, 8)}/${a.fechora.slice(4, 6)}/${a.fechora.slice(0, 4)}` : a.fechora,
           hora: a.fechora.length >= 12 ? `${a.fechora.slice(8, 10)}:${a.fechora.slice(10, 12)}` : "",
-          items,
+          items: JSON.parse(a.items || "[]"),
           active: a.active,
-        };
-      });
+        });
+      }
+
+      for (const a of archivedOrders) {
+        const boleta = a.boleta.trim();
+        if (seenBoletas.has(boleta)) continue;
+        seenBoletas.add(boleta);
+        pedidosArchivados.push({
+          boleta,
+          nroped: a.nroped || "",
+          total: Number(a.total),
+          fecha: a.fechora.length >= 8 ? `${a.fechora.slice(6, 8)}/${a.fechora.slice(4, 6)}/${a.fechora.slice(0, 4)}` : a.fechora,
+          hora: a.fechora.length >= 12 ? `${a.fechora.slice(8, 10)}:${a.fechora.slice(10, 12)}` : "",
+          items: a.items.map((i) => ({ sku: i.sku.trim(), name: i.productName, cant: Number(i.cant), price: Number(i.precio), listaPrecio: i.listaPrecio })),
+          active: true,
+        });
+      }
 
       return NextResponse.json({
         cliente: {
