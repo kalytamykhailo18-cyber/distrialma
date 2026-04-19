@@ -220,7 +220,8 @@ export default function PedidosPage() {
 
                           {/* Facturado-only: no precarga, just show what was invoiced */}
                           {order.facturado && order.items.length === 0 && (
-                            <table className="w-full text-sm">
+                            <div className="overflow-x-auto">
+                            <table className="w-full text-sm min-w-[400px]">
                               <thead>
                                 <tr className="text-white text-xs bg-green-600">
                                   <th className="text-left pb-2 pt-2 pl-2">Producto</th>
@@ -240,6 +241,7 @@ export default function PedidosPage() {
                                 ))}
                               </tbody>
                             </table>
+                            </div>
                           )}
 
                           {/* Card-based comparison for facturado orders with precarga */}

@@ -123,6 +123,7 @@ export default function Navbar() {
     { href: "/admin/movimientos", label: "Movimientos", iconKey: "compras", perm: "movimientos" },
     { href: "/admin/precios", label: "Precios", iconKey: "precios", perm: "costeo" },
     { href: "/admin/dashboard", label: "Dashboard", iconKey: "informes", perm: "dashboard" },
+    { href: "/admin/clientes", label: "Clientes", iconKey: "clientes", perm: "clientes" },
   ];
 
   const menuItems = !session?.user ? [] : isStaff

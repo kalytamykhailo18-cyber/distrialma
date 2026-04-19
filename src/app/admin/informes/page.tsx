@@ -383,10 +383,10 @@ export default function InformesPage() {
                       PDF
                     </button>
                   </div>
-                  <div className="bg-white rounded-lg border shadow-sm overflow-hidden">
-                    <table className="w-full text-sm">
+                  <div className="bg-white rounded-lg border shadow-sm overflow-x-auto">
+                    <table className="w-full text-sm min-w-[500px]">
                       <thead className="bg-gray-50">
-                        <tr>
+                        <tr className="whitespace-nowrap">
                           <th className="text-left px-3 py-2 font-medium text-gray-600">SKU</th>
                           <th className="text-left px-3 py-2 font-medium text-gray-600">Producto</th>
                           <th className="text-right px-3 py-2 font-medium text-gray-600">Cantidad total</th>
@@ -444,10 +444,10 @@ export default function InformesPage() {
                         <h3 className="font-semibold text-gray-800">{day.date}</h3>
                         <span className="text-sm font-medium text-gray-600">{formatPrice(day.dayTotal)}</span>
                       </div>
-                      <div className="bg-white rounded-lg border shadow-sm overflow-hidden">
-                        <table className="w-full text-sm">
+                      <div className="bg-white rounded-lg border shadow-sm overflow-x-auto">
+                        <table className="w-full text-sm min-w-[400px]">
                           <thead className="bg-gray-50">
-                            <tr>
+                            <tr className="whitespace-nowrap">
                               <th className="text-left px-3 py-2 font-medium text-gray-600">Producto</th>
                               <th className="text-right px-3 py-2 font-medium text-gray-600">Cantidad</th>
                               <th className="text-right px-3 py-2 font-medium text-gray-600">Importe</th>

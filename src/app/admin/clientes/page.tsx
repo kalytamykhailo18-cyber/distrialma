@@ -73,8 +73,13 @@ export default function ClientesPage() {
   const [expandedBoleta, setExpandedBoleta] = useState<string | null>(null);
   const [facturaItems, setFacturaItems] = useState<FacturaItem[]>([]);
   const [loadingItems, setLoadingItems] = useState(false);
-  const [pedidosWeb, setPedidosWeb] = useState<Array<{ boleta: string; nroped: string; total: number; fecha: string; hora: string; notas: string }>>([]);
+  const [pedidosWeb, setPedidosWeb] = useState<Array<{ boleta: string; nroped: string; total: number; fecha: string; hora: string; notas: string; archived?: boolean; archivedItems?: Array<{ sku: string; name: string; cant: number; price: number; listaPrecio: number }> }>>([]);
   const [clientTab, setClientTab] = useState<"facturas" | "pedidos">("facturas");
+
+  // Pedido web items
+  const [expandedPedido, setExpandedPedido] = useState<string | null>(null);
+  const [pedidoItems, setPedidoItems] = useState<Array<{ sku: string; nombre: string; cantidad: number; precio: number; impo: number; unidad: string; listaPrecio: number; listaLabel: string }>>([]);
+  const [loadingPedidoItems, setLoadingPedidoItems] = useState(false);
 
   async function loadClientes(p = 1) {
     setLoading(true);
@@ -95,13 +100,20 @@ export default function ClientesPage() {
     setSelectedCod(cod);
     setLoadingDetail(true);
     setExpandedBoleta(null);
+    setExpandedPedido(null);
     setClientTab("facturas");
     try {
       const res = await fetch(`/api/admin/clientes?cod=${cod}`);
       const d = await res.json();
       setCliente(d.cliente || null);
       setFacturas(d.facturas || []);
-      setPedidosWeb(d.pedidosWeb || []);
+      const live = (d.pedidosWeb || []).map((p: Record<string, unknown>) => ({ ...p, archived: false }));
+      const archived = (d.pedidosArchivados || []).map((p: Record<string, unknown>) => ({ ...p, notas: "", archived: true, archivedItems: p.items }));
+      // Merge, deduplicate by boleta (live takes priority), sort by fecha desc
+      const seen = new Set(live.map((p: { boleta: string }) => p.boleta));
+      const merged = [...live, ...archived.filter((p: { boleta: string }) => !seen.has(p.boleta))];
+      merged.sort((a: { fecha: string; hora: string }, b: { fecha: string; hora: string }) => (b.fecha + b.hora).localeCompare(a.fecha + a.hora));
+      setPedidosWeb(merged);
     } catch {}
     setLoadingDetail(false);
   }
@@ -116,6 +128,28 @@ export default function ClientesPage() {
       setFacturaItems(d.items || []);
     } catch {}
     setLoadingItems(false);
+  }
+
+  async function loadPedidoItems(boleta: string) {
+    if (expandedPedido === boleta) { setExpandedPedido(null); return; }
+    setExpandedPedido(boleta);
+    const pedido = pedidosWeb.find((p) => p.boleta === boleta);
+    if (pedido?.archived && pedido.archivedItems) {
+      // Archived pedido already has items embedded
+      const LISTA_LABELS: Record<number, string> = { 1: "Minorista", 2: "Mayorista", 3: "Especial", 4: "Caja Cerrada", 5: "PedidosYa" };
+      setPedidoItems(pedido.archivedItems.map((i) => ({
+        sku: i.sku, nombre: i.name, cantidad: i.cant, precio: i.price, impo: i.cant * i.price,
+        unidad: "", listaPrecio: i.listaPrecio || 0, listaLabel: LISTA_LABELS[i.listaPrecio] || `Lista ${i.listaPrecio}`,
+      })));
+      return;
+    }
+    setLoadingPedidoItems(true);
+    try {
+      const res = await fetch(`/api/admin/clientes/pedido-items?boleta=${boleta}`);
+      const d = await res.json();
+      setPedidoItems(d.items || []);
+    } catch {}
+    setLoadingPedidoItems(false);
   }
 
   async function downloadFacturaPDF(boleta: string, fecha: string) {
@@ -175,9 +209,11 @@ export default function ClientesPage() {
     doc.setFont("helvetica", "bold");
     doc.text("SKU", 14, y + 5);
     doc.text("Producto", 30, y + 5);
-    doc.text("Cant.", 120, y + 5, { align: "right" });
-    doc.text("Precio", 145, y + 5, { align: "right" });
-    doc.text("Importe", w - 14, y + 5, { align: "right" });
+    doc.text("Cant.", 100, y + 5, { align: "right" });
+    doc.text("~Unid.", 118, y + 5, { align: "right" });
+    doc.text("Precio", 140, y + 5, { align: "right" });
+    doc.text("Importe", 168, y + 5, { align: "right" });
+    doc.text("Lista", w - 14, y + 5, { align: "right" });
     y += 12;
 
     doc.setTextColor(50, 50, 50);
@@ -188,12 +224,22 @@ export default function ClientesPage() {
     for (const item of items) {
       if (y > 275) { doc.addPage(); y = 15; }
       doc.text(item.sku, 14, y);
-      doc.text(item.nombre.substring(0, 45), 30, y);
-      doc.text(item.cantidad.toLocaleString("es-AR", { maximumFractionDigits: 2 }) + (item.unidad === "KG" ? " kg" : ""), 120, y, { align: "right" });
-      doc.text(formatPrice(item.precio), 145, y, { align: "right" });
+      doc.text(item.nombre.substring(0, 35), 30, y);
+      const cantStr = item.cantidad.toLocaleString("es-AR", { maximumFractionDigits: 2 }) + (item.unidad === "KG" ? " kg" : "");
+      doc.text(cantStr, 100, y, { align: "right" });
+      // ~Unid
+      doc.setTextColor(59, 130, 246);
+      const unidStr = item.unidadesAprox != null ? `~${item.unidadesAprox}` : (item.unidad === "KG" ? "~1" : "");
+      doc.text(unidStr, 118, y, { align: "right" });
+      doc.setTextColor(50, 50, 50);
+      doc.text(formatPrice(item.precio), 140, y, { align: "right" });
       doc.setFont("helvetica", "bold");
-      doc.text(formatPrice(item.impo), w - 14, y, { align: "right" });
+      doc.text(formatPrice(item.impo), 168, y, { align: "right" });
       doc.setFont("helvetica", "normal");
+      // Lista
+      doc.setTextColor(150, 150, 150);
+      doc.text(item.listaLabel || "", w - 14, y, { align: "right" });
+      doc.setTextColor(50, 50, 50);
       doc.setDrawColor(235, 235, 235);
       doc.line(10, y + 1.5, w - 10, y + 1.5);
       y += 5;
@@ -292,22 +338,59 @@ export default function ClientesPage() {
                   <div className="divide-y">
                     {pedidosWeb.length === 0 ? (
                       <p className="px-4 py-6 text-gray-400 text-center text-sm">No hay pedidos web de este cliente.</p>
-                    ) : pedidosWeb.map((p, i) => (
-                      <div key={p.boleta} style={staggerStyle(true, i, 100, 20)}
-                        className={`px-4 py-3 ${hoverRow}`}>
-                        <div className="flex items-center justify-between">
-                          <div>
+                    ) : pedidosWeb.map((p, i) => {
+                      const isOpenP = expandedPedido === p.boleta;
+                      return (
+                      <div key={p.boleta} className={isOpenP ? "bg-brand-50 border-l-4 border-l-brand-500 rounded-xl shadow-md my-1" : ""} style={staggerStyle(true, i, 100, 20)}>
+                        <button onClick={() => loadPedidoItems(p.boleta)}
+                          className={`w-full px-4 py-2.5 flex items-center justify-between text-left ${hoverRow} ${isOpenP ? "bg-brand-50" : ""}`}>
+                          <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
                               <span className="text-xs text-gray-400 font-mono">#{p.nroped || p.boleta}</span>
-                              <span className="text-sm font-medium text-gray-900">{p.fecha} {p.hora}</span>
-                              <span className="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded font-medium">Web</span>
+                              <span className={`text-sm font-medium truncate ${isOpenP ? "text-brand-700" : "text-gray-900"}`}>{p.fecha} {p.hora}</span>
+                              <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${p.archived ? "bg-gray-100 text-gray-500" : "bg-blue-100 text-blue-700"}`}>{p.archived ? "Archivado" : "Web"}</span>
                             </div>
                             {p.notas && <div className="text-xs text-amber-600 mt-0.5">Nota: {p.notas}</div>}
                           </div>
-                          <div className="text-sm font-bold text-gray-900">{formatPrice(p.total)}</div>
-                        </div>
+                          <div className="flex items-center gap-3 shrink-0">
+                            <div className="text-sm font-bold text-gray-900">{formatPrice(p.total)}</div>
+                            <HiChevronDown className={`w-4 h-4 transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${isOpenP ? "rotate-180 text-brand-600" : "text-gray-400"}`} />
+                          </div>
+                        </button>
+                        <CollapsiblePanel open={isOpenP}>
+                          <div className="px-4 py-2 bg-brand-50/50 border-t border-brand-200 overflow-x-auto">
+                            {loadingPedidoItems ? <p className="text-xs text-gray-400 py-2">Cargando...</p> : (
+                              <table className="w-full text-xs min-w-[400px]">
+                                <thead>
+                                  <tr className="text-gray-500 whitespace-nowrap">
+                                    <th className="text-left py-1">Producto</th>
+                                    <th className="text-right py-1">Cant.</th>
+                                    <th className="text-right py-1">Precio</th>
+                                    <th className="text-right py-1">Importe</th>
+                                    <th className="text-right py-1">Lista</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-brand-100">
+                                  {pedidoItems.map((item, j) => (
+                                    <tr key={j} className={hoverRow}>
+                                      <td className="py-1.5">
+                                        <span className="text-gray-400 font-mono mr-1">{item.sku}</span>
+                                        {item.nombre}
+                                      </td>
+                                      <td className="text-right py-1.5">{item.cantidad.toLocaleString("es-AR", { maximumFractionDigits: 2 })} {item.unidad === "KG" ? "kg" : ""}</td>
+                                      <td className="text-right py-1.5">{formatPrice(item.precio)}</td>
+                                      <td className="text-right py-1.5 font-medium">{formatPrice(item.impo)}</td>
+                                      <td className="text-right py-1.5 text-gray-400">{item.listaLabel}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            )}
+                          </div>
+                        </CollapsiblePanel>
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               </Stagger>
@@ -348,11 +431,11 @@ export default function ClientesPage() {
                         </div>
                       </button>
                       <CollapsiblePanel open={isOpen}>
-                        <div className="px-4 py-2 bg-brand-50/50 border-t border-brand-200">
+                        <div className="px-4 py-2 bg-brand-50/50 border-t border-brand-200 overflow-x-auto">
                           {loadingItems ? <p className="text-xs text-gray-400 py-2">Cargando...</p> : (
-                            <table className="w-full text-xs">
+                            <table className="w-full text-xs min-w-[500px]">
                               <thead>
-                                <tr className="text-gray-500">
+                                <tr className="text-gray-500 whitespace-nowrap">
                                   <th className="text-left py-1">Producto</th>
                                   <th className="text-right py-1">Cant.</th>
                                   <th className="text-right py-1">~Unid.</th>

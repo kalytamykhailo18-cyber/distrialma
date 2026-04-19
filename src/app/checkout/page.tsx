@@ -152,11 +152,13 @@ export default function CheckoutPage() {
             const lineTotal = isBox
               ? item.precioCajaCerrada * item.cantidadPorCaja * item.quantity
               : item.precioMayorista * item.quantity;
+            const isPromo = cartConfig.promoSkus.includes(item.sku);
             return (
-              <div key={item.sku} className="flex justify-between">
+              <div key={item.sku} className={`flex justify-between ${isPromo ? "border border-orange-400 rounded-lg px-2 py-1 bg-orange-50" : ""}`}>
                 <span className="text-gray-700">
                   {item.quantity}x {item.name}
                   {isBox ? ` (Caja x${item.cantidadPorCaja})` : ""}
+                  {isPromo && <span className="text-xs text-orange-600 ml-1">Promo</span>}
                 </span>
                 <span className="font-medium text-gray-900 shrink-0 ml-2">
                   {formatPrice(lineTotal)}
@@ -197,7 +199,7 @@ export default function CheckoutPage() {
         )}
         {meetsMinimum && !freeShipping && items.length > 0 && (
           <div className="bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-3 rounded-lg text-sm">
-            Se agrega envio al pedido. Para envio gratis, el subtotal debe superar {formatPrice(cartConfig.shippingThreshold)}.
+            Se agrega envio al pedido. Para envio gratis, el subtotal en productos no promocionales debe superar {formatPrice(cartConfig.shippingThreshold)}.
           </div>
         )}
         {clientInfo?.deliveryDay && (

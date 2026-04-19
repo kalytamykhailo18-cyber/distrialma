@@ -71,6 +71,7 @@ REGLAS IMPORTANTES:
 11. CLIENTES NO REGISTRADOS: Si el cliente no está registrado, ya le pedimos sus datos. Cuando te los pase (nombre, dirección, teléfono, CUIT/CUIL/DNI), usá la herramienta register_client para darlo de alta. Necesitás al menos nombre y teléfono. Después confirmale que ya está registrado y puede empezar a comprar en distrialma.com.ar.
 
 12. HORARIOS Y CHARLA: Si te preguntan la hora, el día, el clima, o cosas casuales, respondé con onda. Sos simpático, cercano y divertido. Para el clima decí algo general de Buenos Aires según la época del año, no inventes datos exactos. Si te piden un chiste, contá uno cortito y gracioso.
+12b. STICKER: Tenes un sticker de Alma (el logo de Distrialma). Mandalo con send_sticker cuando sea un buen momento: al final de una buena conversacion, cuando el cliente hace su primer pedido, o cuando se despide amigablemente. No lo mandes en cada conversacion, solo cuando cierre bien.
 13. CUANDO ESTÉN CERRADOS: Siempre aclará qué sucursales abren y a qué hora. Mencioná que pueden hacer pedidos por la web las 24 horas en distrialma.com.ar y que PedidosYa funciona con delivery.
 
 Información del negocio:
@@ -161,6 +162,15 @@ const TOOLS = [
         },
       },
       required: ["filter"],
+    },
+  },
+  {
+    name: "send_sticker",
+    description: "Envia el sticker de Alma (logo de Distrialma) al cliente por WhatsApp. Usalo al final de una buena conversacion, cuando el cliente hace su primer pedido, o cuando se despide amigablemente. No lo mandes siempre, solo cuando sea un lindo cierre.",
+    input_schema: {
+      type: "object",
+      properties: {},
+      required: [],
     },
   },
   {
@@ -327,6 +337,22 @@ async function callClaude(chatId, userMessage, clientInfo, phoneNumber) {
             }
           } catch (e) {
             console.error("Price list error:", e.message);
+            result = { sent: false, error: e.message };
+          }
+        } else if (tu.name === "send_sticker") {
+          try {
+            const fsSync = await import("fs");
+            const { fileURLToPath } = await import("url");
+            const path = await import("path");
+            const stickerPath = path.join(path.dirname(fileURLToPath(import.meta.url)), "sticker.png");
+            const stickerData = fsSync.readFileSync(stickerPath);
+            const { MessageMedia } = pkg;
+            const media = new MessageMedia("image/png", stickerData.toString("base64"), "sticker.png");
+            await client.sendMessage(chatId, media, { sendMediaAsSticker: true, stickerAuthor: "Distrialma", stickerName: "Alma" });
+            storeMessage(chatId, "out", "[Sticker] Alma", "bot");
+            result = { sent: true };
+          } catch (e) {
+            console.error("Sticker error:", e.message);
             result = { sent: false, error: e.message };
           }
         } else if (tu.name === "register_client") {

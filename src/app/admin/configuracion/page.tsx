@@ -22,6 +22,14 @@ export default function AdminConfigPage() {
   const [savingMargins, setSavingMargins] = useState(false);
   const [marginSaved, setMarginSaved] = useState(false);
 
+  // Reparto settings
+  const [repartoMin, setRepartoMin] = useState("60000");
+  const [shippingThreshold, setShippingThreshold] = useState("200000");
+  const [shippingSku, setShippingSku] = useState("");
+  const [shippingPrice, setShippingPrice] = useState("0");
+  const [savingReparto, setSavingReparto] = useState(false);
+  const [repartoSaved, setRepartoSaved] = useState(false);
+
   useEffect(() => {
     Promise.all([
       fetch("/api/admin/settings").then((r) => r.json()),
@@ -30,6 +38,10 @@ export default function AdminConfigPage() {
       .then(([settings, marginData]) => {
         setHideOutOfStock(settings.hide_out_of_stock === "true");
         setStockThreshold(settings.stock_threshold || "0");
+        setRepartoMin(settings.promo_min_subtotal || "60000");
+        setShippingThreshold(settings.shipping_threshold || "200000");
+        setShippingSku(settings.shipping_sku || "");
+        setShippingPrice(settings.shipping_price || "0");
         const m: Record<number, string> = {};
         for (const mg of marginData.margins || []) {
           m[mg.lista] = String(mg.margen);
@@ -136,6 +148,85 @@ export default function AdminConfigPage() {
               </div>
             </Stagger>
           )}
+
+          {/* Reparto settings */}
+          <Stagger delay={125}>
+            <div className="bg-white rounded-xl shadow-sm border p-6">
+              <h2 className="font-semibold text-gray-900 mb-1">
+                Reparto directo
+              </h2>
+              <p className="text-sm text-gray-500 mb-4">
+                Configuración de pedido mínimo y envío para pedidos web directos (no vendedores).
+              </p>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Pedido mínimo</label>
+                  <p className="text-xs text-gray-400 mb-2">Monto mínimo para aceptar un pedido web. Los artículos promocionales no cuentan.</p>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-500">$</span>
+                    <input type="number" step="1000" value={repartoMin}
+                      onChange={(e) => setRepartoMin(e.target.value)}
+                      className="w-40 px-3 py-2 border border-brand-400 rounded-xl text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600" />
+                    <span className="text-xs text-gray-400">(0 = sin mínimo)</span>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Umbral envío gratis</label>
+                  <p className="text-xs text-gray-400 mb-2">Por encima de este monto el envío es gratis. Por debajo se cobra automáticamente.</p>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-500">$</span>
+                    <input type="number" step="1000" value={shippingThreshold}
+                      onChange={(e) => setShippingThreshold(e.target.value)}
+                      className="w-40 px-3 py-2 border border-brand-400 rounded-xl text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600" />
+                  </div>
+                </div>
+                <div className="flex gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">SKU envío</label>
+                    <input type="text" value={shippingSku}
+                      onChange={(e) => setShippingSku(e.target.value)}
+                      placeholder="Ej: 1"
+                      className="w-28 px-3 py-2 border border-brand-400 rounded-xl text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Precio envío</label>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-gray-500">$</span>
+                      <input type="number" step="100" value={shippingPrice}
+                        onChange={(e) => setShippingPrice(e.target.value)}
+                        className="w-32 px-3 py-2 border border-brand-400 rounded-xl text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={async () => {
+                  setSavingReparto(true);
+                  setRepartoSaved(false);
+                  const saves = [
+                    { key: "promo_min_subtotal", value: repartoMin },
+                    { key: "shipping_threshold", value: shippingThreshold },
+                    { key: "shipping_sku", value: shippingSku },
+                    { key: "shipping_price", value: shippingPrice },
+                  ];
+                  for (const s of saves) {
+                    await fetch("/api/admin/settings", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify(s),
+                    });
+                  }
+                  setSavingReparto(false);
+                  setRepartoSaved(true);
+                  setTimeout(() => setRepartoSaved(false), 2000);
+                }}
+                disabled={savingReparto}
+                className={`${springBtn} mt-4 px-4 py-2 bg-brand-400 text-white rounded-xl text-sm font-medium hover:bg-brand-500 disabled:opacity-50`}
+              >
+                {savingReparto ? "..." : repartoSaved ? "Guardado!" : "Guardar reparto"}
+              </button>
+            </div>
+          </Stagger>
 
           {/* Price margins */}
           <Stagger delay={150}>

@@ -50,7 +50,17 @@ export async function GET() {
         rubroCod: c.rubroCod,
         porcentaje: Number(c.porcentaje),
       })),
-      promocionales: promocionales.map((p) => p.sku),
+      promocionales: await (async () => {
+        if (promocionales.length === 0) return [];
+        const skuList = promocionales.map((p) => `'${p.sku.padStart(7, " ")}'`).join(",");
+        const names = await pool.request().query(`
+          SELECT LTRIM(RTRIM(Cod)) AS sku, LTRIM(RTRIM(ISNULL(Nombre, ''))) AS nombre
+          FROM [${dbProd}].dbo.Productos
+          WHERE Cod IN (${skuList})
+        `);
+        const nameMap = new Map(names.recordset.map((n: { sku: string; nombre: string }) => [n.sku, n.nombre]));
+        return promocionales.map((p) => ({ sku: p.sku, nombre: nameMap.get(p.sku) || "" }));
+      })(),
       settings: {
         markup: parseFloat(settingsMap.vendedor_markup || "3"),
         minOrder: parseFloat(settingsMap.vendedor_min_order || "0"),

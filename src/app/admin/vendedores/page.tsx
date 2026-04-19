@@ -32,7 +32,7 @@ export default function AdminVendedoresPage() {
   const [vendedores, setVendedores] = useState<Vendedor[]>([]);
   const [rubros, setRubros] = useState<Rubro[]>([]);
   const [comisiones, setComisiones] = useState<Comision[]>([]);
-  const [promocionales, setPromocionales] = useState<string[]>([]);
+  const [promocionales, setPromocionales] = useState<Array<{ sku: string; nombre: string }>>([]);
   const [settings, setSettings] = useState<Settings>({ markup: 3, minOrder: 0, defaultComision: 3 });
   const [loading, setLoading] = useState(true);
   const [selectedVendedor, setSelectedVendedor] = useState<Vendedor | null>(null);
@@ -86,7 +86,7 @@ export default function AdminVendedoresPage() {
     showToast("Configuración guardada");
   }
 
-  async function togglePromocional(sku: string) {
+  async function togglePromocional(sku: string, nombre?: string) {
     const res = await fetch("/api/admin/vendedores/promocionales", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -94,9 +94,9 @@ export default function AdminVendedoresPage() {
     });
     const data = await res.json();
     if (data.promocional) {
-      setPromocionales((prev) => [...prev, sku]);
+      setPromocionales((prev) => [...prev, { sku, nombre: nombre || "" }]);
     } else {
-      setPromocionales((prev) => prev.filter((s) => s !== sku));
+      setPromocionales((prev) => prev.filter((p) => p.sku !== sku));
     }
   }
 
@@ -137,27 +137,27 @@ export default function AdminVendedoresPage() {
 
       {/* Tabs */}
       <Stagger delay={50} y={10}>
-        <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit mb-4">
+        <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-full sm:w-fit mb-4 overflow-x-auto">
           <button
             onClick={() => setTab("vendedores")}
-            className={`px-4 py-1.5 text-sm rounded-md ${springBtn} ${tab === "vendedores" ? "bg-white text-gray-900 shadow-sm font-medium" : "text-gray-500"}`}
+            className={`flex-1 sm:flex-none whitespace-nowrap px-3 sm:px-4 py-1.5 text-xs sm:text-sm rounded-md ${springBtn} ${tab === "vendedores" ? "bg-white text-gray-900 shadow-sm font-medium" : "text-gray-500"}`}
           >
             <HiOutlineUser className="inline w-4 h-4 mr-1" />
-            Comisiones por rubro
+            Comisiones
           </button>
           <button
             onClick={() => setTab("promocionales")}
-            className={`px-4 py-1.5 text-sm rounded-md ${springBtn} ${tab === "promocionales" ? "bg-white text-gray-900 shadow-sm font-medium" : "text-gray-500"}`}
+            className={`flex-1 sm:flex-none whitespace-nowrap px-3 sm:px-4 py-1.5 text-xs sm:text-sm rounded-md ${springBtn} ${tab === "promocionales" ? "bg-white text-gray-900 shadow-sm font-medium" : "text-gray-500"}`}
           >
             <HiOutlineGift className="inline w-4 h-4 mr-1" />
             Promocionales
           </button>
           <button
             onClick={() => setTab("settings")}
-            className={`px-4 py-1.5 text-sm rounded-md ${springBtn} ${tab === "settings" ? "bg-white text-gray-900 shadow-sm font-medium" : "text-gray-500"}`}
+            className={`flex-1 sm:flex-none whitespace-nowrap px-3 sm:px-4 py-1.5 text-xs sm:text-sm rounded-md ${springBtn} ${tab === "settings" ? "bg-white text-gray-900 shadow-sm font-medium" : "text-gray-500"}`}
           >
             <HiOutlineCog className="inline w-4 h-4 mr-1" />
-            Configuración
+            Config
           </button>
         </div>
       </Stagger>
@@ -251,38 +251,41 @@ export default function AdminVendedoresPage() {
                     <span className="text-xs text-gray-400 ml-2">SKU: {p.sku}</span>
                   </div>
                   <button
-                    onClick={() => togglePromocional(p.sku)}
+                    onClick={() => togglePromocional(p.sku, p.name)}
                     className={`text-xs px-3 py-1 rounded-full font-medium ${springBtn} ${
-                      promocionales.includes(p.sku)
+                      promocionales.some((pr) => pr.sku === p.sku)
                         ? "bg-purple-100 text-purple-700"
                         : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                     }`}
                   >
-                    {promocionales.includes(p.sku) ? "Promocional ✓" : "Marcar promocional"}
+                    {promocionales.some((pr) => pr.sku === p.sku) ? "Promocional ✓" : "Marcar promocional"}
                   </button>
                 </div>
               ))}
             </div>
           )}
 
-          <div>
-            <h3 className="text-sm font-medium text-gray-700 mb-2">
+          <div className="bg-purple-50 border border-purple-200 rounded-xl p-4 mt-2">
+            <h3 className="text-sm font-semibold text-purple-800 mb-2">
               Productos promocionales actuales ({promocionales.length})
             </h3>
             {promocionales.length === 0 ? (
-              <p className="text-sm text-gray-400">Ninguno cargado todavía.</p>
+              <p className="text-sm text-purple-400">Ninguno cargado todavía.</p>
             ) : (
-              <div className="flex flex-wrap gap-2">
-                {promocionales.map((sku) => (
-                  <span key={sku} className="text-xs px-3 py-1 rounded-full bg-purple-100 text-purple-700 flex items-center gap-2">
-                    SKU {sku}
+              <div className="bg-white border border-purple-200 rounded-lg divide-y divide-purple-100">
+                {promocionales.map((p, i) => (
+                  <div key={p.sku} className={`flex items-center justify-between px-3 py-2 ${hoverRow}`} style={staggerStyle(true, i)}>
+                    <div>
+                      <span className="text-sm font-medium text-gray-800">{p.nombre || `SKU ${p.sku}`}</span>
+                      <span className="text-xs text-gray-400 ml-2">SKU: {p.sku}</span>
+                    </div>
                     <button
-                      onClick={() => togglePromocional(sku)}
-                      className="text-purple-500 hover:text-purple-900"
+                      onClick={() => togglePromocional(p.sku, p.nombre)}
+                      className={`text-xs px-3 py-1 rounded-full font-medium text-red-600 hover:bg-red-50 ${springBtn}`}
                     >
-                      ×
+                      Quitar
                     </button>
-                  </span>
+                  </div>
                 ))}
               </div>
             )}
@@ -303,14 +306,16 @@ export default function AdminVendedoresPage() {
               <p className="text-xs text-gray-400 mb-2">
                 Porcentaje que se suma al precio Mayorista (Precio2) para calcular el precio que ve el cliente.
               </p>
-              <input
-                type="number"
-                step="0.5"
-                value={settings.markup}
-                onChange={(e) => setSettings({ ...settings, markup: parseFloat(e.target.value) || 0 })}
-                className="w-32 px-3 py-2 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
-              />
-              <span className="text-xs text-gray-400 ml-2">% (default: 3)</span>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  step="0.5"
+                  value={settings.markup}
+                  onChange={(e) => setSettings({ ...settings, markup: parseFloat(e.target.value) || 0 })}
+                  className="w-full sm:w-32 px-3 py-2 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
+                />
+                <span className="text-xs text-gray-400 shrink-0">%</span>
+              </div>
             </div>
 
             <div>
@@ -320,14 +325,17 @@ export default function AdminVendedoresPage() {
               <p className="text-xs text-gray-400 mb-2">
                 Pedido mínimo que el vendedor puede tomar. Los artículos promocionales no cuentan.
               </p>
-              <input
-                type="number"
-                step="100"
-                value={settings.minOrder}
-                onChange={(e) => setSettings({ ...settings, minOrder: parseFloat(e.target.value) || 0 })}
-                className="w-40 px-3 py-2 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
-              />
-              <span className="text-xs text-gray-400 ml-2">pesos (0 = sin mínimo)</span>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-500">$</span>
+                <input
+                  type="number"
+                  step="100"
+                  value={settings.minOrder}
+                  onChange={(e) => setSettings({ ...settings, minOrder: parseFloat(e.target.value) || 0 })}
+                  className="w-full sm:w-40 px-3 py-2 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
+                />
+                <span className="text-xs text-gray-400 shrink-0">(0 = sin mín.)</span>
+              </div>
             </div>
 
             <div>
@@ -337,14 +345,16 @@ export default function AdminVendedoresPage() {
               <p className="text-xs text-gray-400 mb-2">
                 Si un vendedor no tiene comisión específica para un rubro, usa este valor.
               </p>
-              <input
-                type="number"
-                step="0.5"
-                value={settings.defaultComision}
-                onChange={(e) => setSettings({ ...settings, defaultComision: parseFloat(e.target.value) || 0 })}
-                className="w-32 px-3 py-2 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
-              />
-              <span className="text-xs text-gray-400 ml-2">% (default: 3)</span>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  step="0.5"
+                  value={settings.defaultComision}
+                  onChange={(e) => setSettings({ ...settings, defaultComision: parseFloat(e.target.value) || 0 })}
+                  className="w-full sm:w-32 px-3 py-2 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
+                />
+                <span className="text-xs text-gray-400 shrink-0">%</span>
+              </div>
             </div>
 
             <button
