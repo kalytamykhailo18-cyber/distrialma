@@ -528,12 +528,17 @@ export default function PosPage() {
                     className="w-10 h-10 flex items-center justify-center rounded-xl bg-gray-200 hover:bg-gray-300 text-gray-700">
                     <HiOutlineMinus className="w-5 h-5" />
                   </button>
-                  <input ref={qtyRef} type="number" value={detailQty}
-                    onChange={(e) => setDetailQty(e.target.value)}
+                  <input ref={qtyRef} type="text" inputMode="decimal" value={detailQty}
+                    onChange={(e) => { const v = e.target.value.replace(/[^0-9.,]/g, ""); setDetailQty(v); }}
                     onFocus={(e) => e.target.select()}
-                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addFromDetail(); } }}
-                    className="w-24 text-center text-2xl font-bold border-2 border-gray-300 rounded-xl py-2 focus:outline-none focus:border-brand-500"
-                    min="0.01" step={selectedProduct.unidad === "KG" ? "0.25" : "1"} />
+                    onKeyDown={(e) => {
+                      const step = selectedProduct.unidad === "KG" ? 0.25 : 1;
+                      const current = parseFloat(detailQty) || 0;
+                      if (e.key === "ArrowUp") { e.preventDefault(); setDetailQty(String(Math.round((current + step) * 100) / 100)); }
+                      else if (e.key === "ArrowDown") { e.preventDefault(); setDetailQty(String(Math.max(step, Math.round((current - step) * 100) / 100))); }
+                      else if (e.key === "Enter") { e.preventDefault(); addFromDetail(); }
+                    }}
+                    className="w-24 text-center text-2xl font-bold border-2 border-gray-300 rounded-xl py-2 focus:outline-none focus:border-brand-500" />
                   <button onClick={() => setDetailQty(String((parseFloat(detailQty) || 0) + (selectedProduct.unidad === "KG" ? 0.25 : 1)))}
                     className="w-10 h-10 flex items-center justify-center rounded-xl bg-brand-500 hover:bg-brand-600 text-white">
                     <HiOutlinePlus className="w-5 h-5" />
