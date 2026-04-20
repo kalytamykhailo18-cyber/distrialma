@@ -191,6 +191,9 @@ export default function PosPage() {
       if (existing) return prev.map((i) => i.sku === selectedProduct.sku && i.lista === detailLista ? { ...i, cantidad: i.cantidad + qty } : i);
       return [...prev, { sku: selectedProduct.sku, nombre: selectedProduct.nombre, unidad: selectedProduct.unidad, cantidad: qty, precio, lista: detailLista, images: selectedProduct.images || [] }];
     });
+    setSearch("");
+    setSearchResults([]);
+    setHighlightIdx(-1);
     searchRef.current?.focus();
   }
 
