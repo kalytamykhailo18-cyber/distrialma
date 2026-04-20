@@ -80,7 +80,7 @@ export default function PosPage() {
   // Load/save cart
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY + terminalId);
-    if (saved) { try { setCart(JSON.parse(saved)); } catch {} }
+    if (saved) { try { setCart(JSON.parse(saved).map((i: CartItem) => ({ ...i, images: i.images || [] }))); } catch {} }
     cartLoaded.current = true;
   }, [terminalId]);
 
@@ -273,7 +273,7 @@ export default function PosPage() {
                         isSelected ? "bg-brand-100 border-2 border-brand-500" :
                         inCart ? "bg-brand-50 border border-brand-200" : "bg-white border border-gray-200 hover:border-brand-300"
                       }`}>
-                      {p.images.length > 0 ? (
+                      {p.images?.length > 0 ? (
                         <img src={p.images[0]} alt="" className="w-10 h-10 rounded object-contain bg-gray-100 shrink-0" />
                       ) : (
                         <div className="w-10 h-10 rounded bg-gray-100 shrink-0 flex items-center justify-center text-gray-300 text-xs">IMG</div>
@@ -318,7 +318,7 @@ export default function PosPage() {
                   onClick={() => {
                     const prod = searchResults.find((p) => p.sku === item.sku);
                     if (prod) setSelectedProduct(prod);
-                    else setSelectedProduct({ sku: item.sku, nombre: item.nombre, unidad: item.unidad, precios: { [item.lista]: item.precio }, stock: 0, codBarra: "", cantPorCaja: 0, images: item.images });
+                    else setSelectedProduct({ sku: item.sku, nombre: item.nombre, unidad: item.unidad, precios: { [item.lista]: item.precio }, stock: 0, codBarra: "", cantPorCaja: 0, images: item.images || [] });
                   }}>
                   <div className="flex-1 min-w-0">
                     <div className="text-xs font-medium text-gray-900 truncate">{item.nombre}</div>
@@ -368,7 +368,7 @@ export default function PosPage() {
               style={{ animation: "fadeIn 300ms ease" }}>
               {/* Product image */}
               <div className="w-full max-w-md aspect-square bg-gray-50 rounded-2xl flex items-center justify-center overflow-hidden mb-6 shadow-inner">
-                {selectedProduct.images.length > 0 ? (
+                {selectedProduct.images?.length > 0 ? (
                   <img src={selectedProduct.images[0]} alt={selectedProduct.nombre}
                     className="max-w-full max-h-full object-contain p-4" />
                 ) : (
