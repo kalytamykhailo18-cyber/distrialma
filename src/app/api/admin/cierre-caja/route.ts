@@ -187,73 +187,74 @@ export async function POST(req: NextRequest) {
     let emailSent = false;
     const resendKey = process.env.RESEND_API_KEY || "";
     if (emailTo && pdfBase64 && resendKey) {
-      emailSent = true;
-      const cierreId = cierre.id;
-      (async () => {
-        try {
-          const resend = new Resend(resendKey);
-          const fecha = new Date().toLocaleDateString("es-AR");
-          const filename = `CierreCaja-Suc${suc}-${new Date().toISOString().slice(0, 10)}.pdf`;
+      try {
+        const resend = new Resend(resendKey);
+        const fecha = new Date().toLocaleDateString("es-AR");
+        const filename = `CierreCaja-Suc${suc}-${new Date().toISOString().slice(0, 10)}.pdf`;
 
-          await resend.emails.send({
-            from: process.env.RESEND_FROM || "Distrialma <onboarding@resend.dev>",
-            to: emailTo,
-            subject: `Cierre de Caja — Sucursal ${suc} — ${fecha}`,
-            html: (() => {
-              const f = (n: number) => "$" + n.toLocaleString("es-AR", { minimumFractionDigits: 2 });
-              const diferencia = nuevoInicioVal - data.totalEfectivoCaja;
-              const diffLabel = diferencia >= 0 ? "Sobrante" : "Faltante";
-              const diffColor = diferencia >= 0 ? "#16a34a" : "#dc2626";
-              let retirosHtml = "";
-              if (data.retirosDetalle && data.retirosDetalle.length > 0) {
-                retirosHtml = data.retirosDetalle.map((r: { concepto: string; total: number }) =>
-                  `<li>${r.concepto}: ${f(r.total)}</li>`
-                ).join("");
-                retirosHtml = `<ul style="margin:4px 0">${retirosHtml}</ul>`;
-              }
-              return `
-              <h2>Cierre de Caja — Sucursal ${suc}</h2>
-              <p><strong>Fecha:</strong> ${fecha}</p>
-              <p><strong>Responsable:</strong> ${userName}</p>
-              <table style="border-collapse:collapse;width:100%;max-width:400px">
-                <tr><td>Ventas:</td><td style="text-align:right"><strong>${data.ventas.cantidad}</strong></td></tr>
-                <tr><td>Total ventas:</td><td style="text-align:right">${f(data.ventas.total)}</td></tr>
-                <tr><td>Efectivo:</td><td style="text-align:right">${f(data.ventas.efectivo)}</td></tr>
-                <tr><td>Tarjeta:</td><td style="text-align:right">${f(data.ventas.tarjeta)}</td></tr>
-                <tr><td>Retiros (efectivo):</td><td style="text-align:right"><strong>${f(data.retiros)}</strong></td></tr>
-              </table>
-              ${retirosHtml}
-              <hr>
-              <table style="border-collapse:collapse;width:100%;max-width:400px">
-                <tr><td>Total efectivo en caja:</td><td style="text-align:right">${f(data.totalEfectivoCaja)}</td></tr>
-                <tr><td>Inicio de caja siguiente:</td><td style="text-align:right">${f(nuevoInicioVal)}</td></tr>
-                <tr style="color:${diffColor}"><td><strong>${diffLabel}:</strong></td><td style="text-align:right"><strong>${f(Math.abs(diferencia))}</strong></td></tr>
-              </table>
-              <p>Ver detalle completo en el PDF adjunto.</p>
-              <hr>
-              <p style="color: #999; font-size: 12px;">Generado automáticamente por distrialma.com.ar</p>
-            `})(),
-            attachments: [
-              {
-                filename,
-                content: pdfBase64,
-              },
-              ...allFotos.map((foto: string, i: number) => ({
-                filename: `Ticket-Posnet-${i + 1}-${new Date().toISOString().slice(0, 10)}.jpg`,
-                content: foto,
-              })),
-            ],
-          });
+        const f = (n: number) => "$" + n.toLocaleString("es-AR", { minimumFractionDigits: 2 });
+        const diferencia = nuevoInicioVal - data.totalEfectivoCaja;
+        const diffLabel = diferencia >= 0 ? "Sobrante" : "Faltante";
+        const diffColor = diferencia >= 0 ? "#16a34a" : "#dc2626";
+        let retirosHtml = "";
+        if (data.retirosDetalle && data.retirosDetalle.length > 0) {
+          retirosHtml = data.retirosDetalle.map((r: { concepto: string; total: number }) =>
+            `<li>${r.concepto}: ${f(r.total)}</li>`
+          ).join("");
+          retirosHtml = `<ul style="margin:4px 0">${retirosHtml}</ul>`;
+        }
 
+        const emailResult = await resend.emails.send({
+          from: process.env.RESEND_FROM || "Distrialma <onboarding@resend.dev>",
+          to: emailTo,
+          subject: `Cierre de Caja — Sucursal ${suc} — ${fecha}`,
+          html: `
+            <h2>Cierre de Caja — Sucursal ${suc}</h2>
+            <p><strong>Fecha:</strong> ${fecha}</p>
+            <p><strong>Responsable:</strong> ${userName}</p>
+            <table style="border-collapse:collapse;width:100%;max-width:400px">
+              <tr><td>Ventas:</td><td style="text-align:right"><strong>${data.ventas.cantidad}</strong></td></tr>
+              <tr><td>Total ventas:</td><td style="text-align:right">${f(data.ventas.total)}</td></tr>
+              <tr><td>Efectivo:</td><td style="text-align:right">${f(data.ventas.efectivo)}</td></tr>
+              <tr><td>Tarjeta:</td><td style="text-align:right">${f(data.ventas.tarjeta)}</td></tr>
+              <tr><td>Retiros (efectivo):</td><td style="text-align:right"><strong>${f(data.retiros)}</strong></td></tr>
+            </table>
+            ${retirosHtml}
+            <hr>
+            <table style="border-collapse:collapse;width:100%;max-width:400px">
+              <tr><td>Total efectivo en caja:</td><td style="text-align:right">${f(data.totalEfectivoCaja)}</td></tr>
+              <tr><td>Inicio de caja siguiente:</td><td style="text-align:right">${f(nuevoInicioVal)}</td></tr>
+              <tr style="color:${diffColor}"><td><strong>${diffLabel}:</strong></td><td style="text-align:right"><strong>${f(Math.abs(diferencia))}</strong></td></tr>
+            </table>
+            <p>Ver detalle completo en el PDF adjunto.</p>
+            <hr>
+            <p style="color: #999; font-size: 12px;">Generado automáticamente por distrialma.com.ar</p>
+          `,
+          attachments: [
+            {
+              filename,
+              content: pdfBase64,
+            },
+            ...allFotos.map((foto: string, i: number) => ({
+              filename: `Ticket-Posnet-${i + 1}-${new Date().toISOString().slice(0, 10)}.jpg`,
+              content: foto,
+            })),
+          ],
+        });
+
+        if (!emailResult.error) {
+          emailSent = true;
           await prisma.cierreCaja.update({
-            where: { id: cierreId },
+            where: { id: cierre.id },
             data: { emailSent: true },
           });
           console.log("Cierre email sent to", emailTo);
-        } catch (emailErr) {
-          console.error("Error sending cierre email:", emailErr);
+        } else {
+          console.error("Cierre email failed:", emailResult.error);
         }
-      })();
+      } catch (emailErr) {
+        console.error("Error sending cierre email:", emailErr);
+      }
     }
 
     // Enqueue print job for silent printing
