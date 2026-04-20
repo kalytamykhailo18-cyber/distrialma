@@ -26,8 +26,8 @@ export async function POST(req: NextRequest) {
              MAX(CAST(LTRIM(RTRIM(Nroped)) AS BIGINT)) AS maxNroped
       FROM [${dbPedidos}].dbo.Pedidos
     `);
-    let nextCod = (maxResult.recordset[0].maxCod || 0) + 1;
-    const nextNroped = String((maxResult.recordset[0].maxNroped || 0) + 1).padStart(8, " ");
+    let nextCod = Number(maxResult.recordset[0].maxCod || 0) + 1;
+    const nextNroped = String(Number(maxResult.recordset[0].maxNroped || 0) + 1).padStart(8, " ");
     const nextNroTransa = "";
     const nextNroMostra = "";
 

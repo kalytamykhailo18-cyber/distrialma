@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
 
     // Get next Cod
     const maxCodResult = await pool.request().query(`SELECT MAX(CAST(Cod AS BIGINT)) AS maxCod FROM [${dbTransas}].dbo.Transas`);
-    let nextCod = (maxCodResult.recordset[0].maxCod || 0) + 1;
+    let nextCod = Number(maxCodResult.recordset[0].maxCod || 0) + 1;
 
     // Get next NroTransa and NroMostra
     const maxNroResult = await pool.request().query(`
@@ -51,8 +51,8 @@ export async function POST(req: NextRequest) {
              MAX(CAST(LTRIM(RTRIM(NroMostra)) AS BIGINT)) AS maxMostra
       FROM [${dbTransas}].dbo.Transas
     `);
-    const nextNroTransa = String((maxNroResult.recordset[0].maxNro || 0) + 1).padStart(8, "0");
-    const nextNroMostra = String((maxNroResult.recordset[0].maxMostra || 0) + 1).padStart(8, "0");
+    const nextNroTransa = String(Number(maxNroResult.recordset[0].maxNro || 0) + 1).padStart(8, "0");
+    const nextNroMostra = String(Number(maxNroResult.recordset[0].maxMostra || 0) + 1).padStart(8, "0");
 
     // Calculate totals
     const totalImpo = items.reduce((s, i) => s + i.precio * i.cantidad, 0);
