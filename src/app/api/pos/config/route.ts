@@ -47,7 +47,7 @@ export async function GET(req: NextRequest) {
             LTRIM(RTRIM(ISNULL(c.ListaPrecios, ''))) AS listaPrecios
           FROM [${dbClientes}].dbo.Clientes c
           LEFT JOIN [${dbClientes}].dbo.Zonas z ON z.Cod = c.Zona
-          WHERE (c.Nombre LIKE @search OR LTRIM(RTRIM(c.CUIT)) LIKE @search OR LTRIM(RTRIM(c.Cod)) LIKE @search)
+          WHERE (c.Nombre COLLATE Modern_Spanish_CI_AS LIKE @search OR LTRIM(RTRIM(c.CUIT)) LIKE @search OR LTRIM(RTRIM(c.Cod)) LIKE @search)
             AND (c.DeBaja = 0 OR c.DeBaja IS NULL)
           ORDER BY c.Nombre
         `);

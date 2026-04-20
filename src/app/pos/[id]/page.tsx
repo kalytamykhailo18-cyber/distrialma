@@ -75,6 +75,7 @@ export default function PosPage() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const cartLoaded = useRef(false);
 
   // Determine active price list
   const getActiveLista = useCallback((): number => {
@@ -109,17 +110,20 @@ export default function PosPage() {
       .finally(() => setLoading(false));
   }, [terminalId]);
 
-  // Load cart from localStorage
+  // Load cart from localStorage (once)
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY + terminalId);
     if (saved) {
       try { setCart(JSON.parse(saved)); } catch {}
     }
+    cartLoaded.current = true;
   }, [terminalId]);
 
-  // Save cart to localStorage
+  // Save cart to localStorage (skip initial load)
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY + terminalId, JSON.stringify(cart));
+    if (cartLoaded.current) {
+      localStorage.setItem(STORAGE_KEY + terminalId, JSON.stringify(cart));
+    }
   }, [cart, terminalId]);
 
   // Save seller to localStorage
@@ -136,15 +140,17 @@ export default function PosPage() {
       setSearchResults([]);
       return;
     }
+    setSearching(true);
     searchTimeout.current = setTimeout(async () => {
-      setSearching(true);
       try {
         const res = await fetch(`/api/pos/products?q=${encodeURIComponent(search.trim())}`);
-        const d = await res.json();
-        setSearchResults(d.products || []);
+        if (res.ok) {
+          const d = await res.json();
+          setSearchResults(d.products || []);
+        }
       } catch {}
       setSearching(false);
-    }, 200);
+    }, 250);
     return () => { if (searchTimeout.current) clearTimeout(searchTimeout.current); };
   }, [search]);
 

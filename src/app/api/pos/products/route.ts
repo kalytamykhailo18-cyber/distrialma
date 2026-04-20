@@ -38,10 +38,10 @@ export async function GET(req: NextRequest) {
           ISNULL(s.Precio4, 0) AS precio4,
           ISNULL(s.Precio5, 0) AS precio5,
           ISNULL(s.Stk, 0) AS stock,
-          LTRIM(RTRIM(ISNULL(p.CodBarra, ''))) AS codBarra,
+          LTRIM(RTRIM(ISNULL(p.Codbar, ''))) AS codBarra,
           LTRIM(RTRIM(ISNULL(p.Filler1, ''))) AS filler1,
           LTRIM(RTRIM(ISNULL(p.Filler2, ''))) AS filler2,
-          ISNULL(CAST(NULLIF(LTRIM(RTRIM(p.Palabra3)), '') AS INT), 0) AS cantPorCaja
+          ISNULL(TRY_CAST(LTRIM(RTRIM(p.Palabra3)) AS INT), 0) AS cantPorCaja
         FROM [${dbProd}].dbo.Productos p
         OUTER APPLY (
           SELECT TOP 1 s.Precio, s.Precio2, s.Precio3, s.Precio4, s.Precio5, s.Stk
@@ -50,7 +50,7 @@ export async function GET(req: NextRequest) {
             AND LTRIM(RTRIM(s.Deposito)) = '0'
             AND (s.TalleColor IS NULL OR LTRIM(RTRIM(s.TalleColor)) = '')
         ) s
-        WHERE LTRIM(RTRIM(p.CodBarra)) = @barcode
+        WHERE LTRIM(RTRIM(p.Codbar)) COLLATE Modern_Spanish_CI_AS = @barcode
           AND (p.DeBaja = 0 OR p.DeBaja IS NULL)
       `;
     } else {
@@ -68,10 +68,10 @@ export async function GET(req: NextRequest) {
           ISNULL(s.Precio4, 0) AS precio4,
           ISNULL(s.Precio5, 0) AS precio5,
           ISNULL(s.Stk, 0) AS stock,
-          LTRIM(RTRIM(ISNULL(p.CodBarra, ''))) AS codBarra,
+          LTRIM(RTRIM(ISNULL(p.Codbar, ''))) AS codBarra,
           LTRIM(RTRIM(ISNULL(p.Filler1, ''))) AS filler1,
           LTRIM(RTRIM(ISNULL(p.Filler2, ''))) AS filler2,
-          ISNULL(CAST(NULLIF(LTRIM(RTRIM(p.Palabra3)), '') AS INT), 0) AS cantPorCaja
+          ISNULL(TRY_CAST(LTRIM(RTRIM(p.Palabra3)) AS INT), 0) AS cantPorCaja
         FROM [${dbProd}].dbo.Productos p
         OUTER APPLY (
           SELECT TOP 1 s.Precio, s.Precio2, s.Precio3, s.Precio4, s.Precio5, s.Stk
@@ -80,7 +80,7 @@ export async function GET(req: NextRequest) {
             AND LTRIM(RTRIM(s.Deposito)) = '0'
             AND (s.TalleColor IS NULL OR LTRIM(RTRIM(s.TalleColor)) = '')
         ) s
-        WHERE (p.Nombre LIKE @q OR p.Cod = @exact)
+        WHERE (p.Nombre COLLATE Modern_Spanish_CI_AS LIKE @q OR p.Cod = @exact)
           AND (p.DeBaja = 0 OR p.DeBaja IS NULL)
         ORDER BY CASE WHEN p.Cod = @exact THEN 0 ELSE 1 END, p.Nombre
       `;
