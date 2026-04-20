@@ -215,21 +215,22 @@ export default function CheckoutPage() {
           </button>
         )}
 
-        <button
-          onClick={() => {
-            setPendingAction("whatsapp");
-            setShowDisclaimer(true);
-          }}
-          className={`w-full py-3 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600 transition-colors flex items-center justify-center gap-2 ${springBtn}`}
-        >
-          <FaWhatsapp className="w-5 h-5" />
-          Enviar por WhatsApp
-        </button>
-
         {!clientInfo?.deliveryDay && (
-          <p className="text-xs text-gray-400 text-center">
-            Tu cuenta no tiene día de entrega asignado. Podés enviar tu pedido por WhatsApp.
-          </p>
+          <>
+            <button
+              onClick={() => {
+                setPendingAction("whatsapp");
+                setShowDisclaimer(true);
+              }}
+              className={`w-full py-3 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600 transition-colors flex items-center justify-center gap-2 ${springBtn}`}
+            >
+              <FaWhatsapp className="w-5 h-5" />
+              Enviar por WhatsApp
+            </button>
+            <p className="text-xs text-gray-400 text-center">
+              Tu cuenta no tiene día de entrega asignado. Podés enviar tu pedido por WhatsApp.
+            </p>
+          </>
         )}
       </div>
       </Stagger>
