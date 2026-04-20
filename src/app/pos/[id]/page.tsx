@@ -52,6 +52,14 @@ export default function PosPage() {
   const [error, setError] = useState("");
   const cartLoaded = useRef(false);
 
+  // Payment
+  const [showPayment, setShowPayment] = useState(false);
+  const [payMethod, setPayMethod] = useState<string>("");
+  const [payAmount, setPayAmount] = useState("");
+  const [paying, setPaying] = useState(false);
+  const [payError, setPayError] = useState("");
+  const [paySuccess, setPaySuccess] = useState("");
+
   const getActiveLista = useCallback((): number => {
     if (!terminal) return 2;
     const listas = terminal.listas.split(",").map(Number);
@@ -203,11 +211,67 @@ export default function PosPage() {
     if (selectedProduct?.sku === sku) setSelectedProduct(null);
   }
 
+  function openPayment() {
+    if (cart.length === 0 || !selectedEmpleado) return;
+    setShowPayment(true);
+    setPayMethod("");
+    setPayAmount("");
+    setPayError("");
+    setPaySuccess("");
+  }
+
+  async function confirmPayment() {
+    if (!terminal || !selectedEmpleado || cart.length === 0 || !payMethod) return;
+    const totalAmount = cart.reduce((s, i) => s + i.precio * i.cantidad, 0);
+    const tendered = parseFloat(payAmount) || 0;
+
+    // Validate
+    if (payMethod === "efectivo" && tendered < totalAmount) { setPayError("Monto insuficiente"); return; }
+    if (payMethod === "cuenta" && !selectedCliente) { setPayError("Se requiere un cliente para cuenta corriente"); return; }
+
+    const paymentAmount = payMethod === "efectivo" ? totalAmount : (tendered || totalAmount);
+    const vuelto = payMethod === "efectivo" ? Math.max(0, tendered - totalAmount) : 0;
+
+    setPaying(true);
+    setPayError("");
+    try {
+      const res = await fetch("/api/pos/sale", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          terminalId: terminal.id,
+          sucursal: terminal.sucursal,
+          empleadoCod: selectedEmpleado.cod,
+          clienteCod: selectedCliente?.cod,
+          items: cart.map((i) => ({ sku: i.sku, nombre: i.nombre, cantidad: i.cantidad, precio: i.precio, lista: i.lista })),
+          payments: [{ method: payMethod, amount: paymentAmount }],
+          vuelto,
+        }),
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || "Error al registrar");
+
+      setPaySuccess(`Venta registrada — Boleta #${d.boleta}${vuelto > 0 ? ` — Vuelto: ${formatPrice(vuelto)}` : ""}`);
+      setCart([]);
+      setSelectedProduct(null);
+      setTimeout(() => {
+        setShowPayment(false);
+        setPaySuccess("");
+        searchRef.current?.focus();
+      }, 2000);
+    } catch (e) {
+      setPayError(e instanceof Error ? e.message : "Error al registrar la venta");
+    }
+    setPaying(false);
+  }
+
   const qtyRef = useRef<HTMLInputElement>(null);
   const selectedProductRef = useRef(selectedProduct);
   const addFromDetailRef = useRef(addFromDetail);
+  const openPaymentRef = useRef(openPayment);
   selectedProductRef.current = selectedProduct;
   addFromDetailRef.current = addFromDetail;
+  openPaymentRef.current = openPayment;
 
   // Global keyboard shortcuts
   useEffect(() => {
@@ -234,7 +298,7 @@ export default function PosPage() {
         // F12: cobrar/pendiente
         if (fNum === 12) {
           e.preventDefault();
-          // TODO: Phase 4 payment
+          openPaymentRef.current();
           return;
         }
         // Block all other F-keys from browser default
@@ -465,7 +529,7 @@ export default function PosPage() {
                 <span className="text-xs md:text-sm text-gray-500">Total</span>
                 <span className="text-lg md:text-xl font-bold text-brand-600 ml-2 md:ml-3">{formatPrice(total)}</span>
               </div>
-              <button disabled={cart.length === 0 || !selectedEmpleado}
+              <button onClick={openPayment} disabled={cart.length === 0 || !selectedEmpleado}
                 className="px-4 md:px-6 py-2 bg-green-600 text-white rounded-xl text-sm md:text-base font-bold hover:bg-green-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0">
                 {!selectedEmpleado ? "Vendedor" : terminal.flujo === "pendiente" ? "Pendiente" : "Cobrar"} <span className="hidden md:inline text-green-200 text-xs ml-1">F12</span>
               </button>
@@ -601,6 +665,120 @@ export default function PosPage() {
           )}
         </div>
       </div>
+
+      {/* Payment modal */}
+      {showPayment && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+          onClick={(e) => { if (e.target === e.currentTarget && !paying) setShowPayment(false); }}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden"
+            style={{ animation: "fadeIn 200ms ease" }}>
+            {paySuccess ? (
+              <div className="p-8 text-center" style={{ animation: "fadeIn 300ms ease" }}>
+                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-8 h-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                </div>
+                <h2 className="text-xl font-bold text-gray-900 mb-2">Venta registrada</h2>
+                <p className="text-gray-600">{paySuccess}</p>
+              </div>
+            ) : (
+              <>
+                <div className="p-5 border-b flex items-center justify-between">
+                  <h2 className="text-lg font-bold text-gray-900">Cobrar</h2>
+                  <button onClick={() => setShowPayment(false)} disabled={paying}
+                    className="text-gray-400 hover:text-gray-600 text-xl">x</button>
+                </div>
+
+                <div className="p-5">
+                  {/* Total */}
+                  <div className="text-center mb-6">
+                    <div className="text-sm text-gray-500">Total a cobrar</div>
+                    <div className="text-3xl font-bold text-gray-900">{formatPrice(total)}</div>
+                  </div>
+
+                  {/* Payment methods */}
+                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 mb-5">
+                    {[
+                      { key: "efectivo", label: "Efectivo", icon: "💵" },
+                      { key: "debito", label: "Debito", icon: "💳" },
+                      { key: "credito", label: "Credito", icon: "💳" },
+                      { key: "cuotas", label: "Cuotas", icon: "📋" },
+                      { key: "qr", label: "QR", icon: "📱" },
+                      { key: "transferencia", label: "Transfer.", icon: "🏦" },
+                      { key: "cuenta", label: "Cta. Cte.", icon: "📒" },
+                    ].map((m) => (
+                      <button key={m.key} onClick={() => { setPayMethod(m.key); setPayAmount(""); setPayError(""); }}
+                        className={`p-3 rounded-xl text-center transition-all duration-200 ${
+                          payMethod === m.key ? "bg-brand-500 text-white shadow-md scale-105" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                        }`}>
+                        <div className="text-xl mb-1">{m.icon}</div>
+                        <div className="text-xs font-medium">{m.label}</div>
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Method-specific input */}
+                  {payMethod === "efectivo" && (
+                    <div className="mb-4" style={{ animation: "fadeIn 200ms ease" }}>
+                      <label className="text-sm text-gray-500 mb-1 block">Monto recibido</label>
+                      <input type="text" inputMode="decimal" value={payAmount}
+                        onChange={(e) => setPayAmount(e.target.value.replace(/[^0-9.,]/g, ""))}
+                        onKeyDown={(e) => { if (e.key === "Enter") confirmPayment(); }}
+                        placeholder={formatPrice(total)}
+                        className="w-full text-2xl font-bold text-center border-2 border-gray-300 rounded-xl py-3 focus:outline-none focus:border-brand-500"
+                        autoFocus />
+                      {parseFloat(payAmount) > 0 && parseFloat(payAmount) >= total && (
+                        <div className="text-center mt-2 text-green-600 font-bold text-lg">
+                          Vuelto: {formatPrice(parseFloat(payAmount) - total)}
+                        </div>
+                      )}
+                      {parseFloat(payAmount) > 0 && parseFloat(payAmount) < total && (
+                        <div className="text-center mt-2 text-red-500 text-sm">
+                          Faltan: {formatPrice(total - parseFloat(payAmount))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {payMethod === "cuenta" && (
+                    <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-xl" style={{ animation: "fadeIn 200ms ease" }}>
+                      {selectedCliente ? (
+                        <div>
+                          <div className="text-sm font-medium text-gray-800">{selectedCliente.nombre}</div>
+                          <div className="text-xs text-gray-500">Se cargara {formatPrice(total)} a su cuenta corriente</div>
+                        </div>
+                      ) : (
+                        <div className="text-sm text-red-600">Se requiere seleccionar un cliente para cuenta corriente</div>
+                      )}
+                    </div>
+                  )}
+
+                  {payMethod && !["efectivo", "cuenta"].includes(payMethod) && (
+                    <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-xl text-center" style={{ animation: "fadeIn 200ms ease" }}>
+                      <div className="text-sm text-blue-700">Cobrar {formatPrice(total)} con {payMethod === "debito" ? "Debito" : payMethod === "credito" ? "Credito" : payMethod === "cuotas" ? "Cuotas" : payMethod === "qr" ? "QR" : "Transferencia"}</div>
+                    </div>
+                  )}
+
+                  {/* Error */}
+                  {payError && (
+                    <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm text-center">
+                      {payError}
+                    </div>
+                  )}
+                </div>
+
+                {/* Confirm button */}
+                <div className="p-5 border-t bg-gray-50">
+                  <button onClick={confirmPayment}
+                    disabled={paying || !payMethod || (payMethod === "efectivo" && (parseFloat(payAmount) || 0) < total) || (payMethod === "cuenta" && !selectedCliente)}
+                    className="w-full py-3 bg-green-600 text-white rounded-xl text-lg font-bold hover:bg-green-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                    {paying ? "Procesando..." : "Confirmar pago"}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       <style jsx>{`
         @keyframes fadeIn {
