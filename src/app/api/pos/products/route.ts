@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPool, getDbName } from "@/lib/mssql";
 import { requireStaff } from "@/lib/api-auth";
+import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
@@ -88,6 +89,21 @@ export async function GET(req: NextRequest) {
 
     const result = await request.query(query);
 
+    // Fetch images for found products
+    const skus = result.recordset.map((p: Record<string, unknown>) => (p.sku as string).trim());
+    const images = skus.length > 0
+      ? await prisma.productImage.findMany({
+          where: { sku: { in: skus } },
+          orderBy: { position: "asc" },
+        })
+      : [];
+    const imageMap = new Map<string, string[]>();
+    for (const img of images) {
+      const list = imageMap.get(img.sku) || [];
+      list.push(img.filename);
+      imageMap.set(img.sku, list);
+    }
+
     return NextResponse.json({
       products: result.recordset.map((p: Record<string, unknown>) => ({
         sku: p.sku as string,
@@ -105,6 +121,7 @@ export async function GET(req: NextRequest) {
         filler1: p.filler1 as string,
         filler2: p.filler2 as string,
         cantPorCaja: Number(p.cantPorCaja),
+        images: imageMap.get((p.sku as string).trim()) || [],
       })),
     });
   } catch (error) {

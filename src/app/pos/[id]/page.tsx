@@ -6,50 +6,20 @@ import { formatPrice } from "@/lib/utils";
 import {
   HiOutlineSearch, HiOutlineTrash, HiOutlinePlus, HiOutlineMinus,
   HiOutlineUser, HiOutlineUserGroup, HiOutlineDesktopComputer,
+  HiOutlineShoppingCart,
 } from "react-icons/hi";
 
 interface Terminal {
-  id: number;
-  nombre: string;
-  sucursal: string;
-  sucursalNombre: string;
-  listas: string;
-  cuit: string;
-  flujo: string;
-  requiereCliente: boolean;
+  id: number; nombre: string; sucursal: string; sucursalNombre: string;
+  listas: string; cuit: string; flujo: string; requiereCliente: boolean;
 }
-
-interface Empleado {
-  cod: string;
-  nombre: string;
-}
-
-interface Cliente {
-  cod: string;
-  nombre: string;
-  cuit: string;
-  zona: string;
-  listaPrecios: string;
-}
-
+interface Empleado { cod: string; nombre: string; }
+interface Cliente { cod: string; nombre: string; cuit: string; zona: string; listaPrecios: string; }
 interface PosProduct {
-  sku: string;
-  nombre: string;
-  unidad: string;
-  precios: Record<number, number>;
-  stock: number;
-  codBarra: string;
-  cantPorCaja: number;
+  sku: string; nombre: string; unidad: string; precios: Record<number, number>;
+  stock: number; codBarra: string; cantPorCaja: number; images: string[];
 }
-
-interface CartItem {
-  sku: string;
-  nombre: string;
-  unidad: string;
-  cantidad: number;
-  precio: number;
-  lista: number;
-}
+interface CartItem { sku: string; nombre: string; unidad: string; cantidad: number; precio: number; lista: number; images: string[]; }
 
 const LISTA_LABELS: Record<number, string> = { 1: "Minorista", 2: "Mayorista", 3: "Especial", 4: "Caja Cerrada", 5: "PedidosYa" };
 const STORAGE_KEY = "pos_cart_";
@@ -69,6 +39,7 @@ export default function PosPage() {
   const [search, setSearch] = useState("");
   const [searchResults, setSearchResults] = useState<PosProduct[]>([]);
   const [searching, setSearching] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<PosProduct | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const searchTimeout = useRef<NodeJS.Timeout>();
 
@@ -77,11 +48,9 @@ export default function PosPage() {
   const [error, setError] = useState("");
   const cartLoaded = useRef(false);
 
-  // Determine active price list
   const getActiveLista = useCallback((): number => {
     if (!terminal) return 2;
     const listas = terminal.listas.split(",").map(Number);
-    // If client has specific list, use it
     if (selectedCliente?.listaPrecios) {
       const clientLista = Number(selectedCliente.listaPrecios);
       if (listas.includes(clientLista)) return clientLista;
@@ -98,8 +67,6 @@ export default function PosPage() {
         if (d.terminal) setTerminal(d.terminal);
         else setError("Terminal no encontrada");
         setEmpleados(d.empleados || []);
-
-        // Restore seller from localStorage
         const savedSeller = localStorage.getItem(`pos_seller_${terminalId}`);
         if (savedSeller) {
           const emp = (d.empleados || []).find((e: Empleado) => e.cod === savedSeller);
@@ -110,56 +77,39 @@ export default function PosPage() {
       .finally(() => setLoading(false));
   }, [terminalId]);
 
-  // Load cart from localStorage (once)
+  // Load/save cart
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY + terminalId);
-    if (saved) {
-      try { setCart(JSON.parse(saved)); } catch {}
-    }
+    if (saved) { try { setCart(JSON.parse(saved)); } catch {} }
     cartLoaded.current = true;
   }, [terminalId]);
 
-  // Save cart to localStorage (skip initial load)
   useEffect(() => {
-    if (cartLoaded.current) {
-      localStorage.setItem(STORAGE_KEY + terminalId, JSON.stringify(cart));
-    }
+    if (cartLoaded.current) localStorage.setItem(STORAGE_KEY + terminalId, JSON.stringify(cart));
   }, [cart, terminalId]);
 
-  // Save seller to localStorage
   useEffect(() => {
-    if (selectedEmpleado) {
-      localStorage.setItem(`pos_seller_${terminalId}`, selectedEmpleado.cod);
-    }
+    if (selectedEmpleado) localStorage.setItem(`pos_seller_${terminalId}`, selectedEmpleado.cod);
   }, [selectedEmpleado, terminalId]);
 
-  // Product search with debounce
+  // Product search
   useEffect(() => {
     if (searchTimeout.current) clearTimeout(searchTimeout.current);
-    if (!search.trim() || search.trim().length < 2) {
-      setSearchResults([]);
-      return;
-    }
+    if (!search.trim() || search.trim().length < 2) { setSearchResults([]); return; }
     setSearching(true);
     searchTimeout.current = setTimeout(async () => {
       try {
         const res = await fetch(`/api/pos/products?q=${encodeURIComponent(search.trim())}`);
-        if (res.ok) {
-          const d = await res.json();
-          setSearchResults(d.products || []);
-        }
+        if (res.ok) { const d = await res.json(); setSearchResults(d.products || []); }
       } catch {}
       setSearching(false);
     }, 250);
     return () => { if (searchTimeout.current) clearTimeout(searchTimeout.current); };
   }, [search]);
 
-  // Client search with debounce
+  // Client search
   useEffect(() => {
-    if (!clientSearch.trim() || clientSearch.trim().length < 2) {
-      setClientResults([]);
-      return;
-    }
+    if (!clientSearch.trim() || clientSearch.trim().length < 2) { setClientResults([]); return; }
     const timeout = setTimeout(async () => {
       try {
         const res = await fetch(`/api/pos/config?terminalId=${terminalId}&searchClient=${encodeURIComponent(clientSearch.trim())}`);
@@ -170,22 +120,14 @@ export default function PosPage() {
     return () => clearTimeout(timeout);
   }, [clientSearch, terminalId]);
 
-  // Barcode scan handler
   function handleSearchKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === "Enter" && search.trim()) {
       e.preventDefault();
-      // Try barcode scan first
       const val = search.trim();
       if (/^\d{4,}$/.test(val)) {
         fetch(`/api/pos/products?barcode=${encodeURIComponent(val)}`)
           .then((r) => r.json())
-          .then((d) => {
-            if (d.products?.length > 0) {
-              addToCart(d.products[0]);
-              setSearch("");
-              setSearchResults([]);
-            }
-          })
+          .then((d) => { if (d.products?.length > 0) { addToCart(d.products[0]); setSearch(""); setSearchResults([]); } })
           .catch(() => {});
       } else if (searchResults.length === 1) {
         addToCart(searchResults[0]);
@@ -197,27 +139,13 @@ export default function PosPage() {
 
   function addToCart(product: PosProduct) {
     const lista = getActiveLista();
-    const precio = product.precios[lista] || product.precios[2] || 0;
-
+    const precio = product.precios[lista] || product.precios[2] || product.precios[1] || 0;
+    setSelectedProduct(product);
     setCart((prev) => {
       const existing = prev.find((i) => i.sku === product.sku);
-      if (existing) {
-        return prev.map((i) => i.sku === product.sku
-          ? { ...i, cantidad: i.cantidad + 1 }
-          : i
-        );
-      }
-      return [...prev, {
-        sku: product.sku,
-        nombre: product.nombre,
-        unidad: product.unidad,
-        cantidad: 1,
-        precio,
-        lista,
-      }];
+      if (existing) return prev.map((i) => i.sku === product.sku ? { ...i, cantidad: i.cantidad + 1 } : i);
+      return [...prev, { sku: product.sku, nombre: product.nombre, unidad: product.unidad, cantidad: 1, precio, lista, images: product.images }];
     });
-
-    // Re-focus search
     searchRef.current?.focus();
   }
 
@@ -236,10 +164,7 @@ export default function PosPage() {
 
   function removeFromCart(sku: string) {
     setCart((prev) => prev.filter((i) => i.sku !== sku));
-  }
-
-  function clearCart() {
-    setCart([]);
+    if (selectedProduct?.sku === sku) setSelectedProduct(null);
   }
 
   const total = cart.reduce((sum, i) => sum + i.precio * i.cantidad, 0);
@@ -247,11 +172,7 @@ export default function PosPage() {
   const activeLista = getActiveLista();
 
   if (loading) {
-    return (
-      <div className="h-screen flex items-center justify-center bg-gray-100">
-        <div className="text-gray-400 animate-pulse">Cargando terminal...</div>
-      </div>
-    );
+    return <div className="h-screen flex items-center justify-center bg-gray-100"><div className="text-gray-400 animate-pulse text-lg">Cargando terminal...</div></div>;
   }
 
   if (error || !terminal) {
@@ -259,7 +180,7 @@ export default function PosPage() {
       <div className="h-screen flex items-center justify-center bg-gray-100">
         <div className="text-center">
           <HiOutlineDesktopComputer className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-          <p className="text-red-500 font-medium">{error || "Terminal no encontrada"}</p>
+          <p className="text-red-500 font-medium text-lg">{error || "Terminal no encontrada"}</p>
           <p className="text-sm text-gray-400 mt-2">Verifica que la URL sea correcta (/pos/ID)</p>
         </div>
       </div>
@@ -269,37 +190,24 @@ export default function PosPage() {
   return (
     <div className="h-screen flex flex-col bg-gray-100 overflow-hidden">
       {/* Top bar */}
-      <div className="bg-white border-b px-4 py-2 flex items-center justify-between shrink-0">
+      <div className="bg-white border-b px-4 py-2 flex items-center justify-between shrink-0 shadow-sm">
         <div className="flex items-center gap-4">
-          <div>
-            <span className="font-bold text-gray-900">{terminal.nombre}</span>
-            <span className="text-xs text-gray-400 ml-2">{terminal.sucursalNombre}</span>
-          </div>
+          <span className="font-bold text-gray-900 text-lg">{terminal.nombre}</span>
+          <span className="text-xs text-gray-400">{terminal.sucursalNombre}</span>
           <span className="text-xs px-2 py-0.5 rounded-full bg-brand-100 text-brand-700 font-medium">
             {LISTA_LABELS[activeLista] || `Lista ${activeLista}`}
           </span>
         </div>
-
         <div className="flex items-center gap-3">
-          {/* Seller select */}
           <div className="flex items-center gap-2">
             <HiOutlineUser className="w-4 h-4 text-gray-400" />
-            <select
-              value={selectedEmpleado?.cod || ""}
-              onChange={(e) => {
-                const emp = empleados.find((x) => x.cod === e.target.value);
-                setSelectedEmpleado(emp || null);
-              }}
-              className="text-sm border border-gray-300 rounded-lg px-2 py-1.5 focus:outline-none focus:border-brand-500"
-            >
+            <select value={selectedEmpleado?.cod || ""}
+              onChange={(e) => { const emp = empleados.find((x) => x.cod === e.target.value); setSelectedEmpleado(emp || null); }}
+              className="text-sm border border-gray-300 rounded-lg px-2 py-1.5 focus:outline-none focus:border-brand-500">
               <option value="">Vendedor...</option>
-              {empleados.map((e) => (
-                <option key={e.cod} value={e.cod}>{e.nombre}</option>
-              ))}
+              {empleados.map((e) => <option key={e.cod} value={e.cod}>{e.nombre}</option>)}
             </select>
           </div>
-
-          {/* Client select */}
           {terminal.requiereCliente && (
             <div className="relative">
               <div className="flex items-center gap-2">
@@ -307,33 +215,22 @@ export default function PosPage() {
                 {selectedCliente ? (
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-medium text-gray-700">{selectedCliente.nombre}</span>
-                    <button onClick={() => { setSelectedCliente(null); setShowClientSearch(true); }}
-                      className="text-xs text-red-500 hover:text-red-700">✕</button>
+                    <button onClick={() => { setSelectedCliente(null); setShowClientSearch(true); }} className="text-xs text-red-500 hover:text-red-700">x</button>
                   </div>
                 ) : (
-                  <input
-                    type="text"
-                    placeholder="Buscar cliente..."
-                    value={clientSearch}
+                  <input type="text" placeholder="Buscar cliente..." value={clientSearch}
                     onChange={(e) => { setClientSearch(e.target.value); setShowClientSearch(true); }}
                     onFocus={() => setShowClientSearch(true)}
-                    className="text-sm border border-gray-300 rounded-lg px-2 py-1.5 w-48 focus:outline-none focus:border-brand-500"
-                  />
+                    className="text-sm border border-gray-300 rounded-lg px-2 py-1.5 w-48 focus:outline-none focus:border-brand-500" />
                 )}
               </div>
               {showClientSearch && clientResults.length > 0 && !selectedCliente && (
                 <div className="absolute right-0 top-full mt-1 bg-white border rounded-lg shadow-lg z-50 w-72 max-h-60 overflow-y-auto">
                   {clientResults.map((c) => (
-                    <button key={c.cod} onClick={() => {
-                      setSelectedCliente(c);
-                      setClientSearch("");
-                      setClientResults([]);
-                      setShowClientSearch(false);
-                    }} className="w-full text-left px-3 py-2 hover:bg-gray-50 border-b last:border-b-0">
+                    <button key={c.cod} onClick={() => { setSelectedCliente(c); setClientSearch(""); setClientResults([]); setShowClientSearch(false); }}
+                      className="w-full text-left px-3 py-2 hover:bg-gray-50 border-b last:border-b-0">
                       <div className="text-sm font-medium text-gray-800">{c.nombre}</div>
-                      <div className="text-xs text-gray-400">
-                        {c.cuit && `CUIT: ${c.cuit}`} {c.zona && `· ${c.zona}`}
-                      </div>
+                      <div className="text-xs text-gray-400">{c.cuit && `CUIT: ${c.cuit}`} {c.zona && `· ${c.zona}`}</div>
                     </button>
                   ))}
                 </div>
@@ -343,145 +240,204 @@ export default function PosPage() {
         </div>
       </div>
 
-      {/* Main content */}
+      {/* Main content: 2 columns */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Left: Search + results */}
-        <div className="flex-1 flex flex-col p-4 overflow-hidden">
-          {/* Search bar */}
-          <div className="relative mb-3">
-            <HiOutlineSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-            <input
-              ref={searchRef}
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              onKeyDown={handleSearchKeyDown}
-              placeholder="Buscar producto o escanear codigo de barras..."
-              className="w-full pl-10 pr-4 py-3 text-lg border-2 border-brand-400 rounded-xl focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-200"
-              autoFocus
-            />
-            {searching && <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">Buscando...</div>}
+        {/* LEFT: search (top) + cart (bottom) */}
+        <div className="w-1/2 flex flex-col border-r">
+          {/* Search area */}
+          <div className="p-3 border-b bg-white">
+            <div className="relative">
+              <HiOutlineSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <input ref={searchRef} type="text" value={search} onChange={(e) => setSearch(e.target.value)}
+                onKeyDown={handleSearchKeyDown}
+                placeholder="Buscar producto o escanear codigo..."
+                className="w-full pl-10 pr-4 py-3 text-lg border-2 border-brand-400 rounded-xl focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-200"
+                autoFocus />
+              {searching && <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 animate-pulse">Buscando...</div>}
+            </div>
           </div>
 
           {/* Search results */}
-          <div className="flex-1 overflow-y-auto">
-            {searchResults.length > 0 && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+          <div className="flex-1 overflow-y-auto bg-gray-50 p-2">
+            {searchResults.length > 0 ? (
+              <div className="space-y-1">
                 {searchResults.map((p) => {
-                  const precio = p.precios[activeLista] || p.precios[2] || 0;
+                  const precio = p.precios[activeLista] || p.precios[2] || p.precios[1] || 0;
                   const inCart = cart.find((i) => i.sku === p.sku);
+                  const isSelected = selectedProduct?.sku === p.sku;
                   return (
-                    <button
-                      key={p.sku}
-                      onClick={() => addToCart(p)}
-                      className={`text-left p-3 rounded-xl border-2 transition-all duration-150 ${
-                        inCart ? "border-brand-500 bg-brand-50" : "border-gray-200 bg-white hover:border-brand-300 hover:shadow-sm"
-                      }`}
-                    >
-                      <div className="text-sm font-medium text-gray-900 line-clamp-2">{p.nombre}</div>
-                      <div className="flex items-center justify-between mt-2">
-                        <span className="text-xs text-gray-400 font-mono">{p.sku}</span>
-                        <span className="font-bold text-brand-600">{formatPrice(precio)}</span>
+                    <button key={p.sku}
+                      onClick={() => { addToCart(p); }}
+                      onContextMenu={(e) => { e.preventDefault(); setSelectedProduct(p); }}
+                      className={`w-full text-left px-3 py-2 rounded-lg flex items-center gap-3 transition-all duration-150 ${
+                        isSelected ? "bg-brand-100 border-2 border-brand-500" :
+                        inCart ? "bg-brand-50 border border-brand-200" : "bg-white border border-gray-200 hover:border-brand-300"
+                      }`}>
+                      {p.images.length > 0 ? (
+                        <img src={p.images[0]} alt="" className="w-10 h-10 rounded object-contain bg-gray-100 shrink-0" />
+                      ) : (
+                        <div className="w-10 h-10 rounded bg-gray-100 shrink-0 flex items-center justify-center text-gray-300 text-xs">IMG</div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium text-gray-900 truncate">{p.nombre}</div>
+                        <div className="text-xs text-gray-400">{p.sku} · {p.unidad === "KG" ? "/kg" : "/un"}</div>
                       </div>
-                      <div className="flex items-center justify-between mt-1">
-                        <span className="text-xs text-gray-400">
-                          {p.unidad === "KG" ? "/kg" : "/un"}
-                          {p.stock > 0 && <span className="text-green-500 ml-2">En stock</span>}
-                          {p.stock <= 0 && <span className="text-red-400 ml-2">Sin stock</span>}
-                        </span>
-                        {inCart && (
-                          <span className="text-xs bg-brand-500 text-white px-2 py-0.5 rounded-full">
-                            {inCart.cantidad} en carrito
-                          </span>
-                        )}
+                      <div className="text-right shrink-0">
+                        <div className="font-bold text-brand-600">{formatPrice(precio)}</div>
+                        {inCart && <div className="text-xs text-brand-500">{inCart.cantidad} en carrito</div>}
                       </div>
                     </button>
                   );
                 })}
               </div>
-            )}
-            {search.length >= 2 && searchResults.length === 0 && !searching && (
+            ) : search.length >= 2 && !searching ? (
               <div className="text-center text-gray-400 mt-8">No se encontraron productos</div>
-            )}
-            {!search && cart.length === 0 && (
-              <div className="text-center text-gray-400 mt-16">
-                <HiOutlineSearch className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-                <p>Busca un producto o escanea un codigo de barras</p>
+            ) : null}
+          </div>
+
+          {/* Cart */}
+          <div className="border-t bg-white flex flex-col" style={{ maxHeight: "45%" }}>
+            <div className="px-3 py-2 border-b flex items-center justify-between bg-gray-50">
+              <div className="flex items-center gap-2">
+                <HiOutlineShoppingCart className="w-4 h-4 text-gray-500" />
+                <span className="font-bold text-gray-800 text-sm">Carrito</span>
+                {itemCount > 0 && <span className="text-xs text-gray-400">({itemCount})</span>}
               </div>
-            )}
-          </div>
-        </div>
-
-        {/* Right: Cart */}
-        <div className="w-96 bg-white border-l flex flex-col shrink-0">
-          <div className="p-4 border-b flex items-center justify-between">
-            <h2 className="font-bold text-gray-900">
-              Carrito
-              {itemCount > 0 && <span className="text-sm font-normal text-gray-400 ml-2">({itemCount} items)</span>}
-            </h2>
-            {cart.length > 0 && (
-              <button onClick={clearCart} className="text-xs text-red-500 hover:text-red-700">
-                Vaciar
-              </button>
-            )}
-          </div>
-
-          <div className="flex-1 overflow-y-auto p-3 space-y-2">
-            {cart.length === 0 ? (
-              <div className="text-center text-gray-400 mt-8 text-sm">Carrito vacio</div>
-            ) : (
-              cart.map((item) => (
-                <div key={item.sku} className="bg-gray-50 rounded-lg p-3">
-                  <div className="flex items-start justify-between mb-2">
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium text-gray-900 truncate">{item.nombre}</div>
-                      <div className="text-xs text-gray-400">{item.sku} · {formatPrice(item.precio)}/{item.unidad === "KG" ? "kg" : "un"}</div>
-                    </div>
-                    <button onClick={() => removeFromCart(item.sku)} className="text-gray-400 hover:text-red-500 p-1">
-                      <HiOutlineTrash className="w-4 h-4" />
+              {cart.length > 0 && (
+                <button onClick={() => { setCart([]); setSelectedProduct(null); }} className="text-xs text-red-500 hover:text-red-700">Vaciar</button>
+              )}
+            </div>
+            <div className="flex-1 overflow-y-auto px-2 py-1 space-y-1">
+              {cart.length === 0 ? (
+                <div className="text-center text-gray-400 text-xs py-4">Carrito vacio</div>
+              ) : cart.map((item) => (
+                <div key={item.sku}
+                  className={`flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer transition-colors duration-150 ${
+                    selectedProduct?.sku === item.sku ? "bg-brand-50 border border-brand-200" : "bg-gray-50 hover:bg-gray-100"
+                  }`}
+                  onClick={() => {
+                    const prod = searchResults.find((p) => p.sku === item.sku);
+                    if (prod) setSelectedProduct(prod);
+                    else setSelectedProduct({ sku: item.sku, nombre: item.nombre, unidad: item.unidad, precios: { [item.lista]: item.precio }, stock: 0, codBarra: "", cantPorCaja: 0, images: item.images });
+                  }}>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs font-medium text-gray-900 truncate">{item.nombre}</div>
+                    <div className="text-xs text-gray-400">{formatPrice(item.precio)}/{item.unidad === "KG" ? "kg" : "un"}</div>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button onClick={(e) => { e.stopPropagation(); updateQty(item.sku, -1); }}
+                      className="w-6 h-6 flex items-center justify-center rounded bg-gray-200 hover:bg-gray-300 text-gray-700">
+                      <HiOutlineMinus className="w-3 h-3" />
+                    </button>
+                    <input type="number" value={item.cantidad}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={(e) => setQty(item.sku, parseFloat(e.target.value) || 1)}
+                      className="w-12 text-center text-xs font-medium border rounded py-0.5 focus:outline-none focus:border-brand-500"
+                      min="0.01" step={item.unidad === "KG" ? "0.01" : "1"} />
+                    <button onClick={(e) => { e.stopPropagation(); updateQty(item.sku, 1); }}
+                      className="w-6 h-6 flex items-center justify-center rounded bg-gray-200 hover:bg-gray-300 text-gray-700">
+                      <HiOutlinePlus className="w-3 h-3" />
                     </button>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <button onClick={() => updateQty(item.sku, -1)}
-                        className="w-7 h-7 flex items-center justify-center rounded-lg bg-gray-200 hover:bg-gray-300 text-gray-700">
-                        <HiOutlineMinus className="w-3 h-3" />
-                      </button>
-                      <input
-                        type="number"
-                        value={item.cantidad}
-                        onChange={(e) => setQty(item.sku, parseFloat(e.target.value) || 1)}
-                        className="w-16 text-center text-sm font-medium border rounded-lg py-1 focus:outline-none focus:border-brand-500"
-                        min="0.01"
-                        step={item.unidad === "KG" ? "0.01" : "1"}
-                      />
-                      <button onClick={() => updateQty(item.sku, 1)}
-                        className="w-7 h-7 flex items-center justify-center rounded-lg bg-gray-200 hover:bg-gray-300 text-gray-700">
-                        <HiOutlinePlus className="w-3 h-3" />
-                      </button>
-                    </div>
-                    <span className="font-bold text-gray-900">{formatPrice(item.precio * item.cantidad)}</span>
-                  </div>
+                  <span className="font-bold text-sm text-gray-900 w-20 text-right shrink-0">{formatPrice(item.precio * item.cantidad)}</span>
+                  <button onClick={(e) => { e.stopPropagation(); removeFromCart(item.sku); }}
+                    className="text-gray-300 hover:text-red-500 shrink-0">
+                    <HiOutlineTrash className="w-3.5 h-3.5" />
+                  </button>
                 </div>
-              ))
-            )}
-          </div>
-
-          {/* Total + Cobrar */}
-          <div className="border-t p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-lg font-bold text-gray-900">Total</span>
-              <span className="text-2xl font-bold text-brand-600">{formatPrice(total)}</span>
+              ))}
             </div>
-            <button
-              disabled={cart.length === 0 || !selectedEmpleado}
-              className="w-full py-3 bg-green-600 text-white rounded-xl text-lg font-bold hover:bg-green-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              {!selectedEmpleado ? "Selecciona vendedor" : terminal.flujo === "pendiente" ? "Dejar pendiente" : "Cobrar"}
-            </button>
+            {/* Total + action */}
+            <div className="border-t px-3 py-2 flex items-center justify-between bg-white">
+              <div>
+                <span className="text-sm text-gray-500">Total</span>
+                <span className="text-xl font-bold text-brand-600 ml-3">{formatPrice(total)}</span>
+              </div>
+              <button disabled={cart.length === 0 || !selectedEmpleado}
+                className="px-6 py-2 bg-green-600 text-white rounded-xl font-bold hover:bg-green-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                {!selectedEmpleado ? "Selecciona vendedor" : terminal.flujo === "pendiente" ? "Dejar pendiente" : "Cobrar"}
+              </button>
+            </div>
           </div>
         </div>
+
+        {/* RIGHT: product detail / promotions carousel */}
+        <div className="w-1/2 flex flex-col bg-white">
+          {selectedProduct ? (
+            <div className="flex-1 flex flex-col items-center justify-center p-8"
+              style={{ animation: "fadeIn 300ms ease" }}>
+              {/* Product image */}
+              <div className="w-full max-w-md aspect-square bg-gray-50 rounded-2xl flex items-center justify-center overflow-hidden mb-6 shadow-inner">
+                {selectedProduct.images.length > 0 ? (
+                  <img src={selectedProduct.images[0]} alt={selectedProduct.nombre}
+                    className="max-w-full max-h-full object-contain p-4" />
+                ) : (
+                  <div className="text-gray-300 text-center">
+                    <HiOutlineShoppingCart className="w-16 h-16 mx-auto mb-2" />
+                    <p className="text-sm">Sin imagen</p>
+                  </div>
+                )}
+              </div>
+              {/* Product info */}
+              <h2 className="text-xl font-bold text-gray-900 text-center mb-2">{selectedProduct.nombre}</h2>
+              <p className="text-sm text-gray-400 mb-4">SKU: {selectedProduct.sku} · {selectedProduct.unidad === "KG" ? "Por kilo" : "Por unidad"}</p>
+              {/* Prices */}
+              <div className="flex gap-4 mb-6">
+                {Object.entries(selectedProduct.precios).map(([lista, precio]) => {
+                  if (!precio || precio <= 0) return null;
+                  const isActive = Number(lista) === activeLista;
+                  return (
+                    <div key={lista} className={`px-4 py-2 rounded-xl text-center ${isActive ? "bg-brand-500 text-white shadow-md" : "bg-gray-100 text-gray-600"}`}>
+                      <div className="text-xs">{LISTA_LABELS[Number(lista)] || `Lista ${lista}`}</div>
+                      <div className="font-bold text-lg">{formatPrice(precio)}</div>
+                    </div>
+                  );
+                })}
+              </div>
+              {/* Stock */}
+              <div className={`text-sm font-medium ${selectedProduct.stock > 0 ? "text-green-600" : "text-red-500"}`}>
+                {selectedProduct.stock > 0 ? "En stock" : "Sin stock"}
+              </div>
+              {/* Quick add */}
+              {(() => {
+                const inCart = cart.find((i) => i.sku === selectedProduct.sku);
+                return inCart ? (
+                  <div className="flex items-center gap-3 mt-6">
+                    <button onClick={() => updateQty(selectedProduct.sku, -1)}
+                      className="w-10 h-10 flex items-center justify-center rounded-xl bg-gray-200 hover:bg-gray-300 text-gray-700">
+                      <HiOutlineMinus className="w-5 h-5" />
+                    </button>
+                    <span className="text-2xl font-bold text-gray-900 w-16 text-center">{inCart.cantidad}</span>
+                    <button onClick={() => updateQty(selectedProduct.sku, 1)}
+                      className="w-10 h-10 flex items-center justify-center rounded-xl bg-brand-500 hover:bg-brand-600 text-white">
+                      <HiOutlinePlus className="w-5 h-5" />
+                    </button>
+                  </div>
+                ) : (
+                  <button onClick={() => addToCart(selectedProduct)}
+                    className="mt-6 px-8 py-3 bg-brand-500 text-white rounded-xl font-bold text-lg hover:bg-brand-600 transition-colors shadow-md">
+                    Agregar al carrito
+                  </button>
+                );
+              })()}
+            </div>
+          ) : (
+            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center"
+              style={{ animation: "fadeIn 500ms ease" }}>
+              <img src="/logo.png" alt="Distrialma" className="w-48 opacity-20 mb-8" />
+              <h2 className="text-2xl font-bold text-gray-300 mb-2">Distrialma POS</h2>
+              <p className="text-gray-400">Busca un producto o escanea un codigo de barras para comenzar</p>
+            </div>
+          )}
+        </div>
       </div>
+
+      <style jsx>{`
+        @keyframes fadeIn {
+          from { opacity: 0; transform: scale(0.97); }
+          to { opacity: 1; transform: scale(1); }
+        }
+      `}</style>
     </div>
   );
 }
