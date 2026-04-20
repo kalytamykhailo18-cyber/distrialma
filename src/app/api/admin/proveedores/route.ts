@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
       SELECT MAX(CAST(LTRIM(RTRIM(Cod)) AS INT)) AS maxCod
       FROM [${dbProd}].dbo.Proveedores
     `);
-    const nextCod = (maxResult.recordset[0]?.maxCod || 0) + 1;
+    const nextCod = Number(maxResult.recordset[0]?.maxCod || 0) + 1;
     const codPadded = String(nextCod).padStart(7, " ");
 
     await pool

@@ -89,8 +89,8 @@ export async function POST(req: NextRequest) {
         FROM [${dbTransas}].dbo.Transas
         WHERE LEN(LTRIM(RTRIM(Cod))) <= 7
       `);
-      let nextCodNum = (maxResult.recordset[0]?.maxCod || 0) + 1;
-      const nextCierre = (maxResult.recordset[0]?.maxCierre || 0) + 1;
+      let nextCodNum = Number(maxResult.recordset[0]?.maxCod || 0) + 1;
+      const nextCierre = Number(maxResult.recordset[0]?.maxCierre || 0) + 1;
 
       // 1. Write cierre record (Tipo = 'C')
       // Round to 2 decimals for decimal(12,2) columns

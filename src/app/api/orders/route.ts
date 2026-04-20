@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
       FROM [${dbTransas}].dbo.Transas
     `);
 
-    let nextCod = maxResult.recordset[0].maxCod + 1;
+    let nextCod = Number(maxResult.recordset[0].maxCod || 0) + 1;
     const nextNroped = String(maxResult.recordset[0].maxNroped + 1).padStart(8, "0");
     const nextNroTransa = String(maxResult.recordset[0].maxNroTransa + 1).padStart(8, "0");
     const nextNroMostra = String(maxMostra.recordset[0].maxNroMostra + 1).padStart(8, "0");

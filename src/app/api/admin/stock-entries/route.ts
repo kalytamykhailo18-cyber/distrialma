@@ -121,7 +121,7 @@ export async function POST(req: NextRequest) {
           SELECT MAX(CAST(LTRIM(RTRIM(Cod)) AS INT)) AS maxCod
           FROM [${dbCompras}].dbo.Compras
         `);
-        nextCompraCod = (maxCompra.recordset[0]?.maxCod || 0) + 1;
+        nextCompraCod = Number(maxCompra.recordset[0]?.maxCod || 0) + 1;
       } catch {
         // Table might be empty
       }
@@ -160,7 +160,7 @@ export async function POST(req: NextRequest) {
             SELECT MAX(CAST(LTRIM(RTRIM(Cod)) AS INT)) AS maxCod
             FROM [${dbProd}].dbo.Productos
           `);
-          const nextProdCod = (maxProdResult.recordset[0]?.maxCod || 0) + 1;
+          const nextProdCod = Number(maxProdResult.recordset[0]?.maxCod || 0) + 1;
           const codPadded = padLeft(nextProdCod, 7);
           sku = String(nextProdCod);
 
