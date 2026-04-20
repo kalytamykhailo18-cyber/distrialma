@@ -143,9 +143,6 @@ export default function PosPage() {
       e.preventDefault();
       if (highlightIdx >= 0 && highlightIdx < searchResults.length) {
         addToCart(searchResults[highlightIdx]);
-        setSearch("");
-        setSearchResults([]);
-        setHighlightIdx(-1);
       } else if (search.trim()) {
         const val = search.trim();
         if (/^\d{4,}$/.test(val)) {
@@ -155,9 +152,6 @@ export default function PosPage() {
             .catch(() => {});
         } else if (searchResults.length === 1) {
           addToCart(searchResults[0]);
-          setSearch("");
-          setSearchResults([]);
-          setHighlightIdx(-1);
         }
       }
     } else if (e.key === "Escape") {
