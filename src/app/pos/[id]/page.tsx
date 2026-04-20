@@ -6,7 +6,8 @@ import { formatPrice } from "@/lib/utils";
 import {
   HiOutlineSearch, HiOutlineTrash, HiOutlinePlus, HiOutlineMinus,
   HiOutlineUser, HiOutlineUserGroup, HiOutlineDesktopComputer,
-  HiOutlineShoppingCart,
+  HiOutlineShoppingCart, HiOutlineCash, HiOutlineCreditCard,
+  HiOutlineQrcode, HiOutlineLibrary, HiOutlineClipboardList, HiOutlineBookOpen,
 } from "react-icons/hi";
 
 interface Terminal {
@@ -698,19 +699,19 @@ export default function PosPage() {
                   {/* Payment methods */}
                   <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 mb-5">
                     {[
-                      { key: "efectivo", label: "Efectivo", icon: "💵" },
-                      { key: "debito", label: "Debito", icon: "💳" },
-                      { key: "credito", label: "Credito", icon: "💳" },
-                      { key: "cuotas", label: "Cuotas", icon: "📋" },
-                      { key: "qr", label: "QR", icon: "📱" },
-                      { key: "transferencia", label: "Transfer.", icon: "🏦" },
-                      { key: "cuenta", label: "Cta. Cte.", icon: "📒" },
+                      { key: "efectivo", label: "Efectivo", Icon: HiOutlineCash },
+                      { key: "debito", label: "Debito", Icon: HiOutlineCreditCard },
+                      { key: "credito", label: "Credito", Icon: HiOutlineCreditCard },
+                      { key: "cuotas", label: "Cuotas", Icon: HiOutlineClipboardList },
+                      { key: "qr", label: "QR", Icon: HiOutlineQrcode },
+                      { key: "transferencia", label: "Transfer.", Icon: HiOutlineLibrary },
+                      { key: "cuenta", label: "Cta. Cte.", Icon: HiOutlineBookOpen },
                     ].map((m) => (
                       <button key={m.key} onClick={() => { setPayMethod(m.key); setPayAmount(""); setPayError(""); }}
                         className={`p-3 rounded-xl text-center transition-all duration-200 ${
                           payMethod === m.key ? "bg-brand-500 text-white shadow-md scale-105" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                         }`}>
-                        <div className="text-xl mb-1">{m.icon}</div>
+                        <m.Icon className="w-6 h-6 mx-auto mb-1" />
                         <div className="text-xs font-medium">{m.label}</div>
                       </button>
                     ))}
