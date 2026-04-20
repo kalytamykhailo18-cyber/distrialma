@@ -49,6 +49,7 @@ export default function TerminalesPage() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<number | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<number | null>(null);
   const [toast, setToast] = useState("");
   const [modalVisible, setModalVisible] = useState(false);
 
@@ -107,7 +108,9 @@ export default function TerminalesPage() {
   }
 
   async function remove(id: number) {
+    if (confirmDelete !== id) { setConfirmDelete(id); return; }
     setDeleting(id);
+    setConfirmDelete(null);
     try {
       await fetch("/api/admin/pos-terminales", {
         method: "DELETE",
@@ -181,9 +184,16 @@ export default function TerminalesPage() {
                         className={`p-1.5 text-gray-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg ${springBtn}`}>
                         <HiOutlinePencil className="w-4 h-4" />
                       </button>
-                      <button onClick={() => remove(t.id)} disabled={deleting === t.id}
-                        className={`p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg ${springBtn}`}>
-                        <HiOutlineTrash className="w-4 h-4" />
+                      <button onClick={() => remove(t.id)} onBlur={() => setConfirmDelete(null)}
+                        disabled={deleting === t.id}
+                        className={`p-1.5 rounded-lg ${springBtn} ${
+                          confirmDelete === t.id ? "bg-red-500 text-white" : "text-gray-400 hover:text-red-600 hover:bg-red-50"
+                        }`} title={confirmDelete === t.id ? "Click de nuevo para confirmar" : "Eliminar"}>
+                        {confirmDelete === t.id ? (
+                          <span className="text-xs font-medium px-1">Confirmar?</span>
+                        ) : (
+                          <HiOutlineTrash className="w-4 h-4" />
+                        )}
                       </button>
                     </div>
                   </div>
