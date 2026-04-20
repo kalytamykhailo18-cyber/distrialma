@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
-import { HiOutlineDocumentDownload, HiOutlineMail, HiOutlineCheck, HiOutlineCamera } from "react-icons/hi";
+import { HiOutlineDocumentDownload, HiOutlineMail, HiOutlineCheck, HiOutlineCamera, HiOutlineRefresh } from "react-icons/hi";
 import { CollapsiblePanel, Stagger } from "@/components/AnimateIn";
 
 interface MovCaja {
@@ -67,6 +67,7 @@ export default function CierreCajaPage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [history, setHistory] = useState<CierreRecord[]>([]);
+  const [resending, setResending] = useState<number | null>(null);
   const [nuevoInicio, setNuevoInicio] = useState("");
   const [efectivoContado, setEfectivoContado] = useState("");
   const [fotos, setFotos] = useState<string[]>([]);
@@ -124,6 +125,21 @@ export default function CierreCajaPage() {
       const d = await res.json();
       if (res.ok) setHistory(d.cierres || []);
     } catch { /* silent */ }
+  }
+
+  async function resendEmail(cierreId: number) {
+    setResending(cierreId);
+    try {
+      const res = await fetch("/api/admin/cierre-caja/resend", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cierreId }),
+      });
+      if (res.ok) {
+        setHistory((prev) => prev.map((c) => c.id === cierreId ? { ...c, emailSent: true } : c));
+      }
+    } catch { /* silent */ }
+    setResending(null);
   }
 
   async function loadCierre() {
@@ -858,7 +874,14 @@ export default function CierreCajaPage() {
                           {c.emailSent ? (
                             <span className="text-green-600 text-xs font-medium">Enviado</span>
                           ) : (
-                            <span className="text-gray-400 text-xs">—</span>
+                            <button
+                              onClick={() => resendEmail(c.id)}
+                              disabled={resending === c.id}
+                              className="flex items-center gap-1 text-xs text-brand-600 hover:text-brand-700 font-medium disabled:opacity-50 mx-auto"
+                            >
+                              <HiOutlineRefresh className={`w-3.5 h-3.5 ${resending === c.id ? "animate-spin" : ""}`} />
+                              {resending === c.id ? "Enviando..." : "Reenviar"}
+                            </button>
                           )}
                         </td>
                       </tr>
