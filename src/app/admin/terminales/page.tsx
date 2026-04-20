@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { PageTransition, Stagger, staggerStyle, springBtn, LoadingCenter } from "@/components/AnimateIn";
+import { PageTransition, Stagger, springBtn, LoadingCenter } from "@/components/AnimateIn";
 import {
   HiOutlinePlus, HiOutlinePencil, HiOutlineTrash, HiOutlineDesktopComputer,
-  HiOutlineX, HiOutlineCheck,
+  HiOutlineX, HiOutlineCheck, HiOutlineExternalLink,
 } from "react-icons/hi";
 
 interface Terminal {
@@ -27,21 +27,9 @@ interface Terminal {
 }
 
 const EMPTY_FORM: Omit<Terminal, "id"> = {
-  nombre: "",
-  sucursal: "",
-  sucursalNombre: "",
-  listas: "1",
-  cuit: "",
-  razonSocial: "",
-  direccion: "",
-  aliasBanco: "",
-  formatoImpresion: "ticket",
-  flujo: "directo",
-  permisoAnular: false,
-  permisoPrecio: false,
-  permisoDevolver: true,
-  requiereCliente: false,
-  activa: true,
+  nombre: "", sucursal: "", sucursalNombre: "", listas: "1", cuit: "", razonSocial: "",
+  direccion: "", aliasBanco: "", formatoImpresion: "ticket", flujo: "directo",
+  permisoAnular: false, permisoPrecio: false, permisoDevolver: true, requiereCliente: false, activa: true,
 };
 
 const SUCURSALES = [
@@ -62,6 +50,7 @@ export default function TerminalesPage() {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<number | null>(null);
   const [toast, setToast] = useState("");
+  const [modalVisible, setModalVisible] = useState(false);
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 2000); };
 
@@ -77,20 +66,26 @@ export default function TerminalesPage() {
 
   useEffect(() => { loadData(); }, [loadData]);
 
-  function startEdit(t: Terminal) {
-    setEditing(t.id);
-    setForm({
-      nombre: t.nombre, sucursal: t.sucursal, sucursalNombre: t.sucursalNombre,
-      listas: t.listas, cuit: t.cuit, razonSocial: t.razonSocial, direccion: t.direccion,
-      aliasBanco: t.aliasBanco, formatoImpresion: t.formatoImpresion, flujo: t.flujo,
-      permisoAnular: t.permisoAnular, permisoPrecio: t.permisoPrecio,
-      permisoDevolver: t.permisoDevolver, requiereCliente: t.requiereCliente, activa: t.activa,
-    });
+  function openModal(t?: Terminal) {
+    if (t) {
+      setEditing(t.id);
+      setForm({
+        nombre: t.nombre, sucursal: t.sucursal, sucursalNombre: t.sucursalNombre,
+        listas: t.listas, cuit: t.cuit, razonSocial: t.razonSocial, direccion: t.direccion,
+        aliasBanco: t.aliasBanco, formatoImpresion: t.formatoImpresion, flujo: t.flujo,
+        permisoAnular: t.permisoAnular, permisoPrecio: t.permisoPrecio,
+        permisoDevolver: t.permisoDevolver, requiereCliente: t.requiereCliente, activa: t.activa,
+      });
+    } else {
+      setEditing("new");
+      setForm({ ...EMPTY_FORM });
+    }
+    setTimeout(() => setModalVisible(true), 10);
   }
 
-  function startNew() {
-    setEditing("new");
-    setForm({ ...EMPTY_FORM });
+  function closeModal() {
+    setModalVisible(false);
+    setTimeout(() => setEditing(null), 300);
   }
 
   async function save() {
@@ -105,7 +100,7 @@ export default function TerminalesPage() {
         body: JSON.stringify(body),
       });
       showToast(editing === "new" ? "Terminal creada" : "Terminal actualizada");
-      setEditing(null);
+      closeModal();
       loadData();
     } catch {}
     setSaving(false);
@@ -133,7 +128,7 @@ export default function TerminalesPage() {
     setForm({ ...form, listas: updated.join(",") || "1" });
   }
 
-  const inputCls = "w-full px-3 py-2 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600";
+  const inputCls = "w-full px-3 py-2 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 transition-colors duration-200";
   const labelCls = "block text-sm font-medium text-gray-700 mb-1";
 
   return (
@@ -144,7 +139,7 @@ export default function TerminalesPage() {
             <h1 className="text-2xl font-bold text-gray-900">Terminales POS</h1>
             <p className="text-sm text-gray-500 mt-1">Configuracion de las terminales del punto de venta web.</p>
           </div>
-          <button onClick={startNew} className={`flex items-center gap-2 px-4 py-2 bg-brand-500 text-white rounded-xl text-sm font-medium hover:bg-brand-600 ${springBtn}`}>
+          <button onClick={() => openModal()} className={`flex items-center gap-2 px-4 py-2 bg-brand-500 text-white rounded-xl text-sm font-medium hover:bg-brand-600 ${springBtn}`}>
             <HiOutlinePlus className="w-4 h-4" />
             Agregar terminal
           </button>
@@ -153,119 +148,7 @@ export default function TerminalesPage() {
 
       {loading ? <LoadingCenter /> : (
         <>
-          {/* Terminal form (create/edit) */}
-          {editing !== null && (
-            <Stagger delay={50}>
-              <div className="bg-white border rounded-xl shadow-sm p-6 mb-6">
-                <h2 className="font-semibold text-gray-900 mb-4">
-                  {editing === "new" ? "Nueva terminal" : `Editar: ${terminales.find((t) => t.id === editing)?.nombre}`}
-                </h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  <div>
-                    <label className={labelCls}>Nombre *</label>
-                    <input value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })}
-                      placeholder="Ej: Caja 1 Minorista" className={inputCls} />
-                  </div>
-                  <div>
-                    <label className={labelCls}>Sucursal *</label>
-                    <select value={form.sucursal} onChange={(e) => setForm({ ...form, sucursal: e.target.value })}
-                      className={inputCls}>
-                      <option value="">Seleccionar...</option>
-                      {SUCURSALES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className={labelCls}>CUIT *</label>
-                    <input value={form.cuit} onChange={(e) => setForm({ ...form, cuit: e.target.value })}
-                      placeholder="30-12345678-9" className={inputCls} />
-                  </div>
-                  <div>
-                    <label className={labelCls}>Razon social</label>
-                    <input value={form.razonSocial} onChange={(e) => setForm({ ...form, razonSocial: e.target.value })}
-                      placeholder="Distrialma S.R.L." className={inputCls} />
-                  </div>
-                  <div className="sm:col-span-2">
-                    <label className={labelCls}>Direccion</label>
-                    <input value={form.direccion} onChange={(e) => setForm({ ...form, direccion: e.target.value })}
-                      placeholder="Av. San Martin 1234, Merlo" className={inputCls} />
-                  </div>
-                  <div>
-                    <label className={labelCls}>Alias banco (transferencias)</label>
-                    <input value={form.aliasBanco} onChange={(e) => setForm({ ...form, aliasBanco: e.target.value })}
-                      placeholder="distrialma.merlo" className={inputCls} />
-                  </div>
-                  <div>
-                    <label className={labelCls}>Formato impresion</label>
-                    <select value={form.formatoImpresion} onChange={(e) => setForm({ ...form, formatoImpresion: e.target.value })}
-                      className={inputCls}>
-                      <option value="ticket">Ticket (80mm)</option>
-                      <option value="a4">A4</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className={labelCls}>Flujo de venta</label>
-                    <select value={form.flujo} onChange={(e) => setForm({ ...form, flujo: e.target.value })}
-                      className={inputCls}>
-                      <option value="directo">Directo (cobra el vendedor)</option>
-                      <option value="pendiente">Pendiente (cobra el cajero)</option>
-                    </select>
-                  </div>
-
-                  <div className="sm:col-span-2 lg:col-span-3">
-                    <label className={labelCls}>Listas de precios *</label>
-                    <div className="flex flex-wrap gap-2">
-                      {["1", "2", "3", "4", "5"].map((l) => (
-                        <button key={l} onClick={() => toggleLista(l)}
-                          className={`px-3 py-1.5 rounded-lg text-sm font-medium ${springBtn} ${
-                            form.listas.split(",").includes(l)
-                              ? "bg-brand-500 text-white"
-                              : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                          }`}>
-                          {l} — {LISTA_LABELS[l]}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="sm:col-span-2 lg:col-span-3">
-                    <label className={labelCls}>Permisos</label>
-                    <div className="flex flex-wrap gap-4">
-                      {([
-                        ["requiereCliente", "Requiere cliente"],
-                        ["permisoAnular", "Puede anular ventas"],
-                        ["permisoPrecio", "Puede cambiar precios"],
-                        ["permisoDevolver", "Puede hacer devoluciones"],
-                        ["activa", "Terminal activa"],
-                      ] as const).map(([key, label]) => (
-                        <label key={key} className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-                          <input type="checkbox" checked={form[key as keyof typeof form] as boolean}
-                            onChange={(e) => setForm({ ...form, [key]: e.target.checked })}
-                            className="rounded border-gray-300 text-brand-500 focus:ring-brand-500" />
-                          {label}
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex gap-3 mt-6">
-                  <button onClick={save} disabled={saving || !form.nombre.trim() || !form.sucursal || !form.cuit.trim()}
-                    className={`flex items-center gap-2 px-4 py-2 bg-brand-500 text-white rounded-xl text-sm font-medium hover:bg-brand-600 disabled:opacity-50 ${springBtn}`}>
-                    <HiOutlineCheck className="w-4 h-4" />
-                    {saving ? "Guardando..." : "Guardar"}
-                  </button>
-                  <button onClick={() => setEditing(null)}
-                    className={`flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-200 ${springBtn}`}>
-                    <HiOutlineX className="w-4 h-4" />
-                    Cancelar
-                  </button>
-                </div>
-              </div>
-            </Stagger>
-          )}
-
-          {/* Terminal list */}
-          {terminales.length === 0 && editing === null ? (
+          {terminales.length === 0 ? (
             <Stagger delay={100}>
               <div className="text-center py-12">
                 <HiOutlineDesktopComputer className="w-12 h-12 text-gray-300 mx-auto mb-3" />
@@ -276,87 +159,239 @@ export default function TerminalesPage() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {terminales.map((t, i) => (
-                <Stagger key={t.id} delay={100 + i * 40}>
-                  <div className={`bg-white border rounded-xl shadow-sm p-4 ${!t.activa ? "opacity-50" : ""}`} style={staggerStyle(true, i)}>
-                    <div className="flex items-start justify-between mb-2">
-                      <div>
-                        <h3 className="font-semibold text-gray-900">{t.nombre}</h3>
-                        <p className="text-xs text-gray-500">{t.sucursalNombre || `Sucursal ${t.sucursal}`}</p>
-                      </div>
-                      <div className="flex gap-1">
-                        <button onClick={() => startEdit(t)}
-                          className={`p-1.5 text-gray-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg ${springBtn}`}>
-                          <HiOutlinePencil className="w-4 h-4" />
-                        </button>
-                        <button onClick={() => remove(t.id)} disabled={deleting === t.id}
-                          className={`p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg ${springBtn}`}>
-                          <HiOutlineTrash className="w-4 h-4" />
-                        </button>
-                      </div>
+                <div
+                  key={t.id}
+                  className={`bg-white border rounded-xl shadow-sm p-4 transition-all duration-300 hover:shadow-md hover:-translate-y-0.5 ${!t.activa ? "opacity-50" : ""}`}
+                  style={{
+                    opacity: 0,
+                    animation: `cardIn 400ms cubic-bezier(0.25,1,0.5,1) ${100 + i * 60}ms forwards`,
+                  }}
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <div>
+                      <h3 className="font-semibold text-gray-900">{t.nombre}</h3>
+                      <p className="text-xs text-gray-500">{t.sucursalNombre || `Sucursal ${t.sucursal}`}</p>
                     </div>
-
-                    <div className="space-y-1.5 text-xs text-gray-600">
-                      <div className="flex items-center gap-2">
-                        <span className="text-gray-400 w-14">CUIT</span>
-                        <span className="font-mono">{t.cuit}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-gray-400 w-14">Listas</span>
-                        <div className="flex gap-1">
-                          {t.listas.split(",").map((l) => (
-                            <span key={l} className="px-1.5 py-0.5 bg-brand-100 text-brand-700 rounded text-xs font-medium">
-                              {LISTA_LABELS[l] || `L${l}`}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                      {t.direccion && (
-                        <div className="flex items-center gap-2">
-                          <span className="text-gray-400 w-14">Dir.</span>
-                          <span className="truncate">{t.direccion}</span>
-                        </div>
-                      )}
-                      {t.aliasBanco && (
-                        <div className="flex items-center gap-2">
-                          <span className="text-gray-400 w-14">Alias</span>
-                          <span className="font-mono">{t.aliasBanco}</span>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="flex flex-wrap gap-1.5 mt-3">
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${t.formatoImpresion === "ticket" ? "bg-blue-100 text-blue-700" : "bg-purple-100 text-purple-700"}`}>
-                        {t.formatoImpresion === "ticket" ? "Ticket" : "A4"}
-                      </span>
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${t.flujo === "directo" ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"}`}>
-                        {t.flujo === "directo" ? "Directo" : "Pendiente"}
-                      </span>
-                      {t.requiereCliente && (
-                        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">Req. cliente</span>
-                      )}
-                      {t.permisoAnular && (
-                        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-600">Anular</span>
-                      )}
-                      {t.permisoPrecio && (
-                        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-600">Cambiar precio</span>
-                      )}
-                      {!t.activa && (
-                        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-200 text-gray-500">Inactiva</span>
-                      )}
+                    <div className="flex gap-1">
+                      <a href={`/pos/${t.id}`} target="_blank"
+                        className={`p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg ${springBtn}`} title="Abrir POS">
+                        <HiOutlineExternalLink className="w-4 h-4" />
+                      </a>
+                      <button onClick={() => openModal(t)}
+                        className={`p-1.5 text-gray-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg ${springBtn}`}>
+                        <HiOutlinePencil className="w-4 h-4" />
+                      </button>
+                      <button onClick={() => remove(t.id)} disabled={deleting === t.id}
+                        className={`p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg ${springBtn}`}>
+                        <HiOutlineTrash className="w-4 h-4" />
+                      </button>
                     </div>
                   </div>
-                </Stagger>
+
+                  <div className="space-y-1.5 text-xs text-gray-600">
+                    <div className="flex items-center gap-2">
+                      <span className="text-gray-400 w-14">CUIT</span>
+                      <span className="font-mono">{t.cuit}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-gray-400 w-14">Listas</span>
+                      <div className="flex gap-1 flex-wrap">
+                        {t.listas.split(",").map((l) => (
+                          <span key={l} className="px-1.5 py-0.5 bg-brand-100 text-brand-700 rounded text-xs font-medium">
+                            {LISTA_LABELS[l] || `L${l}`}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                    {t.direccion && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-gray-400 w-14">Dir.</span>
+                        <span className="truncate">{t.direccion}</span>
+                      </div>
+                    )}
+                    {t.aliasBanco && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-gray-400 w-14">Alias</span>
+                        <span className="font-mono">{t.aliasBanco}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex flex-wrap gap-1.5 mt-3">
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium transition-colors duration-200 ${t.formatoImpresion === "ticket" ? "bg-blue-100 text-blue-700" : "bg-purple-100 text-purple-700"}`}>
+                      {t.formatoImpresion === "ticket" ? "Ticket" : "A4"}
+                    </span>
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium transition-colors duration-200 ${t.flujo === "directo" ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"}`}>
+                      {t.flujo === "directo" ? "Directo" : "Pendiente"}
+                    </span>
+                    {t.requiereCliente && <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">Req. cliente</span>}
+                    {t.permisoAnular && <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-600">Anular</span>}
+                    {t.permisoPrecio && <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-600">Cambiar precio</span>}
+                    {!t.activa && <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-200 text-gray-500">Inactiva</span>}
+                  </div>
+                </div>
               ))}
             </div>
           )}
         </>
       )}
 
+      {/* Modal */}
+      {editing !== null && (
+        <div
+          className={`fixed inset-0 z-50 flex items-center justify-center p-4 transition-all duration-300 ${modalVisible ? "bg-black/40" : "bg-black/0 pointer-events-none"}`}
+          onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}
+        >
+          <div
+            className={`bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] ${
+              modalVisible ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-95 translate-y-4"
+            }`}
+          >
+            {/* Modal header */}
+            <div className="flex items-center justify-between p-5 border-b sticky top-0 bg-white rounded-t-2xl z-10">
+              <h2 className="text-lg font-bold text-gray-900">
+                {editing === "new" ? "Nueva terminal" : `Editar terminal`}
+              </h2>
+              <button onClick={closeModal} className={`p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg ${springBtn}`}>
+                <HiOutlineX className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal body */}
+            <div className="p-5 space-y-4">
+              {/* Row 1: Name + Branch */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div style={{ opacity: 0, animation: "fadeSlideIn 350ms ease 50ms forwards" }}>
+                  <label className={labelCls}>Nombre *</label>
+                  <input value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })}
+                    placeholder="Ej: Caja 1 Minorista" className={inputCls} />
+                </div>
+                <div style={{ opacity: 0, animation: "fadeSlideIn 350ms ease 100ms forwards" }}>
+                  <label className={labelCls}>Sucursal *</label>
+                  <select value={form.sucursal} onChange={(e) => setForm({ ...form, sucursal: e.target.value })} className={inputCls}>
+                    <option value="">Seleccionar...</option>
+                    {SUCURSALES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              {/* Row 2: CUIT + Razon Social */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div style={{ opacity: 0, animation: "fadeSlideIn 350ms ease 150ms forwards" }}>
+                  <label className={labelCls}>CUIT *</label>
+                  <input value={form.cuit} onChange={(e) => setForm({ ...form, cuit: e.target.value })}
+                    placeholder="30-12345678-9" className={inputCls} />
+                </div>
+                <div style={{ opacity: 0, animation: "fadeSlideIn 350ms ease 200ms forwards" }}>
+                  <label className={labelCls}>Razon social</label>
+                  <input value={form.razonSocial} onChange={(e) => setForm({ ...form, razonSocial: e.target.value })}
+                    placeholder="Distrialma S.R.L." className={inputCls} />
+                </div>
+              </div>
+
+              {/* Row 3: Address */}
+              <div style={{ opacity: 0, animation: "fadeSlideIn 350ms ease 250ms forwards" }}>
+                <label className={labelCls}>Direccion</label>
+                <input value={form.direccion} onChange={(e) => setForm({ ...form, direccion: e.target.value })}
+                  placeholder="Av. San Martin 1234, Merlo" className={inputCls} />
+              </div>
+
+              {/* Row 4: Alias + Format + Flow */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div style={{ opacity: 0, animation: "fadeSlideIn 350ms ease 300ms forwards" }}>
+                  <label className={labelCls}>Alias banco</label>
+                  <input value={form.aliasBanco} onChange={(e) => setForm({ ...form, aliasBanco: e.target.value })}
+                    placeholder="distrialma.merlo" className={inputCls} />
+                </div>
+                <div style={{ opacity: 0, animation: "fadeSlideIn 350ms ease 350ms forwards" }}>
+                  <label className={labelCls}>Formato</label>
+                  <select value={form.formatoImpresion} onChange={(e) => setForm({ ...form, formatoImpresion: e.target.value })} className={inputCls}>
+                    <option value="ticket">Ticket (80mm)</option>
+                    <option value="a4">A4</option>
+                  </select>
+                </div>
+                <div style={{ opacity: 0, animation: "fadeSlideIn 350ms ease 400ms forwards" }}>
+                  <label className={labelCls}>Flujo de venta</label>
+                  <select value={form.flujo} onChange={(e) => setForm({ ...form, flujo: e.target.value })} className={inputCls}>
+                    <option value="directo">Directo</option>
+                    <option value="pendiente">Pendiente</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Listas */}
+              <div style={{ opacity: 0, animation: "fadeSlideIn 350ms ease 450ms forwards" }}>
+                <label className={labelCls}>Listas de precios *</label>
+                <div className="flex flex-wrap gap-2">
+                  {["1", "2", "3", "4", "5"].map((l) => (
+                    <button key={l} onClick={() => toggleLista(l)}
+                      className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 ${springBtn} ${
+                        form.listas.split(",").includes(l)
+                          ? "bg-brand-500 text-white shadow-sm"
+                          : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                      }`}>
+                      {l} — {LISTA_LABELS[l]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Permisos */}
+              <div style={{ opacity: 0, animation: "fadeSlideIn 350ms ease 500ms forwards" }}>
+                <label className={labelCls}>Permisos</label>
+                <div className="flex flex-wrap gap-x-5 gap-y-2">
+                  {([
+                    ["requiereCliente", "Requiere cliente"],
+                    ["permisoAnular", "Puede anular ventas"],
+                    ["permisoPrecio", "Puede cambiar precios"],
+                    ["permisoDevolver", "Puede hacer devoluciones"],
+                    ["activa", "Terminal activa"],
+                  ] as const).map(([key, label]) => (
+                    <label key={key} className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                      <input type="checkbox" checked={form[key as keyof typeof form] as boolean}
+                        onChange={(e) => setForm({ ...form, [key]: e.target.checked })}
+                        className="rounded border-gray-300 text-brand-500 focus:ring-brand-500 transition-colors duration-200" />
+                      {label}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Modal footer */}
+            <div className="flex justify-end gap-3 p-5 border-t bg-gray-50 rounded-b-2xl"
+              style={{ opacity: 0, animation: "fadeSlideIn 350ms ease 550ms forwards" }}>
+              <button onClick={closeModal}
+                className={`px-4 py-2 bg-gray-100 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-200 ${springBtn}`}>
+                Cancelar
+              </button>
+              <button onClick={save} disabled={saving || !form.nombre.trim() || !form.sucursal || !form.cuit.trim()}
+                className={`flex items-center gap-2 px-5 py-2 bg-brand-500 text-white rounded-xl text-sm font-medium hover:bg-brand-600 disabled:opacity-50 ${springBtn}`}>
+                <HiOutlineCheck className="w-4 h-4" />
+                {saving ? "Guardando..." : "Guardar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {toast && (
-        <div className="fixed bottom-4 right-4 bg-green-600 text-white px-4 py-2 rounded-lg shadow-lg text-sm z-50">
+        <div className="fixed bottom-4 right-4 bg-green-600 text-white px-4 py-2 rounded-lg shadow-lg text-sm z-50"
+          style={{ animation: "fadeSlideIn 300ms ease forwards" }}>
           {toast}
         </div>
       )}
+
+      <style jsx>{`
+        @keyframes cardIn {
+          from { opacity: 0; transform: translateY(12px) scale(0.97); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @keyframes fadeSlideIn {
+          from { opacity: 0; transform: translateY(8px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
     </PageTransition>
   );
 }
