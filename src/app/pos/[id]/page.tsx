@@ -302,9 +302,9 @@ export default function PosPage() {
                       onMouseEnter={() => setHighlightIdx(idx)}
                       onContextMenu={(e) => { e.preventDefault(); setSelectedProduct(p); }}
                       className={`w-full text-left px-3 py-2 rounded-lg flex items-center gap-3 transition-all duration-150 ${
-                        isHighlighted ? "bg-brand-50 border border-brand-300" :
-                        isSelected ? "bg-brand-50 border border-brand-300" :
-                        inCart ? "bg-brand-50/50 border border-brand-200" : "bg-white border border-gray-200 hover:bg-gray-50"
+                        isHighlighted ? "bg-blue-50 border border-blue-300" :
+                        isSelected ? "bg-blue-50 border border-blue-200" :
+                        inCart ? "bg-brand-50/50 border border-brand-200" : "bg-white border border-gray-200 hover:bg-blue-50"
                       }`}>
                       {p.images?.length > 0 ? (
                         <img src={p.images[0]} alt="" className="w-10 h-10 rounded object-contain bg-gray-100 shrink-0" />
