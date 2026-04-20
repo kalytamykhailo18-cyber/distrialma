@@ -40,8 +40,10 @@ export default function PosPage() {
   const [searchResults, setSearchResults] = useState<PosProduct[]>([]);
   const [searching, setSearching] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<PosProduct | null>(null);
+  const [highlightIdx, setHighlightIdx] = useState(-1);
   const searchRef = useRef<HTMLInputElement>(null);
   const searchTimeout = useRef<NodeJS.Timeout>();
+  const resultsRef = useRef<HTMLDivElement>(null);
 
   const [cart, setCart] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -97,6 +99,7 @@ export default function PosPage() {
     if (searchTimeout.current) clearTimeout(searchTimeout.current);
     if (!search.trim() || search.trim().length < 2) { setSearchResults([]); return; }
     setSearching(true);
+    setHighlightIdx(-1);
     searchTimeout.current = setTimeout(async () => {
       try {
         const res = await fetch(`/api/pos/products?q=${encodeURIComponent(search.trim())}`);
@@ -121,19 +124,46 @@ export default function PosPage() {
   }, [clientSearch, terminalId]);
 
   function handleSearchKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === "Enter" && search.trim()) {
+    if (e.key === "ArrowDown") {
       e.preventDefault();
-      const val = search.trim();
-      if (/^\d{4,}$/.test(val)) {
-        fetch(`/api/pos/products?barcode=${encodeURIComponent(val)}`)
-          .then((r) => r.json())
-          .then((d) => { if (d.products?.length > 0) { addToCart(d.products[0]); setSearch(""); setSearchResults([]); } })
-          .catch(() => {});
-      } else if (searchResults.length === 1) {
-        addToCart(searchResults[0]);
+      setHighlightIdx((prev) => Math.min(prev + 1, searchResults.length - 1));
+      // Scroll highlighted item into view
+      setTimeout(() => {
+        const el = resultsRef.current?.querySelector(`[data-idx="${Math.min(highlightIdx + 1, searchResults.length - 1)}"]`);
+        el?.scrollIntoView({ block: "nearest" });
+      }, 0);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setHighlightIdx((prev) => Math.max(prev - 1, 0));
+      setTimeout(() => {
+        const el = resultsRef.current?.querySelector(`[data-idx="${Math.max(highlightIdx - 1, 0)}"]`);
+        el?.scrollIntoView({ block: "nearest" });
+      }, 0);
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      if (highlightIdx >= 0 && highlightIdx < searchResults.length) {
+        addToCart(searchResults[highlightIdx]);
         setSearch("");
         setSearchResults([]);
+        setHighlightIdx(-1);
+      } else if (search.trim()) {
+        const val = search.trim();
+        if (/^\d{4,}$/.test(val)) {
+          fetch(`/api/pos/products?barcode=${encodeURIComponent(val)}`)
+            .then((r) => r.json())
+            .then((d) => { if (d.products?.length > 0) { addToCart(d.products[0]); setSearch(""); setSearchResults([]); setHighlightIdx(-1); } })
+            .catch(() => {});
+        } else if (searchResults.length === 1) {
+          addToCart(searchResults[0]);
+          setSearch("");
+          setSearchResults([]);
+          setHighlightIdx(-1);
+        }
       }
+    } else if (e.key === "Escape") {
+      setSearch("");
+      setSearchResults([]);
+      setHighlightIdx(-1);
     }
   }
 
@@ -258,19 +288,22 @@ export default function PosPage() {
           </div>
 
           {/* Search results */}
-          <div className="flex-1 overflow-y-auto bg-gray-50 p-2">
+          <div className="flex-1 overflow-y-auto bg-gray-50 p-2" ref={resultsRef}>
             {searchResults.length > 0 ? (
               <div className="space-y-1">
-                {searchResults.map((p) => {
+                {searchResults.map((p, idx) => {
                   const precio = p.precios[activeLista] || p.precios[2] || p.precios[1] || 0;
                   const inCart = cart.find((i) => i.sku === p.sku);
                   const isSelected = selectedProduct?.sku === p.sku;
+                  const isHighlighted = idx === highlightIdx;
                   return (
-                    <button key={p.sku}
-                      onClick={() => { addToCart(p); }}
+                    <button key={p.sku} data-idx={idx}
+                      onClick={() => { addToCart(p); setHighlightIdx(-1); }}
+                      onMouseEnter={() => setHighlightIdx(idx)}
                       onContextMenu={(e) => { e.preventDefault(); setSelectedProduct(p); }}
                       className={`w-full text-left px-3 py-2 rounded-lg flex items-center gap-3 transition-all duration-150 ${
-                        isSelected ? "bg-brand-100 border-2 border-brand-500" :
+                        isHighlighted ? "bg-brand-100 border-2 border-brand-500 shadow-sm" :
+                        isSelected ? "bg-brand-50 border-2 border-brand-400" :
                         inCart ? "bg-brand-50 border border-brand-200" : "bg-white border border-gray-200 hover:border-brand-300"
                       }`}>
                       {p.images?.length > 0 ? (
