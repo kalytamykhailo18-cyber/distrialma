@@ -204,35 +204,41 @@ export default function PosPage() {
   }
 
   const qtyRef = useRef<HTMLInputElement>(null);
+  const selectedProductRef = useRef(selectedProduct);
+  const addFromDetailRef = useRef(addFromDetail);
+  selectedProductRef.current = selectedProduct;
+  addFromDetailRef.current = addFromDetail;
 
   // Global keyboard shortcuts
   useEffect(() => {
     function handleGlobalKey(e: KeyboardEvent) {
-      const tag = (e.target as HTMLElement)?.tagName;
-      const isInput = tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA";
+      const fMatch = e.key.match(/^F(\d+)$/);
 
       // F1-F5: switch price list
-      if (e.key >= "F1" && e.key <= "F5") {
-        e.preventDefault();
-        const lista = parseInt(e.key.slice(1));
-        if (selectedProduct) {
-          const precio = selectedProduct.precios[lista];
-          if (precio && precio > 0) setDetailLista(lista);
+      if (fMatch) {
+        const fNum = parseInt(fMatch[1]);
+        if (fNum >= 1 && fNum <= 5) {
+          e.preventDefault();
+          if (selectedProductRef.current) {
+            const precio = selectedProductRef.current.precios[fNum];
+            if (precio && precio > 0) setDetailLista(fNum);
+          }
+          return;
         }
-        return;
-      }
-
-      // F8: add to cart from detail
-      if (e.key === "F8") {
+        // F8: add to cart
+        if (fNum === 8) {
+          e.preventDefault();
+          addFromDetailRef.current();
+          return;
+        }
+        // F12: cobrar/pendiente
+        if (fNum === 12) {
+          e.preventDefault();
+          // TODO: Phase 4 payment
+          return;
+        }
+        // Block all other F-keys from browser default
         e.preventDefault();
-        addFromDetail();
-        return;
-      }
-
-      // F12: cobrar/pendiente (placeholder)
-      if (e.key === "F12") {
-        e.preventDefault();
-        // TODO: Phase 4 payment
         return;
       }
 
@@ -248,7 +254,7 @@ export default function PosPage() {
       }
 
       // Tab: jump between search and qty input
-      if (e.key === "Tab" && selectedProduct) {
+      if (e.key === "Tab" && selectedProductRef.current) {
         e.preventDefault();
         if (document.activeElement === searchRef.current) {
           qtyRef.current?.focus();
@@ -260,6 +266,8 @@ export default function PosPage() {
       }
 
       // Any letter/number when not in an input: focus search
+      const tag = (e.target as HTMLElement)?.tagName;
+      const isInput = tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA";
       if (!isInput && e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
         searchRef.current?.focus();
       }
@@ -267,7 +275,7 @@ export default function PosPage() {
 
     document.addEventListener("keydown", handleGlobalKey);
     return () => document.removeEventListener("keydown", handleGlobalKey);
-  }, [selectedProduct, detailLista, detailQty]);
+  }, []);
 
   const total = cart.reduce((sum, i) => sum + i.precio * i.cantidad, 0);
   const itemCount = cart.reduce((sum, i) => sum + i.cantidad, 0);
