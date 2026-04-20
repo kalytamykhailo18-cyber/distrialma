@@ -738,6 +738,28 @@ const httpServer = http.createServer(async (req, res) => {
         res.writeHead(500); res.end('{"error":"' + e.message + '"}');
       }
     });
+  } else if (req.method === "POST" && req.url === "/test-sticker") {
+    let body = "";
+    req.on("data", (c) => body += c);
+    req.on("end", async () => {
+      try {
+        const { chatId } = JSON.parse(body);
+        if (!chatId) { res.writeHead(400); res.end('{"error":"chatId required"}'); return; }
+        const fsSync = await import("fs");
+        const { fileURLToPath } = await import("url");
+        const pathMod = await import("path");
+        const stickerPath = pathMod.join(pathMod.dirname(fileURLToPath(import.meta.url)), "sticker.png");
+        const stickerData = fsSync.readFileSync(stickerPath);
+        const { MessageMedia } = pkg;
+        const media = new MessageMedia("image/png", stickerData.toString("base64"), "sticker.png");
+        await client.sendMessage(chatId, media, { sendMediaAsSticker: true, stickerAuthor: "Distrialma", stickerName: "Alma" });
+        console.log(`[TEST] Sticker sent to ${chatId}`);
+        res.writeHead(200); res.end('{"ok":true,"message":"sticker sent"}');
+      } catch (e) {
+        console.error("Test sticker error:", e.message);
+        res.writeHead(500); res.end('{"error":"' + e.message + '"}');
+      }
+    });
   } else {
     res.writeHead(404); res.end("not found");
   }
