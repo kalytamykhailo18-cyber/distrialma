@@ -35,7 +35,7 @@ export async function GET(req: Request) {
           LTRIM(RTRIM(ISNULL(m.[Desc], ''))) AS marca,
           LTRIM(RTRIM(ISNULL(r.[Desc], ''))) AS rubro,
           LTRIM(RTRIM(ISNULL(pr.Unidad, ''))) AS unidad,
-          ISNULL(CAST(NULLIF(LTRIM(RTRIM(pr.Palabra2)), '') AS FLOAT), 0) AS pesoPorPieza,
+          ISNULL(TRY_CAST(LTRIM(RTRIM(pr.Palabra2)) AS FLOAT), 0) AS pesoPorPieza,
           t.ListaPrecio AS lista,
           SUM(t.Cant) AS cantidad,
           SUM(t.Impo) AS totalVenta,
@@ -55,7 +55,7 @@ export async function GET(req: Request) {
           AND t.Cant > 0
         GROUP BY LTRIM(RTRIM(t.Producto)), LTRIM(RTRIM(ISNULL(pr.Nombre, ''))),
           LTRIM(RTRIM(ISNULL(m.[Desc], ''))), LTRIM(RTRIM(ISNULL(r.[Desc], ''))),
-          LTRIM(RTRIM(ISNULL(pr.Unidad, ''))), ISNULL(pr.FillerNum1, 0), t.ListaPrecio
+          LTRIM(RTRIM(ISNULL(pr.Unidad, ''))), ISNULL(TRY_CAST(LTRIM(RTRIM(pr.Palabra2)) AS FLOAT), 0), t.ListaPrecio
         ORDER BY SUM(t.Impo) DESC
       `);
 

@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
         t.Precio AS precio,
         t.Impo AS impo,
         LTRIM(RTRIM(ISNULL(p.Unidad, ''))) AS unidad,
-        ISNULL(CAST(NULLIF(LTRIM(RTRIM(p.Palabra2)), '') AS FLOAT), 0) AS pesoPorPieza,
+        ISNULL(TRY_CAST(LTRIM(RTRIM(p.Palabra2)) AS FLOAT), 0) AS pesoPorPieza,
         t.ListaPrecio AS listaPrecio
       FROM [${dbTransas}].dbo.Transas t
       LEFT JOIN [${dbProd}].dbo.Productos p ON p.Cod = t.Producto
