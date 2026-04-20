@@ -58,7 +58,7 @@ export async function GET(req: NextRequest) {
 
     // Get all zones that match this delivery day
     const zonesResult = await pool.request().query(`
-      SELECT LTRIM(RTRIM(Cod)) AS cod, LTRIM(RTRIM([Desc])) AS nombre
+      SELECT Cod AS cod, LTRIM(RTRIM([Desc])) AS nombre
       FROM [${dbClientes}].dbo.Zonas
       WHERE [Desc] IS NOT NULL AND LTRIM(RTRIM([Desc])) <> ''
     `);
@@ -72,7 +72,7 @@ export async function GET(req: NextRequest) {
     }
 
     const zoneCods = matchingZones.map((z: { cod: string }) => z.cod);
-    const zoneList = zoneCods.map((c: string) => `'${c.padStart(3, " ")}'`).join(",");
+    const zoneList = zoneCods.map((c: string) => `'${c}'`).join(",");
 
     // Get clients in these zones with phone numbers
     const clients = await pool.request().query(`
