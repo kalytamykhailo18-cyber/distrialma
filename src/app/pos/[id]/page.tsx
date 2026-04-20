@@ -60,6 +60,7 @@ export default function PosPage() {
   const [paying, setPaying] = useState(false);
   const [payError, setPayError] = useState("");
   const [paySuccess, setPaySuccess] = useState("");
+  const [payConfirm, setPayConfirm] = useState(false);
 
   const getActiveLista = useCallback((): number => {
     if (!terminal) return 2;
@@ -226,6 +227,7 @@ export default function PosPage() {
     setPayAmount("");
     setPayError("");
     setPaySuccess("");
+    setPayConfirm(false);
   }
 
   async function savePending() {
@@ -758,7 +760,7 @@ export default function PosPage() {
                       { key: "transferencia", label: "Transfer.", Icon: HiOutlineLibrary, color: "bg-amber-100 text-amber-700", active: "bg-amber-600" },
                       { key: "cuenta", label: "Cta. Cte.", Icon: HiOutlineBookOpen, color: "bg-red-100 text-red-700", active: "bg-red-600" },
                     ].map((m) => (
-                      <button key={m.key} onClick={() => { setPayMethod(m.key); setPayAmount(""); setPayError(""); }}
+                      <button key={m.key} onClick={() => { setPayMethod(m.key); setPayAmount(""); setPayError(""); setPayConfirm(false); }}
                         className={`p-3 rounded-xl text-center transition-all duration-200 ${
                           payMethod === m.key ? `${m.active} text-white shadow-md scale-105` : `${m.color} hover:opacity-80`
                         }`}>
@@ -820,10 +822,12 @@ export default function PosPage() {
 
                 {/* Confirm button */}
                 <div className="p-5 border-t bg-gray-50">
-                  <button onClick={confirmPayment}
+                  <button onClick={() => { if (payConfirm) { confirmPayment(); } else { setPayConfirm(true); } }}
                     disabled={paying || !payMethod || (payMethod === "efectivo" && (parseFloat(payAmount) || 0) < total) || (payMethod === "cuenta" && !selectedCliente)}
-                    className="w-full py-3 bg-green-600 text-white rounded-xl text-lg font-bold hover:bg-green-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
-                    {paying ? "Procesando..." : "Confirmar pago"}
+                    className={`w-full py-3 text-white rounded-xl text-lg font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
+                      payConfirm ? "bg-red-600 hover:bg-red-700 animate-pulse" : "bg-green-600 hover:bg-green-700"
+                    }`}>
+                    {paying ? "Procesando..." : payConfirm ? "CONFIRMAR — Registrar venta" : "Confirmar pago"}
                   </button>
                 </div>
               </>
