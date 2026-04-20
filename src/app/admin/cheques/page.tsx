@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { formatPrice } from "@/lib/utils";
-import { HiOutlinePlus, HiOutlineSearch, HiOutlineTrash, HiOutlinePencil, HiOutlineCheck, HiOutlineX, HiOutlineClock, HiOutlineOfficeBuilding, HiOutlineUser, HiOutlineCog, HiOutlineDocumentText, HiOutlineDeviceMobile, HiOutlineRefresh, HiOutlineCurrencyDollar, HiOutlineArrowRight } from "react-icons/hi";
+import { HiOutlinePlus, HiOutlineSearch, HiOutlineTrash, HiOutlinePencil, HiOutlineCheck, HiOutlineX, HiOutlineClock, HiOutlineOfficeBuilding, HiOutlineUser, HiOutlineCog, HiOutlineDocumentText, HiOutlineDeviceMobile, HiOutlineRefresh, HiOutlineCurrencyDollar, HiOutlineArrowRight, HiOutlineCalendar } from "react-icons/hi";
 import { PageTransition, Stagger, staggerStyle, springBtn, hoverRow, LoadingCenter, useDataReady } from "@/components/AnimateIn";
 import { BANCOS, getBanco } from "@/lib/bancos";
 
@@ -69,7 +69,9 @@ export default function ChequesPage() {
   const [cuentas, setCuentas] = useState<Cuenta[]>([]);
   const [proveedores, setProveedores] = useState<Proveedor[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<"propio" | "tercero">("propio");
+  const [tab, setTab] = useState<"propio" | "tercero" | "flujo">("propio");
+  const [flujoData, setFlujoData] = useState<{ weeks: Array<{ label: string; totalSalidas: number; totalEntradas: number; balance: number; salidas: Array<{ numero: string; monto: number; proveedor: string }>; entradas: Array<{ numero: string; monto: number; librador: string }> }>; vencidos: { propios: Array<{ numero: string; monto: number; proveedor: string }>; terceros: Array<{ numero: string; monto: number; librador: string }>; totalPropios: number; totalTerceros: number }; totales: { totalSalidas: number; totalEntradas: number } } | null>(null);
+  const [loadingFlujo, setLoadingFlujo] = useState(false);
   const [estadoFiltro, setEstadoFiltro] = useState("");
   const [search, setSearch] = useState("");
   const [cuentaFiltro, setCuentaFiltro] = useState("");
@@ -107,6 +109,7 @@ export default function ChequesPage() {
   const [cAlias, setCAlias] = useState("");
 
   async function loadCheques() {
+    if (tab === "flujo") { loadFlujo(); return; }
     setLoading(true);
     const params = new URLSearchParams({ tipo: tab });
     if (estadoFiltro) params.set("estado", estadoFiltro);
@@ -119,6 +122,16 @@ export default function ChequesPage() {
       setResumen(d.resumen || null);
     } catch {}
     setLoading(false);
+  }
+
+  async function loadFlujo() {
+    setLoadingFlujo(true);
+    try {
+      const res = await fetch("/api/admin/cheques/flujo");
+      const d = await res.json();
+      setFlujoData(d);
+    } catch {}
+    setLoadingFlujo(false);
   }
 
   async function loadCuentas() {
@@ -351,6 +364,11 @@ export default function ChequesPage() {
             className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${springBtn} ${tab === "tercero" ? "bg-blue-500 text-white" : "bg-white border text-gray-700 hover:bg-gray-50"}`}>
             <HiOutlineUser className="w-4 h-4 inline mr-1" />
             Terceros (recibidos)
+          </button>
+          <button onClick={() => { setTab("flujo"); }}
+            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${springBtn} ${tab === "flujo" ? "bg-purple-500 text-white" : "bg-white border text-gray-700 hover:bg-gray-50"}`}>
+            <HiOutlineCalendar className="w-4 h-4 inline mr-1" />
+            Flujo
           </button>
           <div className="flex-1" />
           <button onClick={openNew} className={`flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded-xl text-sm font-semibold hover:bg-green-600 ${springBtn}`}>
@@ -777,6 +795,107 @@ export default function ChequesPage() {
         );
       })()}
 
+      {/* Flujo de cheques */}
+      {tab === "flujo" && (
+        <Stagger delay={100}>
+          <div>
+            {loadingFlujo ? (
+              <LoadingCenter />
+            ) : !flujoData ? (
+              <p className="text-gray-400 text-center py-8">No hay datos</p>
+            ) : (
+              <>
+                {/* Vencidos alert */}
+                {(flujoData.vencidos.totalPropios > 0 || flujoData.vencidos.totalTerceros > 0) && (
+                  <div className="bg-red-50 border-2 border-red-200 rounded-xl p-4 mb-4">
+                    <h3 className="font-bold text-red-700 mb-2">Vencidos</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {flujoData.vencidos.totalPropios > 0 && (
+                        <div>
+                          <div className="text-sm text-red-600 font-medium">Propios sin pagar: {formatPrice(flujoData.vencidos.totalPropios)}</div>
+                          <div className="mt-1 space-y-1">
+                            {flujoData.vencidos.propios.map((c, i) => (
+                              <div key={i} className="text-xs text-red-500">#{c.numero} — {formatPrice(c.monto)} {c.proveedor && `(${c.proveedor})`}</div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {flujoData.vencidos.totalTerceros > 0 && (
+                        <div>
+                          <div className="text-sm text-red-600 font-medium">Terceros sin depositar: {formatPrice(flujoData.vencidos.totalTerceros)}</div>
+                          <div className="mt-1 space-y-1">
+                            {flujoData.vencidos.terceros.map((c, i) => (
+                              <div key={i} className="text-xs text-red-500">#{c.numero} — {formatPrice(c.monto)} {c.librador && `(${c.librador})`}</div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Totals */}
+                <div className="grid grid-cols-2 gap-3 mb-4">
+                  <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 text-center">
+                    <div className="text-xs text-orange-600">Total a cubrir (propios)</div>
+                    <div className="text-xl font-bold text-orange-700">{formatPrice(flujoData.totales.totalSalidas)}</div>
+                  </div>
+                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-center">
+                    <div className="text-xs text-blue-600">Total a depositar (terceros)</div>
+                    <div className="text-xl font-bold text-blue-700">{formatPrice(flujoData.totales.totalEntradas)}</div>
+                  </div>
+                </div>
+
+                {/* Weekly flow */}
+                <div className="space-y-2">
+                  {flujoData.weeks.filter((w) => w.totalSalidas > 0 || w.totalEntradas > 0).map((week, i) => (
+                    <div key={i} className="bg-white border rounded-xl p-4 shadow-sm" style={{ opacity: 0, animation: `cardIn 300ms ease ${i * 50}ms forwards` }}>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="font-semibold text-gray-800">{week.label}</span>
+                        <span className={`text-sm font-bold ${week.balance >= 0 ? "text-green-600" : "text-red-600"}`}>
+                          {week.balance >= 0 ? "+" : ""}{formatPrice(week.balance)}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        {/* Salidas */}
+                        <div>
+                          {week.totalSalidas > 0 && (
+                            <>
+                              <div className="text-xs text-orange-600 font-medium mb-1">Cubrir: {formatPrice(week.totalSalidas)}</div>
+                              {week.salidas.map((c, j) => (
+                                <div key={j} className="text-xs text-gray-500 py-0.5">
+                                  #{c.numero} — {formatPrice(c.monto)} {c.proveedor && <span className="text-gray-400">({c.proveedor})</span>}
+                                </div>
+                              ))}
+                            </>
+                          )}
+                        </div>
+                        {/* Entradas */}
+                        <div>
+                          {week.totalEntradas > 0 && (
+                            <>
+                              <div className="text-xs text-blue-600 font-medium mb-1">Depositar: {formatPrice(week.totalEntradas)}</div>
+                              {week.entradas.map((c, j) => (
+                                <div key={j} className="text-xs text-gray-500 py-0.5">
+                                  #{c.numero} — {formatPrice(c.monto)} {c.librador && <span className="text-gray-400">({c.librador})</span>}
+                                </div>
+                              ))}
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  {flujoData.weeks.every((w) => w.totalSalidas === 0 && w.totalEntradas === 0) && (
+                    <p className="text-gray-400 text-center py-8">No hay cheques activos en las proximas 12 semanas</p>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        </Stagger>
+      )}
+
       {/* Cuentas modal */}
       {showCuentas && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={() => setShowCuentas(false)}>
@@ -822,6 +941,12 @@ export default function ChequesPage() {
         </div>
       )}
 
+      <style jsx>{`
+        @keyframes cardIn {
+          from { opacity: 0; transform: translateY(8px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
     </PageTransition>
   );
 }
