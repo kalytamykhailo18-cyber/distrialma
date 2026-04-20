@@ -233,6 +233,15 @@ export async function POST(req: NextRequest) {
         continue;
       }
 
+      // Double-check this specific client hasn't been sent already (prevents race conditions)
+      const alreadySent = await prisma.notificationLog.findFirst({
+        where: { clientId: client.cod, tipo: "recordatorio_reparto", ok: true, createdAt: { gte: since24h } },
+      });
+      if (alreadySent) {
+        results.push({ cod: client.cod, nombre: client.nombre, ok: false, error: "Ya contactado en 24hs" });
+        continue;
+      }
+
       const chatId = toWaChatId(client.telefono);
       if (!chatId) {
         results.push({ cod: client.cod, nombre: client.nombre, ok: false, error: "Telefono invalido" });
