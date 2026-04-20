@@ -217,11 +217,44 @@ export default function PosPage() {
 
   function openPayment() {
     if (cart.length === 0 || !selectedEmpleado) return;
+    if (terminal?.flujo === "pendiente") {
+      savePending();
+      return;
+    }
     setShowPayment(true);
     setPayMethod("");
     setPayAmount("");
     setPayError("");
     setPaySuccess("");
+  }
+
+  async function savePending() {
+    if (!terminal || !selectedEmpleado || cart.length === 0) return;
+    setPaying(true);
+    setPayError("");
+    try {
+      const res = await fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          items: cart.map((i) => ({ sku: i.sku, name: i.nombre, cant: i.cantidad, price: i.precio, listaPrecio: i.lista })),
+          notes: "",
+          posPendiente: true,
+          sucursal: terminal.sucursal,
+          empleadoCod: selectedEmpleado.cod,
+          clienteCod: selectedCliente?.cod,
+        }),
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || "Error al crear pendiente");
+      setPaySuccess(`Pedido pendiente #${d.nroped || d.boleta} creado`);
+      setCart([]);
+      setSelectedProduct(null);
+      setTimeout(() => { setPaySuccess(""); searchRef.current?.focus(); }, 2000);
+    } catch (e) {
+      setPayError(e instanceof Error ? e.message : "Error");
+    }
+    setPaying(false);
   }
 
   async function confirmPayment() {
@@ -670,6 +703,20 @@ export default function PosPage() {
         </div>
       </div>
 
+      {/* Pending/payment toast (outside modal) */}
+      {paySuccess && !showPayment && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-green-600 text-white px-6 py-3 rounded-xl shadow-lg text-lg font-bold"
+          style={{ animation: "fadeIn 300ms ease" }}>
+          {paySuccess}
+        </div>
+      )}
+      {payError && !showPayment && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-red-600 text-white px-6 py-3 rounded-xl shadow-lg text-sm font-medium"
+          style={{ animation: "fadeIn 300ms ease" }}>
+          {payError}
+        </div>
+      )}
+
       {/* Payment modal */}
       {showPayment && (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
@@ -702,17 +749,17 @@ export default function PosPage() {
                   {/* Payment methods */}
                   <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 mb-5">
                     {[
-                      { key: "efectivo", label: "Efectivo", Icon: HiOutlineCash },
-                      { key: "debito", label: "Debito", Icon: HiOutlineCreditCard },
-                      { key: "credito", label: "Credito", Icon: HiOutlineCreditCard },
-                      { key: "cuotas", label: "Cuotas", Icon: HiOutlineClipboardList },
-                      { key: "qr", label: "QR", Icon: HiOutlineQrcode },
-                      { key: "transferencia", label: "Transfer.", Icon: HiOutlineLibrary },
-                      { key: "cuenta", label: "Cta. Cte.", Icon: HiOutlineBookOpen },
+                      { key: "efectivo", label: "Efectivo", Icon: HiOutlineCash, color: "bg-green-100 text-green-700", active: "bg-green-600" },
+                      { key: "debito", label: "Debito", Icon: HiOutlineCreditCard, color: "bg-blue-100 text-blue-700", active: "bg-blue-600" },
+                      { key: "credito", label: "Credito", Icon: HiOutlineCreditCard, color: "bg-purple-100 text-purple-700", active: "bg-purple-600" },
+                      { key: "cuotas", label: "Cuotas", Icon: HiOutlineClipboardList, color: "bg-indigo-100 text-indigo-700", active: "bg-indigo-600" },
+                      { key: "qr", label: "QR", Icon: HiOutlineQrcode, color: "bg-cyan-100 text-cyan-700", active: "bg-cyan-600" },
+                      { key: "transferencia", label: "Transfer.", Icon: HiOutlineLibrary, color: "bg-amber-100 text-amber-700", active: "bg-amber-600" },
+                      { key: "cuenta", label: "Cta. Cte.", Icon: HiOutlineBookOpen, color: "bg-red-100 text-red-700", active: "bg-red-600" },
                     ].map((m) => (
                       <button key={m.key} onClick={() => { setPayMethod(m.key); setPayAmount(""); setPayError(""); }}
                         className={`p-3 rounded-xl text-center transition-all duration-200 ${
-                          payMethod === m.key ? "bg-brand-500 text-white shadow-md scale-105" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                          payMethod === m.key ? `${m.active} text-white shadow-md scale-105` : `${m.color} hover:opacity-80`
                         }`}>
                         <m.Icon className="w-6 h-6 mx-auto mb-1" />
                         <div className="text-xs font-medium">{m.label}</div>
