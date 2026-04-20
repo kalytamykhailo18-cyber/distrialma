@@ -16,9 +16,10 @@ interface Terminal {
 }
 interface Empleado { cod: string; nombre: string; }
 interface Cliente { cod: string; nombre: string; cuit: string; zona: string; listaPrecios: string; }
+interface PosPromo { desde: number; precio: number; label: string; }
 interface PosProduct {
   sku: string; nombre: string; unidad: string; precios: Record<number, number>;
-  stock: number; codBarra: string; cantPorCaja: number; images: string[];
+  stock: number; codBarra: string; cantPorCaja: number; images: string[]; promos: PosPromo[];
 }
 interface CartItem { sku: string; nombre: string; unidad: string; cantidad: number; precio: number; lista: number; images: string[]; }
 
@@ -182,10 +183,18 @@ export default function PosPage() {
     setDetailQty("1");
   }
 
+  function getEffectivePrice(product: PosProduct, lista: number, qty: number): number {
+    const basePrice = product.precios[lista] || 0;
+    if (!product.promos?.length || qty <= 0) return basePrice;
+    // Find the best promo that applies (highest desde that qty meets)
+    const applicable = product.promos.filter((p) => qty >= p.desde).sort((a, b) => b.desde - a.desde);
+    return applicable.length > 0 ? applicable[0].precio : basePrice;
+  }
+
   function addFromDetail() {
     if (!selectedProduct) return;
-    const precio = selectedProduct.precios[detailLista] || 0;
     const qty = parseFloat(detailQty) || 1;
+    const precio = getEffectivePrice(selectedProduct, detailLista, qty);
     if (qty <= 0 || precio <= 0) return;
     setCart((prev) => {
       const existing = prev.find((i) => i.sku === selectedProduct.sku && i.lista === detailLista);
@@ -496,7 +505,12 @@ export default function PosPage() {
                       )}
                       <div className="flex-1 min-w-0">
                         <div className="text-sm font-medium text-gray-900 truncate">{p.nombre}</div>
-                        <div className="text-xs text-gray-400">{p.sku} · {p.unidad === "KG" ? "/kg" : "/un"}</div>
+                        <div className="text-xs text-gray-400">
+                          {p.sku} · {p.unidad === "KG" ? "/kg" : "/un"}
+                          {p.promos?.length > 0 && (
+                            <span className="ml-1 px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded font-medium">{p.promos[0].label}</span>
+                          )}
+                        </div>
                       </div>
                       <div className="text-right shrink-0">
                         <div className="font-bold text-brand-600">{formatPrice(precio)}</div>
@@ -534,7 +548,7 @@ export default function PosPage() {
                   onClick={() => {
                     const prod = searchResults.find((p) => p.sku === item.sku);
                     if (prod) selectProduct(prod);
-                    else selectProduct({ sku: item.sku, nombre: item.nombre, unidad: item.unidad, precios: { [item.lista]: item.precio }, stock: 0, codBarra: "", cantPorCaja: 0, images: item.images || [] });
+                    else selectProduct({ sku: item.sku, nombre: item.nombre, unidad: item.unidad, precios: { [item.lista]: item.precio }, stock: 0, codBarra: "", cantPorCaja: 0, images: item.images || [], promos: [] });
                   }}>
                   <div className="flex-1 min-w-0">
                     <div className="text-xs font-medium text-gray-900 truncate">{item.nombre}</div>
@@ -621,9 +635,27 @@ export default function PosPage() {
                 })}
               </div>
               {/* Stock */}
-              <div className={`text-sm font-medium mb-4 ${selectedProduct.stock > 0 ? "text-green-600" : "text-red-500"}`}>
+              <div className={`text-sm font-medium ${selectedProduct.stock > 0 ? "text-green-600" : "text-red-500"}`}>
                 {selectedProduct.stock > 0 ? "En stock" : "Sin stock"}
               </div>
+              {/* Promos */}
+              {selectedProduct.promos?.length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-2 mb-4 justify-center">
+                  {selectedProduct.promos.map((promo, i) => {
+                    const qty = parseFloat(detailQty) || 0;
+                    const isActive = qty >= promo.desde;
+                    return (
+                      <div key={i} className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 ${
+                        isActive ? "bg-orange-500 text-white shadow-md" : "bg-orange-100 text-orange-700"
+                      }`}>
+                        {promo.label}
+                        {isActive && " ✓"}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              {!selectedProduct.promos?.length && <div className="mb-4" />}
               {/* Quantity input */}
               <div className="flex flex-col items-center gap-2 mb-4">
                 <label className="text-sm text-gray-500">{selectedProduct.unidad === "KG" ? "Peso (kg)" : "Cantidad"}</label>
@@ -667,9 +699,22 @@ export default function PosPage() {
               </div>
               {/* Line total preview */}
               <div className="text-sm text-gray-500 mb-3">
-                {parseFloat(detailQty) > 0 && selectedProduct.precios[detailLista] > 0 && (
-                  <span>{detailQty} × {formatPrice(selectedProduct.precios[detailLista])} = <span className="font-bold text-gray-900">{formatPrice((parseFloat(detailQty) || 0) * selectedProduct.precios[detailLista])}</span></span>
-                )}
+                {(() => {
+                  const qty = parseFloat(detailQty) || 0;
+                  const basePrice = selectedProduct.precios[detailLista] || 0;
+                  const effectivePrice = getEffectivePrice(selectedProduct, detailLista, qty);
+                  const isPromo = effectivePrice !== basePrice && effectivePrice > 0;
+                  if (qty <= 0 || basePrice <= 0) return null;
+                  return isPromo ? (
+                    <span>
+                      {detailQty} × <span className="line-through text-gray-400">{formatPrice(basePrice)}</span>{" "}
+                      <span className="text-orange-600 font-bold">{formatPrice(effectivePrice)}</span>{" "}
+                      = <span className="font-bold text-orange-600">{formatPrice(qty * effectivePrice)}</span>
+                    </span>
+                  ) : (
+                    <span>{detailQty} × {formatPrice(basePrice)} = <span className="font-bold text-gray-900">{formatPrice(qty * basePrice)}</span></span>
+                  );
+                })()}
               </div>
               {/* Add button */}
               <button onClick={addFromDetail}

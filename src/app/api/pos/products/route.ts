@@ -3,6 +3,45 @@ import { getPool, getDbName } from "@/lib/mssql";
 import { requireStaff } from "@/lib/api-auth";
 import { prisma } from "@/lib/prisma";
 
+interface Promo {
+  desde: number;
+  precio: number;
+  label: string;
+}
+
+function parsePromos(filler1: string, filler2: string, unidad: string): Promo[] {
+  const promos: Promo[] = [];
+  if (!filler1 || !filler2 || !filler2.trim()) return promos;
+
+  const isKg = unidad === "KG";
+  const flags = filler2.trim();
+  const data = filler1.trimEnd();
+
+  // Match all "desde precio" pairs in the string
+  // Pattern: number (int or decimal) + spaces + price (with dots as thousands, comma as decimal)
+  const regex = /([\d]+(?:[.,]\d+)?)\s+([\d]+(?:\.[\d]{3})*(?:,[\d]{2})?)/g;
+  let match;
+  let promoIdx = 0;
+
+  while ((match = regex.exec(data)) !== null && promoIdx < 2) {
+    if (promoIdx >= flags.length || flags[promoIdx] !== "1") { promoIdx++; continue; }
+
+    const desde = parseFloat(match[1].replace(",", "."));
+    const precioStr = match[2].replace(/\.(?=\d{3})/g, "").replace(",", ".");
+    const precio = parseFloat(precioStr);
+
+    if (!isNaN(desde) && !isNaN(precio) && precio > 0) {
+      const label = isKg
+        ? `Desde ${desde}kg a $${precio.toLocaleString("es-AR", { maximumFractionDigits: 0 })}/kg`
+        : `Lleva ${Math.round(desde)} x $${precio.toLocaleString("es-AR", { maximumFractionDigits: 0 })}`;
+      promos.push({ desde, precio, label });
+    }
+    promoIdx++;
+  }
+
+  return promos;
+}
+
 export const dynamic = "force-dynamic";
 
 // GET: search products for POS
@@ -122,6 +161,7 @@ export async function GET(req: NextRequest) {
         filler2: p.filler2 as string,
         cantPorCaja: Number(p.cantPorCaja),
         images: imageMap.get((p.sku as string).trim()) || [],
+        promos: parsePromos(p.filler1 as string, p.filler2 as string, p.unidad as string),
       })),
     });
   } catch (error) {
