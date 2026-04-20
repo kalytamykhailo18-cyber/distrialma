@@ -40,6 +40,8 @@ export default function PosPage() {
   const [searchResults, setSearchResults] = useState<PosProduct[]>([]);
   const [searching, setSearching] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<PosProduct | null>(null);
+  const [detailLista, setDetailLista] = useState<number>(0);
+  const [detailQty, setDetailQty] = useState<string>("1");
   const [highlightIdx, setHighlightIdx] = useState(-1);
   const searchRef = useRef<HTMLInputElement>(null);
   const searchTimeout = useRef<NodeJS.Timeout>();
@@ -142,16 +144,16 @@ export default function PosPage() {
     } else if (e.key === "Enter") {
       e.preventDefault();
       if (highlightIdx >= 0 && highlightIdx < searchResults.length) {
-        addToCart(searchResults[highlightIdx]);
+        selectProduct(searchResults[highlightIdx]);
       } else if (search.trim()) {
         const val = search.trim();
         if (/^\d{4,}$/.test(val)) {
           fetch(`/api/pos/products?barcode=${encodeURIComponent(val)}`)
             .then((r) => r.json())
-            .then((d) => { if (d.products?.length > 0) { addToCart(d.products[0]); setSearch(""); setSearchResults([]); setHighlightIdx(-1); } })
+            .then((d) => { if (d.products?.length > 0) { selectProduct(d.products[0]); setSearch(""); setSearchResults([]); setHighlightIdx(-1); } })
             .catch(() => {});
         } else if (searchResults.length === 1) {
-          addToCart(searchResults[0]);
+          selectProduct(searchResults[0]);
         }
       }
     } else if (e.key === "Escape") {
@@ -161,14 +163,24 @@ export default function PosPage() {
     }
   }
 
-  function addToCart(product: PosProduct) {
-    const lista = getActiveLista();
-    const precio = product.precios[lista] || product.precios[2] || product.precios[1] || 0;
+  function selectProduct(product: PosProduct) {
     setSelectedProduct(product);
+    const lista = getActiveLista();
+    // Pick the best available list
+    const availListas = Object.entries(product.precios).filter(([, p]) => p > 0).map(([l]) => Number(l));
+    setDetailLista(availListas.includes(lista) ? lista : availListas[0] || lista);
+    setDetailQty(product.unidad === "KG" ? "1.000" : "1");
+  }
+
+  function addFromDetail() {
+    if (!selectedProduct) return;
+    const precio = selectedProduct.precios[detailLista] || 0;
+    const qty = parseFloat(detailQty) || 1;
+    if (qty <= 0 || precio <= 0) return;
     setCart((prev) => {
-      const existing = prev.find((i) => i.sku === product.sku);
-      if (existing) return prev.map((i) => i.sku === product.sku ? { ...i, cantidad: i.cantidad + 1 } : i);
-      return [...prev, { sku: product.sku, nombre: product.nombre, unidad: product.unidad, cantidad: 1, precio, lista, images: product.images }];
+      const existing = prev.find((i) => i.sku === selectedProduct.sku && i.lista === detailLista);
+      if (existing) return prev.map((i) => i.sku === selectedProduct.sku && i.lista === detailLista ? { ...i, cantidad: i.cantidad + qty } : i);
+      return [...prev, { sku: selectedProduct.sku, nombre: selectedProduct.nombre, unidad: selectedProduct.unidad, cantidad: qty, precio, lista: detailLista, images: selectedProduct.images || [] }];
     });
     searchRef.current?.focus();
   }
@@ -292,9 +304,8 @@ export default function PosPage() {
                   const isHighlighted = idx === highlightIdx;
                   return (
                     <button key={p.sku} data-idx={idx}
-                      onClick={() => { addToCart(p); setHighlightIdx(-1); }}
+                      onClick={() => { selectProduct(p); setHighlightIdx(idx); }}
                       onMouseEnter={() => setHighlightIdx(idx)}
-                      onContextMenu={(e) => { e.preventDefault(); setSelectedProduct(p); }}
                       className={`w-full text-left px-3 py-2 rounded-lg flex items-center gap-3 transition-all duration-150 ${
                         isHighlighted ? "bg-blue-50 border border-blue-300" :
                         isSelected ? "bg-blue-50 border border-blue-200" :
@@ -344,8 +355,8 @@ export default function PosPage() {
                   }`}
                   onClick={() => {
                     const prod = searchResults.find((p) => p.sku === item.sku);
-                    if (prod) setSelectedProduct(prod);
-                    else setSelectedProduct({ sku: item.sku, nombre: item.nombre, unidad: item.unidad, precios: { [item.lista]: item.precio }, stock: 0, codBarra: "", cantPorCaja: 0, images: item.images || [] });
+                    if (prod) selectProduct(prod);
+                    else selectProduct({ sku: item.sku, nombre: item.nombre, unidad: item.unidad, precios: { [item.lista]: item.precio }, stock: 0, codBarra: "", cantPorCaja: 0, images: item.images || [] });
                   }}>
                   <div className="flex-1 min-w-0">
                     <div className="text-xs font-medium text-gray-900 truncate">{item.nombre}</div>
@@ -417,44 +428,79 @@ export default function PosPage() {
               {/* Product info */}
               <h2 className="text-lg md:text-xl font-bold text-gray-900 text-center mb-2">{selectedProduct.nombre}</h2>
               <p className="text-xs md:text-sm text-gray-400 mb-3 md:mb-4">SKU: {selectedProduct.sku} · {selectedProduct.unidad === "KG" ? "Por kilo" : "Por unidad"}</p>
-              {/* Prices */}
-              <div className="flex flex-wrap gap-2 md:gap-4 mb-4 md:mb-6 justify-center">
+              {/* Selectable price lists */}
+              <div className="flex flex-wrap gap-2 md:gap-3 mb-4 md:mb-5 justify-center">
                 {Object.entries(selectedProduct.precios).map(([lista, precio]) => {
                   if (!precio || precio <= 0) return null;
-                  const isActive = Number(lista) === activeLista;
+                  const isSelected = Number(lista) === detailLista;
                   return (
-                    <div key={lista} className={`px-3 md:px-4 py-1.5 md:py-2 rounded-xl text-center ${isActive ? "bg-brand-500 text-white shadow-md" : "bg-gray-100 text-gray-600"}`}>
+                    <button key={lista} onClick={() => setDetailLista(Number(lista))}
+                      className={`px-3 md:px-4 py-1.5 md:py-2 rounded-xl text-center transition-all duration-200 cursor-pointer ${isSelected ? "bg-brand-500 text-white shadow-md scale-105" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
                       <div className="text-xs">{LISTA_LABELS[Number(lista)] || `Lista ${lista}`}</div>
                       <div className="font-bold text-base md:text-lg">{formatPrice(precio)}</div>
-                    </div>
+                    </button>
                   );
                 })}
               </div>
               {/* Stock */}
-              <div className={`text-sm font-medium ${selectedProduct.stock > 0 ? "text-green-600" : "text-red-500"}`}>
+              <div className={`text-sm font-medium mb-4 ${selectedProduct.stock > 0 ? "text-green-600" : "text-red-500"}`}>
                 {selectedProduct.stock > 0 ? "En stock" : "Sin stock"}
               </div>
-              {/* Quick add */}
-              {(() => {
-                const inCart = cart.find((i) => i.sku === selectedProduct.sku);
-                return inCart ? (
-                  <div className="flex items-center gap-3 mt-6">
-                    <button onClick={() => updateQty(selectedProduct.sku, -1)}
-                      className="w-10 h-10 flex items-center justify-center rounded-xl bg-gray-200 hover:bg-gray-300 text-gray-700">
-                      <HiOutlineMinus className="w-5 h-5" />
-                    </button>
-                    <span className="text-2xl font-bold text-gray-900 w-16 text-center">{inCart.cantidad}</span>
-                    <button onClick={() => updateQty(selectedProduct.sku, 1)}
-                      className="w-10 h-10 flex items-center justify-center rounded-xl bg-brand-500 hover:bg-brand-600 text-white">
-                      <HiOutlinePlus className="w-5 h-5" />
-                    </button>
-                  </div>
-                ) : (
-                  <button onClick={() => addToCart(selectedProduct)}
-                    className="mt-6 px-8 py-3 bg-brand-500 text-white rounded-xl font-bold text-lg hover:bg-brand-600 transition-colors shadow-md">
-                    Agregar al carrito
+              {/* Quantity input */}
+              <div className="flex flex-col items-center gap-2 mb-4">
+                <label className="text-sm text-gray-500">{selectedProduct.unidad === "KG" ? "Peso (kg)" : "Cantidad"}</label>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => setDetailQty(String(Math.max(0.01, (parseFloat(detailQty) || 1) - (selectedProduct.unidad === "KG" ? 0.25 : 1))))}
+                    className="w-10 h-10 flex items-center justify-center rounded-xl bg-gray-200 hover:bg-gray-300 text-gray-700">
+                    <HiOutlineMinus className="w-5 h-5" />
                   </button>
-                );
+                  <input type="number" value={detailQty}
+                    onChange={(e) => setDetailQty(e.target.value)}
+                    onFocus={(e) => e.target.select()}
+                    className="w-24 text-center text-2xl font-bold border-2 border-gray-300 rounded-xl py-2 focus:outline-none focus:border-brand-500"
+                    min="0.01" step={selectedProduct.unidad === "KG" ? "0.01" : "1"} />
+                  <button onClick={() => setDetailQty(String((parseFloat(detailQty) || 0) + (selectedProduct.unidad === "KG" ? 0.25 : 1)))}
+                    className="w-10 h-10 flex items-center justify-center rounded-xl bg-brand-500 hover:bg-brand-600 text-white">
+                    <HiOutlinePlus className="w-5 h-5" />
+                  </button>
+                </div>
+                {selectedProduct.unidad === "KG" && (
+                  <div className="flex gap-2 mt-1">
+                    {[0.25, 0.5, 1, 2, 5].map((q) => (
+                      <button key={q} onClick={() => setDetailQty(String(q))}
+                        className="px-2 py-1 text-xs rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 font-medium">
+                        {q} kg
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {selectedProduct.cantPorCaja > 0 && (
+                  <button onClick={() => { setDetailQty(String(selectedProduct.cantPorCaja)); }}
+                    className="text-xs text-brand-600 hover:text-brand-700 font-medium mt-1">
+                    Caja x{selectedProduct.cantPorCaja}
+                  </button>
+                )}
+              </div>
+              {/* Line total preview */}
+              <div className="text-sm text-gray-500 mb-3">
+                {parseFloat(detailQty) > 0 && selectedProduct.precios[detailLista] > 0 && (
+                  <span>{detailQty} × {formatPrice(selectedProduct.precios[detailLista])} = <span className="font-bold text-gray-900">{formatPrice((parseFloat(detailQty) || 0) * selectedProduct.precios[detailLista])}</span></span>
+                )}
+              </div>
+              {/* Add button */}
+              <button onClick={addFromDetail}
+                disabled={!parseFloat(detailQty) || parseFloat(detailQty) <= 0 || !selectedProduct.precios[detailLista]}
+                className="px-8 py-3 bg-green-600 text-white rounded-xl font-bold text-lg hover:bg-green-700 transition-colors shadow-md disabled:opacity-40 disabled:cursor-not-allowed">
+                Agregar al carrito
+              </button>
+              {/* Already in cart indicator */}
+              {(() => {
+                const inCart = cart.filter((i) => i.sku === selectedProduct.sku);
+                return inCart.length > 0 ? (
+                  <div className="mt-3 text-xs text-gray-400">
+                    Ya en carrito: {inCart.map((i) => `${i.cantidad} × ${LISTA_LABELS[i.lista] || `L${i.lista}`}`).join(", ")}
+                  </div>
+                ) : null;
               })()}
             </div>
           ) : (
