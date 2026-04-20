@@ -94,7 +94,26 @@ export default function CheckoutPage() {
     return msg;
   }
 
-  function handleWhatsApp() {
+  async function handleWhatsApp() {
+    // Save order to backup before sending via WhatsApp
+    try {
+      await fetch("/api/orders/backup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          items: items.map((i) => ({
+            sku: i.sku,
+            name: i.name,
+            quantity: i.quantity,
+            price: i.mode === "box" && i.precioCajaCerrada > 0 ? i.precioCajaCerrada : i.precioMayorista,
+            listaPrecio: i.mode === "box" ? 4 : 2,
+          })),
+          total: totalPrice,
+          notes: notes.trim(),
+        }),
+      });
+    } catch { /* don't block WhatsApp if backup fails */ }
+
     const msg = buildWhatsAppMessage();
     const encoded = encodeURIComponent(msg);
     window.open(`https://wa.me/5491154137677?text=${encoded}`, "_blank");
