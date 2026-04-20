@@ -233,16 +233,15 @@ export default function PosPage() {
     setPaying(true);
     setPayError("");
     try {
-      const res = await fetch("/api/orders", {
+      const res = await fetch("/api/pos/pending", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          items: cart.map((i) => ({ sku: i.sku, name: i.nombre, cant: i.cantidad, price: i.precio, listaPrecio: i.lista })),
-          notes: "",
-          posPendiente: true,
           sucursal: terminal.sucursal,
           empleadoCod: selectedEmpleado.cod,
           clienteCod: selectedCliente?.cod,
+          items: cart.map((i) => ({ sku: i.sku, nombre: i.nombre, cantidad: i.cantidad, precio: i.precio, lista: i.lista })),
+          notes: "",
         }),
       });
       const d = await res.json();
