@@ -212,7 +212,7 @@ export default function PosPage() {
   }
 
   return (
-    <div className="h-screen flex flex-col bg-gray-100 overflow-hidden">
+    <div className="min-h-screen md:h-screen flex flex-col bg-gray-100 md:overflow-hidden">
       {/* Top bar */}
       <div className="bg-white border-b px-3 md:px-4 py-2 flex flex-wrap items-center justify-between gap-2 shrink-0 shadow-sm">
         <div className="flex items-center gap-2 md:gap-4">
@@ -265,9 +265,9 @@ export default function PosPage() {
       </div>
 
       {/* Main content: 2 columns on desktop, stacked on mobile */}
-      <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
+      <div className="flex-1 flex flex-col md:flex-row md:overflow-hidden">
         {/* LEFT: search (top) + cart (bottom) */}
-        <div className="flex-1 md:w-1/2 flex flex-col md:border-r">
+        <div className="md:w-1/2 flex flex-col md:border-r">
           {/* Search area */}
           <div className="p-2 md:p-3 border-b bg-white">
             <div className="relative">
@@ -282,7 +282,7 @@ export default function PosPage() {
           </div>
 
           {/* Search results */}
-          <div className="flex-1 overflow-y-auto bg-gray-50 p-2" ref={resultsRef}>
+          <div className="md:flex-1 md:overflow-y-auto bg-gray-50 p-2" ref={resultsRef}>
             {searchResults.length > 0 ? (
               <div className="space-y-1">
                 {searchResults.map((p, idx) => {
@@ -323,7 +323,7 @@ export default function PosPage() {
           </div>
 
           {/* Cart */}
-          <div className="border-t bg-white flex flex-col" style={{ maxHeight: "45%" }}>
+          <div className="border-t bg-white flex flex-col md:max-h-[45%]">
             <div className="px-3 py-2 border-b flex items-center justify-between bg-gray-50">
               <div className="flex items-center gap-2">
                 <HiOutlineShoppingCart className="w-4 h-4 text-gray-500" />
@@ -334,7 +334,7 @@ export default function PosPage() {
                 <button onClick={() => { setCart([]); setSelectedProduct(null); }} className="text-xs text-red-500 hover:text-red-700">Vaciar</button>
               )}
             </div>
-            <div className="flex-1 overflow-y-auto px-2 py-1 space-y-1">
+            <div className="md:flex-1 md:overflow-y-auto px-2 py-1 space-y-1">
               {cart.length === 0 ? (
                 <div className="text-center text-gray-400 text-xs py-4">Carrito vacio</div>
               ) : cart.map((item) => (
