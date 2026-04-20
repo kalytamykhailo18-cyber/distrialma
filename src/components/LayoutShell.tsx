@@ -4,7 +4,7 @@ import { usePathname } from "next/navigation";
 import Navbar from "./Navbar";
 import WhatsAppButton from "./WhatsAppButton";
 
-const KIOSK_ROUTES = ["/consulta-precios"];
+const KIOSK_ROUTES = ["/consulta-precios", "/pos"];
 
 export default function LayoutShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
