@@ -203,6 +203,72 @@ export default function PosPage() {
     if (selectedProduct?.sku === sku) setSelectedProduct(null);
   }
 
+  const qtyRef = useRef<HTMLInputElement>(null);
+
+  // Global keyboard shortcuts
+  useEffect(() => {
+    function handleGlobalKey(e: KeyboardEvent) {
+      const tag = (e.target as HTMLElement)?.tagName;
+      const isInput = tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA";
+
+      // F1-F5: switch price list
+      if (e.key >= "F1" && e.key <= "F5") {
+        e.preventDefault();
+        const lista = parseInt(e.key.slice(1));
+        if (selectedProduct) {
+          const precio = selectedProduct.precios[lista];
+          if (precio && precio > 0) setDetailLista(lista);
+        }
+        return;
+      }
+
+      // F8: add to cart from detail
+      if (e.key === "F8") {
+        e.preventDefault();
+        addFromDetail();
+        return;
+      }
+
+      // F12: cobrar/pendiente (placeholder)
+      if (e.key === "F12") {
+        e.preventDefault();
+        // TODO: Phase 4 payment
+        return;
+      }
+
+      // Escape: back to search
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setSearch("");
+        setSearchResults([]);
+        setHighlightIdx(-1);
+        setSelectedProduct(null);
+        searchRef.current?.focus();
+        return;
+      }
+
+      // Tab: jump between search and qty input
+      if (e.key === "Tab" && selectedProduct) {
+        e.preventDefault();
+        if (document.activeElement === searchRef.current) {
+          qtyRef.current?.focus();
+          qtyRef.current?.select();
+        } else {
+          searchRef.current?.focus();
+        }
+        return;
+      }
+
+      // Any letter/number when not in an input: focus search
+      if (!isInput && e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        searchRef.current?.focus();
+      }
+    }
+
+    document.addEventListener("keydown", handleGlobalKey);
+    return () => document.removeEventListener("keydown", handleGlobalKey);
+  }, [selectedProduct, detailLista, detailQty]);
+
   const total = cart.reduce((sum, i) => sum + i.precio * i.cantidad, 0);
   const itemCount = cart.reduce((sum, i) => sum + i.cantidad, 0);
   const activeLista = getActiveLista();
@@ -393,7 +459,7 @@ export default function PosPage() {
               </div>
               <button disabled={cart.length === 0 || !selectedEmpleado}
                 className="px-4 md:px-6 py-2 bg-green-600 text-white rounded-xl text-sm md:text-base font-bold hover:bg-green-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0">
-                {!selectedEmpleado ? "Vendedor" : terminal.flujo === "pendiente" ? "Pendiente" : "Cobrar"}
+                {!selectedEmpleado ? "Vendedor" : terminal.flujo === "pendiente" ? "Pendiente" : "Cobrar"} <span className="hidden md:inline text-green-200 text-xs ml-1">F12</span>
               </button>
             </div>
           </div>
@@ -454,9 +520,10 @@ export default function PosPage() {
                     className="w-10 h-10 flex items-center justify-center rounded-xl bg-gray-200 hover:bg-gray-300 text-gray-700">
                     <HiOutlineMinus className="w-5 h-5" />
                   </button>
-                  <input type="number" value={detailQty}
+                  <input ref={qtyRef} type="number" value={detailQty}
                     onChange={(e) => setDetailQty(e.target.value)}
                     onFocus={(e) => e.target.select()}
+                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addFromDetail(); } }}
                     className="w-24 text-center text-2xl font-bold border-2 border-gray-300 rounded-xl py-2 focus:outline-none focus:border-brand-500"
                     min="0.01" step={selectedProduct.unidad === "KG" ? "0.01" : "1"} />
                   <button onClick={() => setDetailQty(String((parseFloat(detailQty) || 0) + (selectedProduct.unidad === "KG" ? 0.25 : 1)))}
@@ -491,7 +558,7 @@ export default function PosPage() {
               <button onClick={addFromDetail}
                 disabled={!parseFloat(detailQty) || parseFloat(detailQty) <= 0 || !selectedProduct.precios[detailLista]}
                 className="px-8 py-3 bg-green-600 text-white rounded-xl font-bold text-lg hover:bg-green-700 transition-colors shadow-md disabled:opacity-40 disabled:cursor-not-allowed">
-                Agregar al carrito
+                Agregar al carrito <span className="text-green-200 text-sm ml-2">F8</span>
               </button>
               {/* Already in cart indicator */}
               {(() => {
@@ -502,6 +569,14 @@ export default function PosPage() {
                   </div>
                 ) : null;
               })()}
+              {/* Keyboard shortcuts */}
+              <div className="hidden md:flex flex-wrap gap-x-4 gap-y-1 mt-4 text-xs text-gray-400 justify-center">
+                <span><kbd className="px-1 py-0.5 bg-gray-100 rounded text-gray-500">F1-F5</kbd> Lista</span>
+                <span><kbd className="px-1 py-0.5 bg-gray-100 rounded text-gray-500">Tab</kbd> Cantidad</span>
+                <span><kbd className="px-1 py-0.5 bg-gray-100 rounded text-gray-500">Enter</kbd> Agregar</span>
+                <span><kbd className="px-1 py-0.5 bg-gray-100 rounded text-gray-500">Esc</kbd> Volver</span>
+                <span><kbd className="px-1 py-0.5 bg-gray-100 rounded text-gray-500">F12</kbd> Cobrar</span>
+              </div>
             </div>
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center p-8 text-center"
