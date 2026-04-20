@@ -50,13 +50,19 @@ export async function GET() {
 
     const client = result.recordset[0];
 
-    // Check our delivery days first, fallback to PunTouch Zona
+    // Check our delivery days first, fallback to PunTouch Zona (only if it's a real day)
+    const DAY_NAMES = ["LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO", "DOMINGO"];
     const ourDays = await prisma.clientDeliveryDay.findMany({
       where: { clientId: user.clientId! },
     });
-    const deliveryDays = ourDays.length > 0
-      ? ourDays.map((d) => d.day)
-      : client.zona ? [client.zona] : [];
+    let deliveryDays: string[];
+    if (ourDays.length > 0) {
+      deliveryDays = ourDays.map((d) => d.day);
+    } else if (client.zona && DAY_NAMES.some((d) => client.zona.toUpperCase().includes(d))) {
+      deliveryDays = [client.zona];
+    } else {
+      deliveryDays = [];
+    }
 
     return NextResponse.json({
       name: client.nombre,
