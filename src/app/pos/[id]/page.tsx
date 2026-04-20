@@ -305,9 +305,11 @@ export default function PosPage() {
   const selectedProductRef = useRef(selectedProduct);
   const addFromDetailRef = useRef(addFromDetail);
   const openPaymentRef = useRef(openPayment);
+  const terminalRef = useRef(terminal);
   selectedProductRef.current = selectedProduct;
   addFromDetailRef.current = addFromDetail;
   openPaymentRef.current = openPayment;
+  terminalRef.current = terminal;
 
   // Global keyboard shortcuts
   useEffect(() => {
