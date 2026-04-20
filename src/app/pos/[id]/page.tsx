@@ -214,20 +214,20 @@ export default function PosPage() {
   return (
     <div className="h-screen flex flex-col bg-gray-100 overflow-hidden">
       {/* Top bar */}
-      <div className="bg-white border-b px-4 py-2 flex items-center justify-between shrink-0 shadow-sm">
-        <div className="flex items-center gap-4">
-          <span className="font-bold text-gray-900 text-lg">{terminal.nombre}</span>
-          <span className="text-xs text-gray-400">{terminal.sucursalNombre}</span>
+      <div className="bg-white border-b px-3 md:px-4 py-2 flex flex-wrap items-center justify-between gap-2 shrink-0 shadow-sm">
+        <div className="flex items-center gap-2 md:gap-4">
+          <span className="font-bold text-gray-900 text-sm md:text-lg">{terminal.nombre}</span>
+          <span className="text-xs text-gray-400 hidden sm:inline">{terminal.sucursalNombre}</span>
           <span className="text-xs px-2 py-0.5 rounded-full bg-brand-100 text-brand-700 font-medium">
             {LISTA_LABELS[activeLista] || `Lista ${activeLista}`}
           </span>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <HiOutlineUser className="w-4 h-4 text-gray-400" />
+        <div className="flex items-center gap-2 md:gap-3">
+          <div className="flex items-center gap-1 md:gap-2">
+            <HiOutlineUser className="w-4 h-4 text-gray-400 hidden md:block" />
             <select value={selectedEmpleado?.cod || ""}
               onChange={(e) => { const emp = empleados.find((x) => x.cod === e.target.value); setSelectedEmpleado(emp || null); }}
-              className="text-sm border border-gray-300 rounded-lg px-2 py-1.5 focus:outline-none focus:border-brand-500">
+              className="text-xs md:text-sm border border-gray-300 rounded-lg px-2 py-1.5 focus:outline-none focus:border-brand-500 max-w-[140px] md:max-w-none">
               <option value="">Vendedor...</option>
               {empleados.map((e) => <option key={e.cod} value={e.cod}>{e.nombre}</option>)}
             </select>
@@ -264,18 +264,18 @@ export default function PosPage() {
         </div>
       </div>
 
-      {/* Main content: 2 columns */}
-      <div className="flex-1 flex overflow-hidden">
+      {/* Main content: 2 columns on desktop, stacked on mobile */}
+      <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
         {/* LEFT: search (top) + cart (bottom) */}
-        <div className="w-1/2 flex flex-col border-r">
+        <div className="flex-1 md:w-1/2 flex flex-col md:border-r">
           {/* Search area */}
-          <div className="p-3 border-b bg-white">
+          <div className="p-2 md:p-3 border-b bg-white">
             <div className="relative">
               <HiOutlineSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
               <input ref={searchRef} type="text" value={search} onChange={(e) => setSearch(e.target.value)}
                 onKeyDown={handleSearchKeyDown}
                 placeholder="Buscar producto o escanear codigo..."
-                className="w-full pl-10 pr-4 py-3 text-lg border-2 border-brand-400 rounded-xl focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-200"
+                className="w-full pl-10 pr-4 py-2 md:py-3 text-base md:text-lg border-2 border-brand-400 rounded-xl focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-200"
                 autoFocus />
               {searching && <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 animate-pulse">Buscando...</div>}
             </div>
@@ -375,26 +375,35 @@ export default function PosPage() {
               ))}
             </div>
             {/* Total + action */}
-            <div className="border-t px-3 py-2 flex items-center justify-between bg-white">
-              <div>
-                <span className="text-sm text-gray-500">Total</span>
-                <span className="text-xl font-bold text-brand-600 ml-3">{formatPrice(total)}</span>
+            <div className="border-t px-3 py-2 flex items-center justify-between bg-white gap-2">
+              <div className="min-w-0">
+                <span className="text-xs md:text-sm text-gray-500">Total</span>
+                <span className="text-lg md:text-xl font-bold text-brand-600 ml-2 md:ml-3">{formatPrice(total)}</span>
               </div>
               <button disabled={cart.length === 0 || !selectedEmpleado}
-                className="px-6 py-2 bg-green-600 text-white rounded-xl font-bold hover:bg-green-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
-                {!selectedEmpleado ? "Selecciona vendedor" : terminal.flujo === "pendiente" ? "Dejar pendiente" : "Cobrar"}
+                className="px-4 md:px-6 py-2 bg-green-600 text-white rounded-xl text-sm md:text-base font-bold hover:bg-green-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0">
+                {!selectedEmpleado ? "Vendedor" : terminal.flujo === "pendiente" ? "Pendiente" : "Cobrar"}
               </button>
             </div>
           </div>
         </div>
 
-        {/* RIGHT: product detail / promotions carousel */}
-        <div className="w-1/2 flex flex-col bg-white">
+        {/* RIGHT: product detail / promotions — hidden on mobile, overlay on tap */}
+        {selectedProduct && (
+          <div className="fixed inset-0 z-50 bg-black/30 md:hidden" onClick={() => setSelectedProduct(null)} />
+        )}
+        <div className={`
+          ${selectedProduct ? "fixed inset-x-0 bottom-0 z-50 max-h-[80vh] rounded-t-2xl shadow-2xl" : "hidden"}
+          md:static md:block md:w-1/2 md:max-h-none md:rounded-none md:shadow-none
+          flex flex-col bg-white overflow-y-auto
+        `}>
           {selectedProduct ? (
-            <div className="flex-1 flex flex-col items-center justify-center p-8"
+            <div className="flex-1 flex flex-col items-center justify-center p-4 md:p-8"
               style={{ animation: "fadeIn 300ms ease" }}>
+              {/* Close on mobile */}
+              <button onClick={() => setSelectedProduct(null)} className="md:hidden self-end text-gray-400 hover:text-gray-600 mb-2 text-xl">x</button>
               {/* Product image */}
-              <div className="w-full max-w-md aspect-square bg-gray-50 rounded-2xl flex items-center justify-center overflow-hidden mb-6 shadow-inner">
+              <div className="w-full max-w-xs md:max-w-md aspect-square bg-gray-50 rounded-2xl flex items-center justify-center overflow-hidden mb-4 md:mb-6 shadow-inner">
                 {selectedProduct.images?.length > 0 ? (
                   <img src={selectedProduct.images[0]} alt={selectedProduct.nombre}
                     className="max-w-full max-h-full object-contain p-4" />
@@ -406,17 +415,17 @@ export default function PosPage() {
                 )}
               </div>
               {/* Product info */}
-              <h2 className="text-xl font-bold text-gray-900 text-center mb-2">{selectedProduct.nombre}</h2>
-              <p className="text-sm text-gray-400 mb-4">SKU: {selectedProduct.sku} · {selectedProduct.unidad === "KG" ? "Por kilo" : "Por unidad"}</p>
+              <h2 className="text-lg md:text-xl font-bold text-gray-900 text-center mb-2">{selectedProduct.nombre}</h2>
+              <p className="text-xs md:text-sm text-gray-400 mb-3 md:mb-4">SKU: {selectedProduct.sku} · {selectedProduct.unidad === "KG" ? "Por kilo" : "Por unidad"}</p>
               {/* Prices */}
-              <div className="flex gap-4 mb-6">
+              <div className="flex flex-wrap gap-2 md:gap-4 mb-4 md:mb-6 justify-center">
                 {Object.entries(selectedProduct.precios).map(([lista, precio]) => {
                   if (!precio || precio <= 0) return null;
                   const isActive = Number(lista) === activeLista;
                   return (
-                    <div key={lista} className={`px-4 py-2 rounded-xl text-center ${isActive ? "bg-brand-500 text-white shadow-md" : "bg-gray-100 text-gray-600"}`}>
+                    <div key={lista} className={`px-3 md:px-4 py-1.5 md:py-2 rounded-xl text-center ${isActive ? "bg-brand-500 text-white shadow-md" : "bg-gray-100 text-gray-600"}`}>
                       <div className="text-xs">{LISTA_LABELS[Number(lista)] || `Lista ${lista}`}</div>
-                      <div className="font-bold text-lg">{formatPrice(precio)}</div>
+                      <div className="font-bold text-base md:text-lg">{formatPrice(precio)}</div>
                     </div>
                   );
                 })}
