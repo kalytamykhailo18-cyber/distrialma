@@ -98,6 +98,7 @@ export default function ChequesPage() {
   const [fCuitLibrador, setFCuitLibrador] = useState("");
   const [fProveedorCod, setFProveedorCod] = useState("");
   const [fProveedorSearch, setFProveedorSearch] = useState("");
+  const [fProvHighlight, setFProvHighlight] = useState(-1);
   const [fObs, setFObs] = useState("");
 
   // Cuenta form state
@@ -671,14 +672,23 @@ export default function ChequesPage() {
               )}
               <div className="relative" style={{ zIndex: filteredProveedores.length > 0 ? 60 : "auto" }}>
                 <label className="block text-sm font-semibold text-gray-700 mb-1">Proveedor {tab === "tercero" && "(si ya lo endosaste)"}</label>
-                <input type="text" value={fProveedorSearch} onChange={(e) => { setFProveedorSearch(e.target.value); setFProveedorCod(""); }}
+                <input type="text" value={fProveedorSearch}
+                  onChange={(e) => { setFProveedorSearch(e.target.value); setFProveedorCod(""); setFProvHighlight(-1); }}
+                  onKeyDown={(e) => {
+                    if (filteredProveedores.length > 0 && !fProveedorCod) {
+                      if (e.key === "ArrowDown") { e.preventDefault(); setFProvHighlight((p) => Math.min(p + 1, filteredProveedores.length - 1)); }
+                      else if (e.key === "ArrowUp") { e.preventDefault(); setFProvHighlight((p) => Math.max(p - 1, 0)); }
+                      else if (e.key === "Enter" && fProvHighlight >= 0) { e.preventDefault(); const sel = filteredProveedores[fProvHighlight]; setFProveedorCod(sel.cod); setFProveedorSearch(sel.nombre); setFProvHighlight(-1); }
+                    }
+                  }}
                   placeholder="Buscar proveedor..." className="w-full px-4 py-3 border border-gray-300 rounded-xl text-base focus:outline-none focus:border-brand-500" />
                 {filteredProveedores.length > 0 && !fProveedorCod && (
                   <div className="absolute left-0 right-0 z-50 mt-1 bg-white border rounded-xl shadow-lg max-h-56 overflow-y-auto">
-                    {filteredProveedores.map((p) => (
+                    {filteredProveedores.map((p, idx) => (
                       <button key={p.cod} type="button"
-                        onClick={() => { setFProveedorCod(p.cod); setFProveedorSearch(p.nombre); }}
-                        className={`w-full px-4 py-2 text-left text-sm ${hoverRow}`}>
+                        onClick={() => { setFProveedorCod(p.cod); setFProveedorSearch(p.nombre); setFProvHighlight(-1); }}
+                        onMouseEnter={() => setFProvHighlight(idx)}
+                        className={`w-full px-4 py-2 text-left text-sm ${idx === fProvHighlight ? "bg-brand-50 text-brand-700" : hoverRow}`}>
                         {p.nombre}
                       </button>
                     ))}
