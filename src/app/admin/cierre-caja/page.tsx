@@ -400,6 +400,11 @@ export default function CierreCajaPage() {
       else if (d.emailTo) msg += ` — Error al enviar email`;
       else msg += ` — Email no configurado`;
       setSuccess(msg);
+      setNuevoInicio("");
+      setEfectivoContado("");
+      setFotos([]);
+      setSelectedEmpleado("");
+      loadCierre();
       if (isAdmin) loadHistory();
 
     } catch (e: unknown) {
