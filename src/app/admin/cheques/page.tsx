@@ -72,6 +72,8 @@ export default function ChequesPage() {
   const [tab, setTab] = useState<"propio" | "tercero" | "flujo">("propio");
   const [flujoData, setFlujoData] = useState<{ weeks: Array<{ label: string; totalSalidas: number; totalEntradas: number; balance: number; salidas: Array<{ numero: string; monto: number; proveedor: string }>; entradas: Array<{ numero: string; monto: number; librador: string }> }>; vencidos: { propios: Array<{ numero: string; monto: number; proveedor: string }>; terceros: Array<{ numero: string; monto: number; librador: string }>; totalPropios: number; totalTerceros: number }; totales: { totalSalidas: number; totalEntradas: number } } | null>(null);
   const [loadingFlujo, setLoadingFlujo] = useState(false);
+  const [chequePage, setChequePage] = useState(1);
+  const CHEQUES_PER_PAGE = 12;
   const [estadoFiltro, setEstadoFiltro] = useState("");
   const [search, setSearch] = useState("");
   const [cuentaFiltro, setCuentaFiltro] = useState("");
@@ -355,12 +357,12 @@ export default function ChequesPage() {
       {/* Tabs */}
       <Stagger delay={100}>
         <div className="flex flex-wrap gap-2 mb-4">
-          <button onClick={() => { setTab("propio"); setEstadoFiltro(""); }}
+          <button onClick={() => { setTab("propio"); setEstadoFiltro(""); setChequePage(1); }}
             className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${springBtn} ${tab === "propio" ? "bg-orange-500 text-white" : "bg-white border text-gray-700 hover:bg-gray-50"}`}>
             <HiOutlineOfficeBuilding className="w-4 h-4 inline mr-1" />
             Propios (emitidos)
           </button>
-          <button onClick={() => { setTab("tercero"); setEstadoFiltro(""); }}
+          <button onClick={() => { setTab("tercero"); setEstadoFiltro(""); setChequePage(1); }}
             className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${springBtn} ${tab === "tercero" ? "bg-blue-500 text-white" : "bg-white border text-gray-700 hover:bg-gray-50"}`}>
             <HiOutlineUser className="w-4 h-4 inline mr-1" />
             Terceros (recibidos)
@@ -417,7 +419,7 @@ export default function ChequesPage() {
       ) : (
         <Stagger delay={150}>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {cheques.map((c, i) => {
+            {cheques.slice((chequePage - 1) * CHEQUES_PER_PAGE, chequePage * CHEQUES_PER_PAGE).map((c, i) => {
               const estadoInfo = ESTADO_LABELS[c.estado] || { label: c.estado, color: "text-gray-700", bg: "bg-gray-100" };
               const bancoInfo = getBanco(c.banco);
               const dias = daysUntil(c.fechaCobro);
@@ -794,6 +796,24 @@ export default function ChequesPage() {
           </div>
         );
       })()}
+
+      {/* Pagination */}
+      {tab !== "flujo" && cheques.length > CHEQUES_PER_PAGE && (
+        <div className="flex items-center justify-center gap-3 mt-4">
+          <button onClick={() => setChequePage((p) => Math.max(1, p - 1))} disabled={chequePage === 1}
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium ${springBtn} ${chequePage === 1 ? "bg-gray-100 text-gray-400" : "bg-white border text-gray-700 hover:bg-gray-50"}`}>
+            Anterior
+          </button>
+          <span className="text-sm text-gray-500">
+            {chequePage} / {Math.ceil(cheques.length / CHEQUES_PER_PAGE)} ({cheques.length} cheques)
+          </span>
+          <button onClick={() => setChequePage((p) => Math.min(Math.ceil(cheques.length / CHEQUES_PER_PAGE), p + 1))}
+            disabled={chequePage >= Math.ceil(cheques.length / CHEQUES_PER_PAGE)}
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium ${springBtn} ${chequePage >= Math.ceil(cheques.length / CHEQUES_PER_PAGE) ? "bg-gray-100 text-gray-400" : "bg-white border text-gray-700 hover:bg-gray-50"}`}>
+            Siguiente
+          </button>
+        </div>
+      )}
 
       {/* Flujo de cheques */}
       {tab === "flujo" && (
