@@ -418,6 +418,22 @@ export default function ChequesPage() {
         </div>
       ) : (
         <Stagger delay={150}>
+          {cheques.length > CHEQUES_PER_PAGE && (
+            <div className="flex items-center justify-center gap-3 mb-3">
+              <button onClick={() => setChequePage((p) => Math.max(1, p - 1))} disabled={chequePage === 1}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium ${springBtn} ${chequePage === 1 ? "bg-gray-100 text-gray-400" : "bg-white border text-gray-700 hover:bg-gray-50"}`}>
+                Anterior
+              </button>
+              <span className="text-sm text-gray-500">
+                {chequePage} / {Math.ceil(cheques.length / CHEQUES_PER_PAGE)} ({cheques.length} cheques)
+              </span>
+              <button onClick={() => setChequePage((p) => Math.min(Math.ceil(cheques.length / CHEQUES_PER_PAGE), p + 1))}
+                disabled={chequePage >= Math.ceil(cheques.length / CHEQUES_PER_PAGE)}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium ${springBtn} ${chequePage >= Math.ceil(cheques.length / CHEQUES_PER_PAGE) ? "bg-gray-100 text-gray-400" : "bg-white border text-gray-700 hover:bg-gray-50"}`}>
+                Siguiente
+              </button>
+            </div>
+          )}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {cheques.slice((chequePage - 1) * CHEQUES_PER_PAGE, chequePage * CHEQUES_PER_PAGE).map((c, i) => {
               const estadoInfo = ESTADO_LABELS[c.estado] || { label: c.estado, color: "text-gray-700", bg: "bg-gray-100" };
