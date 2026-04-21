@@ -485,6 +485,12 @@ export default function PosPage() {
           <span className="text-xs px-2 py-0.5 rounded-full bg-brand-100 text-brand-700 font-medium">
             {LISTA_LABELS[activeLista] || `Lista ${activeLista}`}
           </span>
+          {terminal.esCajero && (
+            <button onClick={() => { setSelectedPendiente(null); setCart([]); loadPendientes(); }}
+              className="text-xs px-2 py-0.5 rounded-full bg-cyan-100 text-cyan-700 font-medium hover:bg-cyan-200">
+              Pendientes ({pendientes.length})
+            </button>
+          )}
         </div>
         <div className="flex items-center gap-2 md:gap-3">
           <div className="flex items-center gap-1 md:gap-2">
