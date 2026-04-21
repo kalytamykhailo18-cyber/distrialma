@@ -65,6 +65,7 @@ export default function PreciosPage() {
   const [query, setQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searching, setSearching] = useState(false);
+  const [hlIdx, setHlIdx] = useState(-1);
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -246,7 +247,15 @@ export default function PreciosPage() {
           <input
             type="text"
             value={query}
-            onChange={(e) => handleSearch(e.target.value)}
+            onChange={(e) => { handleSearch(e.target.value); setHlIdx(-1); }}
+            onKeyDown={(e) => {
+              if (searchResults.length > 0) {
+                if (e.key === "ArrowDown") { e.preventDefault(); setHlIdx((p) => Math.min(p + 1, searchResults.length - 1)); }
+                else if (e.key === "ArrowUp") { e.preventDefault(); setHlIdx((p) => Math.max(p - 1, 0)); }
+                else if (e.key === "Enter" && hlIdx >= 0) { e.preventDefault(); selectProduct(searchResults[hlIdx].sku); setHlIdx(-1); }
+                else if (e.key === "Escape") { setSearchResults([]); setHlIdx(-1); }
+              }
+            }}
             placeholder="Buscar por nombre, SKU o código de barras..."
             className="w-full pl-10 pr-4 py-2.5 border border-brand-400 rounded-xl text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
           />
@@ -258,8 +267,9 @@ export default function PreciosPage() {
               {searchResults.map((r, i) => (
                 <button
                   key={r.sku}
-                  onClick={() => selectProduct(r.sku)}
-                  className={`w-full text-left px-4 py-2 text-sm border-b last:border-0 ${hoverRow}`}
+                  onClick={() => { selectProduct(r.sku); setHlIdx(-1); }}
+                  onMouseEnter={() => setHlIdx(i)}
+                  className={`w-full text-left px-4 py-2 text-sm border-b last:border-0 ${i === hlIdx ? "bg-brand-50 text-brand-700" : hoverRow}`}
                   style={staggerStyle(true, i)}
                 >
                   <span className="font-medium text-gray-900">{r.name}</span>
