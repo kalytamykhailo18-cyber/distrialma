@@ -12,7 +12,7 @@ import {
 
 interface Terminal {
   id: number; nombre: string; sucursal: string; sucursalNombre: string;
-  listas: string; cuit: string; flujo: string; requiereCliente: boolean; esCajero: boolean;
+  listas: string; cuit: string; flujo: string; requiereCliente: boolean; esCajero: boolean; modoPrueba: boolean;
 }
 interface Pendiente {
   boleta: string; nroped: string; total: number; cant: number; fecha: string; hora: string;
@@ -290,6 +290,12 @@ export default function PosPage() {
 
   async function savePending() {
     if (!terminal || !selectedEmpleado || cart.length === 0) return;
+    if (terminal.modoPrueba) {
+      setPaySuccess("[PRUEBA] Pedido pendiente simulado");
+      setCart([]); setSelectedProduct(null); setPeyaCode("");
+      setTimeout(() => { setPaySuccess(""); searchRef.current?.focus(); }, 2000);
+      return;
+    }
     setPaying(true);
     setPayError("");
     try {
@@ -336,6 +342,16 @@ export default function PosPage() {
     setPaying(true);
     setPayError("");
     try {
+      // Test mode: skip PunTouch write
+      if (terminal.modoPrueba) {
+        setPaySuccess(`[PRUEBA] Venta simulada — ${formatPrice(totalAmount)}${vuelto > 0 ? ` — Vuelto: ${formatPrice(vuelto)}` : ""}`);
+        setCart([]);
+        setSelectedProduct(null);
+        setTimeout(() => { setShowPayment(false); setPaySuccess(""); searchRef.current?.focus(); }, 2000);
+        setPaying(false);
+        return;
+      }
+
       const res = await fetch("/api/pos/sale", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -533,6 +549,13 @@ export default function PosPage() {
           )}
         </div>
       </div>
+
+      {/* Test mode banner */}
+      {terminal.modoPrueba && (
+        <div className="bg-yellow-400 text-yellow-900 text-center py-1 text-sm font-bold">
+          MODO PRUEBA — Las ventas NO se registran
+        </div>
+      )}
 
       {/* Main content: 2 columns on desktop, stacked on mobile */}
       <div className="flex-1 flex flex-col md:flex-row md:overflow-hidden">

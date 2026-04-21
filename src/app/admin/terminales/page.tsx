@@ -24,13 +24,14 @@ interface Terminal {
   permisoDevolver: boolean;
   requiereCliente: boolean;
   esCajero: boolean;
+  modoPrueba: boolean;
   activa: boolean;
 }
 
 const EMPTY_FORM: Omit<Terminal, "id"> = {
   nombre: "", sucursal: "", sucursalNombre: "", listas: "1", cuit: "", razonSocial: "",
   direccion: "", aliasBanco: "", formatoImpresion: "ticket", flujo: "directo",
-  permisoAnular: false, permisoPrecio: false, permisoDevolver: true, requiereCliente: false, esCajero: false, activa: true,
+  permisoAnular: false, permisoPrecio: false, permisoDevolver: true, requiereCliente: false, esCajero: false, modoPrueba: false, activa: true,
 };
 
 const SUCURSALES = [
@@ -76,7 +77,7 @@ export default function TerminalesPage() {
         listas: t.listas, cuit: t.cuit, razonSocial: t.razonSocial, direccion: t.direccion,
         aliasBanco: t.aliasBanco, formatoImpresion: t.formatoImpresion, flujo: t.flujo,
         permisoAnular: t.permisoAnular, permisoPrecio: t.permisoPrecio,
-        permisoDevolver: t.permisoDevolver, requiereCliente: t.requiereCliente, esCajero: t.esCajero, activa: t.activa,
+        permisoDevolver: t.permisoDevolver, requiereCliente: t.requiereCliente, esCajero: t.esCajero, modoPrueba: t.modoPrueba, activa: t.activa,
       });
     } else {
       setEditing("new");
@@ -239,6 +240,7 @@ export default function TerminalesPage() {
                     {t.permisoAnular && <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-600">Anular</span>}
                     {t.permisoPrecio && <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-600">Cambiar precio</span>}
                     {t.esCajero && <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-cyan-100 text-cyan-600">Cajero</span>}
+                    {t.modoPrueba && <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700">Prueba</span>}
                     {!t.activa && <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-200 text-gray-500">Inactiva</span>}
                   </div>
                 </div>
@@ -355,6 +357,7 @@ export default function TerminalesPage() {
                   {([
                     ["requiereCliente", "Requiere cliente"],
                     ["esCajero", "Es cajero (levanta pendientes)"],
+                    ["modoPrueba", "Modo prueba (no escribe a PunTouch)"],
                     ["permisoAnular", "Puede anular ventas"],
                     ["permisoPrecio", "Puede cambiar precios"],
                     ["permisoDevolver", "Puede hacer devoluciones"],

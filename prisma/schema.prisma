@@ -569,6 +569,7 @@ model PosTerminal {
   permisoDevolver Boolean  @default(true)
   requiereCliente Boolean  @default(false)
   esCajero        Boolean  @default(false)  // true = shows pending orders list instead of product search
+  modoPrueba      Boolean  @default(false)  // true = sales NOT written to PunTouch (training mode)
   activa          Boolean  @default(true)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
