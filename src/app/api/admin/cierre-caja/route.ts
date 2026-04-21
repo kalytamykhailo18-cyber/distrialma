@@ -84,10 +84,9 @@ export async function POST(req: NextRequest) {
 
       // Get next Cod and NroCierreCaja
       const maxResult = await pool.request().query(`
-        SELECT MAX(CAST(LTRIM(RTRIM(Cod)) AS INT)) AS maxCod,
+        SELECT MAX(CAST(LTRIM(RTRIM(Cod)) AS BIGINT)) AS maxCod,
                MAX(NroCierreCaja) AS maxCierre
         FROM [${dbTransas}].dbo.Transas
-        WHERE LEN(LTRIM(RTRIM(Cod))) <= 7
       `);
       let nextCodNum = Number(maxResult.recordset[0]?.maxCod || 0) + 1;
       const nextCierre = Number(maxResult.recordset[0]?.maxCierre || 0) + 1;
