@@ -682,7 +682,7 @@ export default function PosPage() {
                 </div>
                 {selectedProduct.unidad === "KG" && (
                   <div className="flex gap-2 mt-1">
-                    {[0.25, 0.5, 1, 2, 5].map((q) => (
+                    {[0.1, 0.25, 0.5, 1, 2, 5].map((q) => (
                       <button key={q} onClick={() => setDetailQty(String(q))}
                         className="px-2 py-1 text-xs rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 font-medium">
                         {q} kg
