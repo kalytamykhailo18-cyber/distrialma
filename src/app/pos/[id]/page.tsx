@@ -58,6 +58,7 @@ export default function PosPage() {
   const [showPayment, setShowPayment] = useState(false);
   const [payMethod, setPayMethod] = useState<string>("");
   const [payAmount, setPayAmount] = useState("");
+  const [payLines, setPayLines] = useState<Array<{ method: string; amount: number }>>([]);
   const [paying, setPaying] = useState(false);
   const [payError, setPayError] = useState("");
   const [paySuccess, setPaySuccess] = useState("");
@@ -241,6 +242,7 @@ export default function PosPage() {
     setShowPayment(true);
     setPayMethod("");
     setPayAmount("");
+    setPayLines([]);
     setPayError("");
     setPaySuccess("");
     setPayConfirm(false);
@@ -275,16 +277,20 @@ export default function PosPage() {
   }
 
   async function confirmPayment() {
-    if (!terminal || !selectedEmpleado || cart.length === 0 || !payMethod) return;
+    if (!terminal || !selectedEmpleado || cart.length === 0) return;
     const totalAmount = cart.reduce((s, i) => s + i.precio * i.cantidad, 0);
-    const tendered = parseFloat(payAmount) || 0;
+    const paidSoFar = payLines.reduce((s, l) => s + l.amount, 0);
+    const remaining = totalAmount - paidSoFar;
 
     // Validate
-    if (payMethod === "efectivo" && tendered < totalAmount) { setPayError("Monto insuficiente"); return; }
-    if (payMethod === "cuenta" && !selectedCliente) { setPayError("Se requiere un cliente para cuenta corriente"); return; }
+    if (remaining > 0.01) { setPayError(`Falta: ${formatPrice(remaining)}`); return; }
+    if (payLines.some((l) => l.method === "cuenta") && !selectedCliente) { setPayError("Se requiere un cliente para cuenta corriente"); return; }
 
-    const paymentAmount = payMethod === "efectivo" ? totalAmount : (tendered || totalAmount);
-    const vuelto = payMethod === "efectivo" ? Math.max(0, tendered - totalAmount) : 0;
+    // Calculate vuelto from cash overpay
+    const cashLines = payLines.filter((l) => l.method === "efectivo");
+    const cashTotal = cashLines.reduce((s, l) => s + l.amount, 0);
+    const nonCashTotal = payLines.filter((l) => l.method !== "efectivo").reduce((s, l) => s + l.amount, 0);
+    const vuelto = Math.max(0, cashTotal - (totalAmount - nonCashTotal));
 
     setPaying(true);
     setPayError("");
@@ -293,12 +299,11 @@ export default function PosPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          terminalId: terminal.id,
           sucursal: terminal.sucursal,
           empleadoCod: selectedEmpleado.cod,
           clienteCod: selectedCliente?.cod,
           items: cart.map((i) => ({ sku: i.sku, nombre: i.nombre, cantidad: i.cantidad, precio: i.precio, lista: i.lista })),
-          payments: [{ method: payMethod, amount: paymentAmount }],
+          payments: payLines,
           vuelto,
         }),
       });
@@ -794,14 +799,44 @@ export default function PosPage() {
                 </div>
 
                 <div className="p-5">
-                  {/* Total */}
-                  <div className="text-center mb-6">
-                    <div className="text-sm text-gray-500">Total a cobrar</div>
-                    <div className="text-3xl font-bold text-gray-900">{formatPrice(total)}</div>
-                  </div>
+                  {/* Total + Remaining */}
+                  {(() => {
+                    const paid = payLines.reduce((s, l) => s + l.amount, 0);
+                    const rem = total - paid;
+                    return (
+                      <div className="text-center mb-4">
+                        <div className="text-sm text-gray-500">Total a cobrar</div>
+                        <div className="text-3xl font-bold text-gray-900">{formatPrice(total)}</div>
+                        {paid > 0 && (
+                          <div className={`text-lg font-bold mt-1 ${rem <= 0.01 ? "text-green-600" : "text-red-500"}`}>
+                            {rem <= 0.01 ? "Completo" : `Restante: ${formatPrice(rem)}`}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+
+                  {/* Payment lines added */}
+                  {payLines.length > 0 && (
+                    <div className="mb-4 space-y-1">
+                      {payLines.map((line, i) => {
+                        const METHOD_LABELS: Record<string, string> = { efectivo: "Efectivo", debito: "Debito", credito: "Credito", cuotas: "Cuotas", qr: "QR", transferencia: "Transfer.", cuenta: "Cta. Cte." };
+                        return (
+                          <div key={i} className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2">
+                            <span className="text-sm font-medium text-gray-700">{METHOD_LABELS[line.method] || line.method}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-gray-900">{formatPrice(line.amount)}</span>
+                              <button onClick={() => { setPayLines((prev) => prev.filter((_, j) => j !== i)); setPayConfirm(false); }}
+                                className="text-red-400 hover:text-red-600 text-xs">✕</button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
 
                   {/* Payment methods */}
-                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 mb-5">
+                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 mb-4">
                     {[
                       { key: "efectivo", label: "Efectivo", Icon: HiOutlineCash, color: "bg-green-100 text-green-700", active: "bg-green-600" },
                       { key: "debito", label: "Debito", Icon: HiOutlineCreditCard, color: "bg-blue-100 text-blue-700", active: "bg-blue-600" },
@@ -812,56 +847,57 @@ export default function PosPage() {
                       { key: "cuenta", label: "Cta. Cte.", Icon: HiOutlineBookOpen, color: "bg-red-100 text-red-700", active: "bg-red-600" },
                     ].map((m) => (
                       <button key={m.key} onClick={() => { setPayMethod(m.key); setPayAmount(""); setPayError(""); setPayConfirm(false); }}
-                        className={`p-3 rounded-xl text-center transition-all duration-200 ${
+                        className={`p-2 rounded-xl text-center transition-all duration-200 ${
                           payMethod === m.key ? `${m.active} text-white shadow-md scale-105` : `${m.color} hover:opacity-80`
                         }`}>
-                        <m.Icon className="w-6 h-6 mx-auto mb-1" />
+                        <m.Icon className="w-5 h-5 mx-auto mb-0.5" />
                         <div className="text-xs font-medium">{m.label}</div>
                       </button>
                     ))}
                   </div>
 
-                  {/* Method-specific input */}
-                  {payMethod === "efectivo" && (
+                  {/* Amount input + Add button */}
+                  {payMethod && (
                     <div className="mb-4" style={{ animation: "fadeIn 200ms ease" }}>
-                      <label className="text-sm text-gray-500 mb-1 block">Monto recibido</label>
-                      <input type="text" inputMode="decimal" value={payAmount}
-                        onChange={(e) => setPayAmount(e.target.value.replace(/[^0-9.,]/g, ""))}
-                        onKeyDown={(e) => { if (e.key === "Enter") confirmPayment(); }}
-                        placeholder={formatPrice(total)}
-                        className="w-full text-2xl font-bold text-center border-2 border-gray-300 rounded-xl py-3 focus:outline-none focus:border-brand-500"
-                        autoFocus />
-                      {parseFloat(payAmount) > 0 && parseFloat(payAmount) >= total && (
-                        <div className="text-center mt-2 text-green-600 font-bold text-lg">
-                          Vuelto: {formatPrice(parseFloat(payAmount) - total)}
-                        </div>
-                      )}
-                      {parseFloat(payAmount) > 0 && parseFloat(payAmount) < total && (
-                        <div className="text-center mt-2 text-red-500 text-sm">
-                          Faltan: {formatPrice(total - parseFloat(payAmount))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {payMethod === "cuenta" && (
-                    <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-xl" style={{ animation: "fadeIn 200ms ease" }}>
-                      {selectedCliente ? (
-                        <div>
-                          <div className="text-sm font-medium text-gray-800">{selectedCliente.nombre}</div>
-                          <div className="text-xs text-gray-500">Se cargara {formatPrice(total)} a su cuenta corriente</div>
-                        </div>
+                      {payMethod === "cuenta" && !selectedCliente ? (
+                        <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm">Se requiere seleccionar un cliente</div>
                       ) : (
-                        <div className="text-sm text-red-600">Se requiere seleccionar un cliente para cuenta corriente</div>
+                        <div className="flex gap-2">
+                          <div className="flex-1">
+                            <input type="text" inputMode="decimal" value={payAmount}
+                              onChange={(e) => setPayAmount(e.target.value.replace(/[^0-9.,]/g, ""))}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  e.preventDefault();
+                                  const amt = parseFloat(payAmount) || (total - payLines.reduce((s, l) => s + l.amount, 0));
+                                  if (amt > 0) { setPayLines((prev) => [...prev, { method: payMethod, amount: amt }]); setPayMethod(""); setPayAmount(""); setPayConfirm(false); }
+                                }
+                              }}
+                              placeholder={formatPrice(Math.max(0, total - payLines.reduce((s, l) => s + l.amount, 0)))}
+                              className="w-full text-xl font-bold text-center border-2 border-gray-300 rounded-xl py-2 focus:outline-none focus:border-brand-500"
+                              autoFocus />
+                          </div>
+                          <button onClick={() => {
+                            const amt = parseFloat(payAmount) || (total - payLines.reduce((s, l) => s + l.amount, 0));
+                            if (amt > 0) { setPayLines((prev) => [...prev, { method: payMethod, amount: amt }]); setPayMethod(""); setPayAmount(""); setPayConfirm(false); }
+                          }} className="px-4 py-2 bg-brand-500 text-white rounded-xl font-bold hover:bg-brand-600 shrink-0">
+                            Agregar
+                          </button>
+                        </div>
                       )}
                     </div>
                   )}
 
-                  {payMethod && !["efectivo", "cuenta"].includes(payMethod) && (
-                    <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-xl text-center" style={{ animation: "fadeIn 200ms ease" }}>
-                      <div className="text-sm text-blue-700">Cobrar {formatPrice(total)} con {payMethod === "debito" ? "Debito" : payMethod === "credito" ? "Credito" : payMethod === "cuotas" ? "Cuotas" : payMethod === "qr" ? "QR" : "Transferencia"}</div>
-                    </div>
-                  )}
+                  {/* Vuelto preview */}
+                  {(() => {
+                    const paid = payLines.reduce((s, l) => s + l.amount, 0);
+                    const cashPaid = payLines.filter((l) => l.method === "efectivo").reduce((s, l) => s + l.amount, 0);
+                    const nonCash = paid - cashPaid;
+                    const vuelto = Math.max(0, cashPaid - (total - nonCash));
+                    return vuelto > 0.01 ? (
+                      <div className="mb-4 text-center text-green-600 font-bold text-lg">Vuelto: {formatPrice(vuelto)}</div>
+                    ) : null;
+                  })()}
 
                   {/* Error */}
                   {payError && (
@@ -874,11 +910,11 @@ export default function PosPage() {
                 {/* Confirm button */}
                 <div className="p-5 border-t bg-gray-50">
                   <button onClick={() => { if (payConfirm) { confirmPayment(); } else { setPayConfirm(true); } }}
-                    disabled={paying || !payMethod || (payMethod === "efectivo" && (parseFloat(payAmount) || 0) < total) || (payMethod === "cuenta" && !selectedCliente)}
+                    disabled={paying || payLines.length === 0 || (total - payLines.reduce((s, l) => s + l.amount, 0)) > 0.01}
                     className={`w-full py-3 text-white rounded-xl text-lg font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
                       payConfirm ? "bg-red-600 hover:bg-red-700 animate-pulse" : "bg-green-600 hover:bg-green-700"
                     }`}>
-                    {paying ? "Procesando..." : payConfirm ? "CONFIRMAR — Registrar venta" : "Confirmar pago"}
+                    {paying ? "Procesando..." : payConfirm ? "CONFIRMAR — Registrar venta" : `Confirmar pago (${payLines.length} medio${payLines.length !== 1 ? "s" : ""})`}
                   </button>
                 </div>
               </>
