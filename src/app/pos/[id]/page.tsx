@@ -16,7 +16,7 @@ interface Terminal {
 }
 interface Empleado { cod: string; nombre: string; }
 interface Cliente { cod: string; nombre: string; cuit: string; zona: string; listaPrecios: string; }
-interface PosPromo { desde: number; precio: number; label: string; }
+interface PosPromo { desde: number; precio: number; tipo: "por-unidad" | "precio-fijo"; label: string; }
 interface PosProduct {
   sku: string; nombre: string; unidad: string; precios: Record<number, number>;
   stock: number; codBarra: string; cantPorCaja: number; images: string[]; promos: PosPromo[];
@@ -183,23 +183,30 @@ export default function PosPage() {
     setDetailQty("1");
   }
 
-  function getEffectivePrice(product: PosProduct, lista: number, qty: number): number {
+  function getEffectivePrice(product: PosProduct, lista: number, qty: number): { unitPrice: number; lineTotal: number; isPromo: boolean; promoLabel?: string } {
     const basePrice = product.precios[lista] || 0;
-    if (!product.promos?.length || qty <= 0) return basePrice;
+    if (!product.promos?.length || qty <= 0) return { unitPrice: basePrice, lineTotal: qty * basePrice, isPromo: false };
     // Find the best promo that applies (highest desde that qty meets)
     const applicable = product.promos.filter((p) => qty >= p.desde).sort((a, b) => b.desde - a.desde);
-    return applicable.length > 0 ? applicable[0].precio : basePrice;
+    if (applicable.length === 0) return { unitPrice: basePrice, lineTotal: qty * basePrice, isPromo: false };
+    const promo = applicable[0];
+    if (promo.tipo === "precio-fijo") {
+      // Fixed total price for that qty tier
+      return { unitPrice: promo.precio / promo.desde, lineTotal: promo.precio, isPromo: true, promoLabel: promo.label };
+    }
+    // Per-unit promo price
+    return { unitPrice: promo.precio, lineTotal: qty * promo.precio, isPromo: true, promoLabel: promo.label };
   }
 
   function addFromDetail() {
     if (!selectedProduct) return;
     const qty = parseFloat(detailQty) || 1;
-    const precio = getEffectivePrice(selectedProduct, detailLista, qty);
-    if (qty <= 0 || precio <= 0) return;
+    const eff = getEffectivePrice(selectedProduct, detailLista, qty);
+    if (qty <= 0 || eff.unitPrice <= 0) return;
     setCart((prev) => {
       const existing = prev.find((i) => i.sku === selectedProduct.sku && i.lista === detailLista);
-      if (existing) return prev.map((i) => i.sku === selectedProduct.sku && i.lista === detailLista ? { ...i, cantidad: i.cantidad + qty } : i);
-      return [...prev, { sku: selectedProduct.sku, nombre: selectedProduct.nombre, unidad: selectedProduct.unidad, cantidad: qty, precio, lista: detailLista, images: selectedProduct.images || [] }];
+      if (existing) return prev.map((i) => i.sku === selectedProduct.sku && i.lista === detailLista ? { ...i, cantidad: i.cantidad + qty, precio: eff.unitPrice } : i);
+      return [...prev, { sku: selectedProduct.sku, nombre: selectedProduct.nombre, unidad: selectedProduct.unidad, cantidad: qty, precio: eff.unitPrice, lista: detailLista, images: selectedProduct.images || [] }];
     });
     setSearch("");
     setSearchResults([]);
@@ -702,17 +709,16 @@ export default function PosPage() {
                 {(() => {
                   const qty = parseFloat(detailQty) || 0;
                   const basePrice = selectedProduct.precios[detailLista] || 0;
-                  const effectivePrice = getEffectivePrice(selectedProduct, detailLista, qty);
-                  const isPromo = effectivePrice !== basePrice && effectivePrice > 0;
+                  const eff = getEffectivePrice(selectedProduct, detailLista, qty);
                   if (qty <= 0 || basePrice <= 0) return null;
-                  return isPromo ? (
+                  return eff.isPromo ? (
                     <span>
+                      {eff.promoLabel && <span className="text-orange-600 text-xs block mb-1">{eff.promoLabel}</span>}
                       {detailQty} × <span className="line-through text-gray-400">{formatPrice(basePrice)}</span>{" "}
-                      <span className="text-orange-600 font-bold">{formatPrice(effectivePrice)}</span>{" "}
-                      = <span className="font-bold text-orange-600">{formatPrice(qty * effectivePrice)}</span>
+                      = <span className="font-bold text-orange-600">{formatPrice(eff.lineTotal)}</span>
                     </span>
                   ) : (
-                    <span>{detailQty} × {formatPrice(basePrice)} = <span className="font-bold text-gray-900">{formatPrice(qty * basePrice)}</span></span>
+                    <span>{detailQty} × {formatPrice(basePrice)} = <span className="font-bold text-gray-900">{formatPrice(eff.lineTotal)}</span></span>
                   );
                 })()}
               </div>

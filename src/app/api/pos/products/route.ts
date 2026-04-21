@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 interface Promo {
   desde: number;
   precio: number;
+  tipo: "por-unidad" | "precio-fijo"; // por-unidad: qty × precio. precio-fijo: total = precio
   label: string;
 }
 
@@ -17,27 +18,37 @@ function parsePromos(filler1: string, filler2: string, unidad: string): Promo[] 
   const flags = filler2.trim();
   const data = filler1.trimEnd();
 
-  // Match all "desde precio" pairs in the string
-  // Pattern: number (int or decimal) + spaces + price (with dots as thousands, comma as decimal)
+  // Detect promo type from trailing character in Filler1
+  // Trailing "1" or no trailing = Promo 1 (per-unit price)
+  // Trailing "2" = Promo 2 (fixed total price)
+  const lastChar = data.slice(-1);
+  const isPromo2 = lastChar === "2";
+
+  // Match all "desde precio" pairs
   const regex = /([\d]+(?:[.,]\d+)?)\s+([\d]+(?:\.[\d]{3})*(?:,[\d]{2})?)/g;
   let match;
-  let promoIdx = 0;
 
-  while ((match = regex.exec(data)) !== null && promoIdx < 2) {
-    if (promoIdx >= flags.length || flags[promoIdx] !== "1") { promoIdx++; continue; }
-
+  while ((match = regex.exec(data)) !== null) {
     const desde = parseFloat(match[1].replace(",", "."));
     const precioStr = match[2].replace(/\.(?=\d{3})/g, "").replace(",", ".");
     const precio = parseFloat(precioStr);
 
     if (!isNaN(desde) && !isNaN(precio) && precio > 0) {
-      const label = isKg
-        ? `Desde ${desde}kg a $${precio.toLocaleString("es-AR", { maximumFractionDigits: 0 })}/kg`
-        : `Lleva ${Math.round(desde)} x $${precio.toLocaleString("es-AR", { maximumFractionDigits: 0 })}`;
-      promos.push({ desde, precio, label });
+      const tipo = isPromo2 ? "precio-fijo" : "por-unidad";
+      let label: string;
+      if (isPromo2) {
+        label = `${Math.round(desde)}u → $${precio.toLocaleString("es-AR", { maximumFractionDigits: 0 })} total`;
+      } else if (isKg) {
+        label = `Desde ${desde}kg a $${precio.toLocaleString("es-AR", { maximumFractionDigits: 0 })}/kg`;
+      } else {
+        label = `Lleva ${Math.round(desde)} x $${precio.toLocaleString("es-AR", { maximumFractionDigits: 0 })}`;
+      }
+      promos.push({ desde, precio, tipo, label });
     }
-    promoIdx++;
   }
+
+  // Only return promos if the flag is active
+  if (flags[0] !== "1" && promos.length > 0) return [];
 
   return promos;
 }
