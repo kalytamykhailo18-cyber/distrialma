@@ -12,7 +12,12 @@ import {
 
 interface Terminal {
   id: number; nombre: string; sucursal: string; sucursalNombre: string;
-  listas: string; cuit: string; flujo: string; requiereCliente: boolean;
+  listas: string; cuit: string; flujo: string; requiereCliente: boolean; esCajero: boolean;
+}
+interface Pendiente {
+  boleta: string; nroped: string; total: number; cant: number; fecha: string; hora: string;
+  clienteCod: string; clienteNombre: string; empleadoNombre: string; origen: string; notas: string;
+  items: Array<{ sku: string; nombre: string; cantidad: number; precio: number; impo: number; lista: number }>;
 }
 interface Empleado { cod: string; nombre: string; }
 interface Cliente { cod: string; nombre: string; cuit: string; zona: string; listaPrecios: string; }
@@ -53,6 +58,11 @@ export default function PosPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const cartLoaded = useRef(false);
+
+  // Cajero: pending orders
+  const [pendientes, setPendientes] = useState<Pendiente[]>([]);
+  const [loadingPendientes, setLoadingPendientes] = useState(false);
+  const [selectedPendiente, setSelectedPendiente] = useState<Pendiente | null>(null);
 
   // Payment
   const [showPayment, setShowPayment] = useState(false);
@@ -233,6 +243,33 @@ export default function PosPage() {
     if (selectedProduct?.sku === sku) setSelectedProduct(null);
   }
 
+  async function loadPendientes() {
+    if (!terminal) return;
+    setLoadingPendientes(true);
+    try {
+      const res = await fetch(`/api/pos/pendientes?sucursal=${terminal.sucursal}`);
+      if (res.ok) { const d = await res.json(); setPendientes(d.pendientes || []); }
+    } catch {}
+    setLoadingPendientes(false);
+  }
+
+  function loadPendienteToCart(p: Pendiente) {
+    setSelectedPendiente(p);
+    setCart(p.items.map((i) => ({
+      sku: i.sku, nombre: i.nombre, unidad: "", cantidad: i.cantidad,
+      precio: i.precio, lista: i.lista, images: [],
+    })));
+  }
+
+  // Load pendientes for cajero terminals
+  useEffect(() => {
+    if (terminal?.esCajero) {
+      loadPendientes();
+      const interval = setInterval(loadPendientes, 30000); // refresh every 30s
+      return () => clearInterval(interval);
+    }
+  }, [terminal]);
+
   function openPayment() {
     if (cart.length === 0 || !selectedEmpleado) return;
     if (terminal?.flujo === "pendiente") {
@@ -313,6 +350,18 @@ export default function PosPage() {
       setPaySuccess(`Venta registrada — Boleta #${d.boleta}${vuelto > 0 ? ` — Vuelto: ${formatPrice(vuelto)}` : ""}`);
       setCart([]);
       setSelectedProduct(null);
+      // If this was a pendiente, delete it from PunTouch
+      if (selectedPendiente) {
+        try {
+          await fetch("/api/pos/pendientes", {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ boleta: selectedPendiente.boleta }),
+          });
+        } catch {}
+        setSelectedPendiente(null);
+        loadPendientes();
+      }
       setTimeout(() => {
         setShowPayment(false);
         setPaySuccess("");
@@ -477,8 +526,48 @@ export default function PosPage() {
 
       {/* Main content: 2 columns on desktop, stacked on mobile */}
       <div className="flex-1 flex flex-col md:flex-row md:overflow-hidden">
-        {/* LEFT: search (top) + cart (bottom) */}
+        {/* LEFT: search (top) + cart (bottom) OR pending list for cajero */}
         <div className="md:w-1/2 flex flex-col md:border-r">
+          {terminal.esCajero && !selectedPendiente ? (
+            /* Cajero: pending orders list */
+            <div className="flex-1 overflow-y-auto p-3">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="font-bold text-gray-900">Pendientes ({pendientes.length})</h2>
+                <button onClick={loadPendientes} disabled={loadingPendientes}
+                  className={`text-sm text-brand-600 hover:text-brand-700 ${loadingPendientes ? "animate-pulse" : ""}`}>
+                  {loadingPendientes ? "Cargando..." : "Actualizar"}
+                </button>
+              </div>
+              {pendientes.length === 0 ? (
+                <div className="text-center text-gray-400 py-12">
+                  <HiOutlineShoppingCart className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                  <p>No hay pedidos pendientes</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {pendientes.map((p, i) => (
+                    <button key={p.boleta} onClick={() => loadPendienteToCart(p)}
+                      className="w-full text-left bg-white border rounded-xl p-3 hover:shadow-md transition-all duration-200"
+                      style={{ opacity: 0, animation: `cardIn 300ms ease ${i * 40}ms forwards` }}>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs text-gray-400 font-mono">#{p.nroped || p.boleta}</span>
+                        <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${p.origen === "POS" ? "bg-cyan-100 text-cyan-700" : p.origen === "Web" ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-600"}`}>
+                          {p.origen}
+                        </span>
+                      </div>
+                      <div className="font-medium text-gray-900 text-sm">{p.clienteNombre || "Sin cliente"}</div>
+                      <div className="flex items-center justify-between mt-1">
+                        <span className="text-xs text-gray-500">{p.empleadoNombre} · {p.fecha} {p.hora}</span>
+                        <span className="font-bold text-brand-600">{formatPrice(p.total)}</span>
+                      </div>
+                      <div className="text-xs text-gray-400 mt-1">{p.items.length} items · {p.cant} unidades</div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
+          <>
           {/* Search area */}
           <div className="p-2 md:p-3 border-b bg-white">
             <div className="relative">
@@ -546,7 +635,12 @@ export default function PosPage() {
                 {itemCount > 0 && <span className="text-xs text-gray-400">({itemCount})</span>}
               </div>
               {cart.length > 0 && (
-                <button onClick={() => { setCart([]); setSelectedProduct(null); }} className="text-xs text-red-500 hover:text-red-700">Vaciar</button>
+                <>
+                {selectedPendiente && (
+                  <button onClick={() => { setCart([]); setSelectedPendiente(null); setSelectedProduct(null); }} className="text-xs text-blue-500 hover:text-blue-700 mr-2">&larr; Pendientes</button>
+                )}
+                <button onClick={() => { setCart([]); setSelectedProduct(null); setSelectedPendiente(null); }} className="text-xs text-red-500 hover:text-red-700">Vaciar</button>
+                </>
               )}
             </div>
             <div className="md:flex-1 md:overflow-y-auto px-2 py-1 space-y-1">
@@ -601,7 +695,9 @@ export default function PosPage() {
               </button>
             </div>
           </div>
-        </div>
+          </>
+          )}
+        </div>{/* end left panel */}
 
         {/* RIGHT: product detail / promotions — hidden on mobile, overlay on tap */}
         {selectedProduct && (

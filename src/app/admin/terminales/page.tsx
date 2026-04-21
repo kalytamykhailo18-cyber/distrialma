@@ -23,13 +23,14 @@ interface Terminal {
   permisoPrecio: boolean;
   permisoDevolver: boolean;
   requiereCliente: boolean;
+  esCajero: boolean;
   activa: boolean;
 }
 
 const EMPTY_FORM: Omit<Terminal, "id"> = {
   nombre: "", sucursal: "", sucursalNombre: "", listas: "1", cuit: "", razonSocial: "",
   direccion: "", aliasBanco: "", formatoImpresion: "ticket", flujo: "directo",
-  permisoAnular: false, permisoPrecio: false, permisoDevolver: true, requiereCliente: false, activa: true,
+  permisoAnular: false, permisoPrecio: false, permisoDevolver: true, requiereCliente: false, esCajero: false, activa: true,
 };
 
 const SUCURSALES = [
@@ -75,7 +76,7 @@ export default function TerminalesPage() {
         listas: t.listas, cuit: t.cuit, razonSocial: t.razonSocial, direccion: t.direccion,
         aliasBanco: t.aliasBanco, formatoImpresion: t.formatoImpresion, flujo: t.flujo,
         permisoAnular: t.permisoAnular, permisoPrecio: t.permisoPrecio,
-        permisoDevolver: t.permisoDevolver, requiereCliente: t.requiereCliente, activa: t.activa,
+        permisoDevolver: t.permisoDevolver, requiereCliente: t.requiereCliente, esCajero: t.esCajero, activa: t.activa,
       });
     } else {
       setEditing("new");
@@ -237,6 +238,7 @@ export default function TerminalesPage() {
                     {t.requiereCliente && <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">Req. cliente</span>}
                     {t.permisoAnular && <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-600">Anular</span>}
                     {t.permisoPrecio && <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-600">Cambiar precio</span>}
+                    {t.esCajero && <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-cyan-100 text-cyan-600">Cajero</span>}
                     {!t.activa && <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-200 text-gray-500">Inactiva</span>}
                   </div>
                 </div>
@@ -352,6 +354,7 @@ export default function TerminalesPage() {
                 <div className="flex flex-wrap gap-x-5 gap-y-2">
                   {([
                     ["requiereCliente", "Requiere cliente"],
+                    ["esCajero", "Es cajero (levanta pendientes)"],
                     ["permisoAnular", "Puede anular ventas"],
                     ["permisoPrecio", "Puede cambiar precios"],
                     ["permisoDevolver", "Puede hacer devoluciones"],

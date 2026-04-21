@@ -568,6 +568,7 @@ model PosTerminal {
   permisoPrecio   Boolean  @default(false)
   permisoDevolver Boolean  @default(true)
   requiereCliente Boolean  @default(false)
+  esCajero        Boolean  @default(false)  // true = shows pending orders list instead of product search
   activa          Boolean  @default(true)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
