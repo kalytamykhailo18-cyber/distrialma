@@ -194,6 +194,15 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    // Auto-add bonificacion SKU 22 at $0.01
+    expandedItems.push({
+      sku: "22",
+      name: "ENVIO BONIFICACION",
+      cant: 1,
+      price: 0.01,
+      listaPrecio: 2,
+    });
+
     // Calculate totals
     let totalCant = 0;
     let totalImpo = 0;
