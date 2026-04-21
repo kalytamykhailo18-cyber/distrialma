@@ -25,6 +25,9 @@ interface Client {
   facturadoMercaderia: number;
   lastOrderTotal: number;
   lastOrderDate: string | null;
+  hasOldOrders: boolean;
+  oldOrdersCount: number;
+  oldOrdersTotal: number;
 }
 
 interface RepartoData {
@@ -469,6 +472,27 @@ export default function RepartoPage() {
             )}
           </div>
         </Stagger>
+
+        {/* Old undelivered orders warning */}
+        {(() => {
+          const clientsWithOld = filtered.filter((c) => c.hasOldOrders);
+          if (clientsWithOld.length === 0) return null;
+          return (
+            <Stagger delay={130}>
+              <div className="bg-amber-50 border-2 border-amber-300 rounded-xl p-3 mb-4">
+                <h3 className="font-bold text-amber-800 text-sm mb-2">Entregas pendientes de dias anteriores ({clientsWithOld.length})</h3>
+                <div className="space-y-1">
+                  {clientsWithOld.map((c) => (
+                    <div key={c.cod + "-old"} className="flex items-center justify-between bg-white rounded-lg px-3 py-2 text-sm">
+                      <span className="font-medium text-gray-800">{c.nombre}</span>
+                      <span className="text-amber-700 font-bold">{c.oldOrdersCount} boleta{c.oldOrdersCount > 1 ? "s" : ""} · ${c.oldOrdersTotal.toLocaleString("es-AR", { maximumFractionDigits: 0 })}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </Stagger>
+          );
+        })()}
 
         {/* Client list */}
         <Stagger delay={150}>

@@ -205,6 +205,11 @@ export async function GET(req: NextRequest) {
       const facturadoPlata = orders.filter((o) => o.origen === "facturado").reduce((s, o) => s + (Number(o.total) || 0), 0);
       const facturadoMercaderia = orders.filter((o) => o.origen === "facturado").reduce((s, o) => s + (Number(o.cant) || 0), 0);
 
+      // Detect old orders (before the delivery date window)
+      const oldOrders = orders.filter((o) => o.fechora < sinceStr);
+      const hasOldOrders = oldOrders.length > 0;
+      const oldOrdersTotal = oldOrders.reduce((s, o) => s + (Number(o.total) || 0), 0);
+
       return {
         cod: c.cod,
         nombre: c.nombre,
@@ -219,8 +224,11 @@ export async function GET(req: NextRequest) {
         totalMercaderia,
         facturadoPlata,
         facturadoMercaderia,
-        lastOrderTotal: totalPlata, // retained for backwards compat
+        lastOrderTotal: totalPlata,
         lastOrderDate: latestOrder ? `${latestOrder.fechora.slice(6, 8)}/${latestOrder.fechora.slice(4, 6)}/${latestOrder.fechora.slice(0, 4)}` : null,
+        hasOldOrders,
+        oldOrdersCount: oldOrders.length,
+        oldOrdersTotal,
       };
     });
 
