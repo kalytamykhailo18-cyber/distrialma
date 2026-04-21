@@ -116,6 +116,7 @@ export default function PreciosPage() {
           precio4: String(data.product.precio4 || ""),
           precio5: String(data.product.precio5 || ""),
         });
+        setTimeout(() => { const el = document.getElementById("price-precio") as HTMLInputElement; if (el) { el.focus(); el.select(); } }, 300);
       } else {
         setError(data.error || "Producto no encontrado");
       }
@@ -322,6 +323,7 @@ export default function PreciosPage() {
                     <div className="flex items-center gap-2 flex-1 min-w-0">
                       <span className="text-gray-400">$</span>
                       <input
+                        id={`price-${field.key}`}
                         type="number"
                         min="0"
                         step="0.01"
