@@ -747,6 +747,8 @@ export default function PosPage() {
               <div className="flex flex-wrap gap-2 md:gap-3 mb-4 md:mb-5 justify-center">
                 {Object.entries(selectedProduct.precios).map(([lista, precio]) => {
                   if (!precio || precio <= 0) return null;
+                  const terminalListas = terminal.listas.split(",").map((l) => l.trim());
+                  if (!terminalListas.includes(lista)) return null;
                   const isSelected = Number(lista) === detailLista;
                   return (
                     <button key={lista} onClick={() => setDetailLista(Number(lista))}
