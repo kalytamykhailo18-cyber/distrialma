@@ -64,6 +64,9 @@ export default function PosPage() {
   const [loadingPendientes, setLoadingPendientes] = useState(false);
   const [selectedPendiente, setSelectedPendiente] = useState<Pendiente | null>(null);
 
+  // PeYa
+  const [peyaCode, setPeyaCode] = useState("");
+
   // Payment
   const [showPayment, setShowPayment] = useState(false);
   const [payMethod, setPayMethod] = useState<string>("");
@@ -298,14 +301,15 @@ export default function PosPage() {
           empleadoCod: selectedEmpleado.cod,
           clienteCod: selectedCliente?.cod,
           items: cart.map((i) => ({ sku: i.sku, nombre: i.nombre, cantidad: i.cantidad, precio: i.precio, lista: i.lista })),
-          notes: "",
+          notes: peyaCode ? `PeYa: ${peyaCode}` : "",
         }),
       });
       const d = await res.json();
       if (!res.ok) throw new Error(d.error || "Error al crear pendiente");
-      setPaySuccess(`Pedido pendiente #${d.nroped || d.boleta} creado`);
+      setPaySuccess(`Pedido pendiente #${d.nroped || d.boleta} creado${peyaCode ? ` — PeYa: ${peyaCode}` : ""}`);
       setCart([]);
       setSelectedProduct(null);
+      setPeyaCode("");
       setTimeout(() => { setPaySuccess(""); searchRef.current?.focus(); }, 2000);
     } catch (e) {
       setPayError(e instanceof Error ? e.message : "Error");
@@ -561,6 +565,9 @@ export default function PosPage() {
                         <span className="font-bold text-brand-600">{formatPrice(p.total)}</span>
                       </div>
                       <div className="text-xs text-gray-400 mt-1">{p.items.length} items · {p.cant} unidades</div>
+                      {p.notas && p.notas.startsWith("PeYa:") && (
+                        <div className="text-xs font-medium text-amber-600 mt-1">{p.notas}</div>
+                      )}
                     </button>
                   ))}
                 </div>
@@ -683,6 +690,14 @@ export default function PosPage() {
                 </div>
               ))}
             </div>
+            {/* PeYa code (suc 3 only) */}
+            {terminal.sucursal.trim() === "3" && terminal.flujo === "pendiente" && (
+              <div className="border-t px-3 py-2 bg-amber-50">
+                <input type="text" value={peyaCode} onChange={(e) => setPeyaCode(e.target.value)}
+                  placeholder="Codigo PeYa..."
+                  className="w-full px-3 py-1.5 border border-amber-300 rounded-lg text-sm focus:outline-none focus:border-amber-500 bg-white" />
+              </div>
+            )}
             {/* Total + action */}
             <div className="border-t px-3 py-2 flex items-center justify-between bg-white gap-2">
               <div className="min-w-0">
