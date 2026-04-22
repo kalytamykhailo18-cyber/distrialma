@@ -400,11 +400,8 @@ export default function CierreCajaPage() {
       else if (d.emailTo) msg += ` — Error al enviar email`;
       else msg += ` — Email no configurado`;
       setSuccess(msg);
-      setNuevoInicio("");
-      setEfectivoContado("");
-      setFotos([]);
-      setSelectedEmpleado("");
-      loadCierre();
+      // Don't clear fields immediately — show success modal first
+      // Fields will reset when user clicks "Cerrar" or loads new cierre
       if (isAdmin) loadHistory();
 
     } catch (e: unknown) {
@@ -506,16 +503,22 @@ export default function CierreCajaPage() {
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl">{error}</div>
       </div>
 
-      {/* Success alert */}
-      <div
-        className="overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)]"
-        style={{ maxHeight: success ? 80 : 0, opacity: success ? 1 : 0, marginBottom: success ? 16 : 0 }}
-      >
-        <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl flex items-center gap-2">
-          <HiOutlineCheck className="w-5 h-5 shrink-0" />
-          {success}
+      {/* Success modal */}
+      {success && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md text-center" style={{ animation: "fadeScaleIn 300ms ease" }}>
+            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <HiOutlineCheck className="w-8 h-8 text-green-600" />
+            </div>
+            <h2 className="text-xl font-bold text-gray-900 mb-2">Cierre registrado</h2>
+            <p className="text-gray-600 mb-6">{success}</p>
+            <button onClick={() => { setSuccess(""); setNuevoInicio(""); setEfectivoContado(""); setFotos([]); setSelectedEmpleado(""); loadCierre(); }}
+              className="px-6 py-3 bg-green-600 text-white rounded-xl font-bold text-lg hover:bg-green-700 transition-colors">
+              Aceptar
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Data section */}
       {data && (
