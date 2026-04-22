@@ -880,7 +880,11 @@ export default function CierreCajaPage() {
                         <td className="p-3 text-right">${Number(c.nuevoInicio || 0).toLocaleString("es-AR", { minimumFractionDigits: 0 })}</td>
                         <td className="p-3 text-center">
                           <div className="flex items-center justify-center gap-2">
-                            {c.emailSent && <span className="text-green-600 text-xs font-medium">Enviado</span>}
+                            <a href={`/api/admin/cierre-caja/pdf?id=${c.id}`} target="_blank"
+                              className="flex items-center gap-1 text-xs text-red-500 hover:text-red-700 font-medium">
+                              <HiOutlineDocumentDownload className="w-3.5 h-3.5" />
+                              PDF
+                            </a>
                             <button
                               onClick={() => resendEmail(c.id)}
                               disabled={resending === c.id}
