@@ -182,10 +182,123 @@ export async function POST(req: NextRequest) {
     break; // success, exit retry loop
     }
 
+    // Generate PDF server-side (don't rely on browser PDF)
+    let serverPdf = "";
+    try {
+      const { jsPDF } = await import("jspdf");
+      const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+      const w = doc.internal.pageSize.getWidth();
+      let y = 15;
+      const fmt = (n: number) => "$" + n.toLocaleString("es-AR", { minimumFractionDigits: 2 });
+      const now2 = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Argentina/Buenos_Aires" }));
+
+      // Header
+      doc.setFillColor(251, 154, 71);
+      doc.rect(0, 0, w, 24, "F");
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(18);
+      doc.setFont("helvetica", "bold");
+      doc.text("Distrialma — Cierre de Caja", 14, 14);
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "normal");
+      doc.text(`Sucursal ${suc} — Caja ${data.nroCaja} — Desde: ${data.desde}`, w - 14, 14, { align: "right" });
+      doc.text(`Responsable: ${userName} — ${now2.toLocaleString("es-AR")}`, w - 14, 20, { align: "right" });
+      y = 32;
+
+      // Summary cards
+      const cards = [
+        { label: "Ventas", value: String(data.ventas.cantidad), color: [232, 245, 233] as [number, number, number] },
+        { label: "Efectivo", value: fmt(data.ventas.efectivo), color: [232, 245, 233] as [number, number, number] },
+        { label: "Tarjeta", value: fmt(data.ventas.tarjeta), color: [255, 243, 224] as [number, number, number] },
+        { label: "Cta. Cte.", value: fmt(data.ventas.deuda), color: [255, 235, 238] as [number, number, number] },
+      ];
+      const cardW = (w - 28 - 9) / 4;
+      cards.forEach((c, i) => {
+        const x = 14 + i * (cardW + 3);
+        doc.setFillColor(...c.color);
+        doc.roundedRect(x, y, cardW, 18, 2, 2, "F");
+        doc.setTextColor(80, 80, 80);
+        doc.setFontSize(8);
+        doc.text(c.label, x + cardW / 2, y + 6, { align: "center" });
+        doc.setFontSize(12);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(30, 30, 30);
+        doc.text(c.value, x + cardW / 2, y + 14, { align: "center" });
+        doc.setFont("helvetica", "normal");
+      });
+      y += 24;
+
+      // Detail section
+      doc.setFillColor(41, 50, 60);
+      doc.roundedRect(14, y, w - 28, 8, 1, 1, "F");
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "bold");
+      doc.text("TOTAL VENTAS", 18, y + 6);
+      doc.text(fmt(data.ventas.total), w - 18, y + 6, { align: "right" });
+      y += 12;
+
+      doc.setTextColor(60, 60, 60);
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "normal");
+      const lines = [
+        ["Inicio de caja:", fmt(data.inicioCaja), "Total tarjeta/otros:", fmt(data.ventas.tarjeta)],
+        ["Ventas en efectivo:", fmt(data.ventas.efectivo), "Total Cta. Cte.:", fmt(data.ventas.deuda)],
+        ["Retiros:", fmt(data.retiros), "", ""],
+        ["Ingresos:", fmt(data.ingresos), "", ""],
+        ["Pagos proveedores:", fmt(data.pagos), "", ""],
+        ["TOTAL EFECTIVO EN CAJA:", fmt(data.totalEfectivoCaja), "", ""],
+      ];
+      for (const line of lines) {
+        doc.text(line[0], 18, y);
+        doc.text(line[1], 90, y, { align: "right" });
+        if (line[2]) { doc.text(line[2], 110, y); doc.text(line[3], w - 18, y, { align: "right" }); }
+        y += 5;
+      }
+      y += 4;
+
+      // Total general
+      doc.setFillColor(255, 243, 224);
+      doc.roundedRect(14, y, w - 28, 10, 2, 2, "F");
+      doc.setTextColor(200, 100, 0);
+      doc.setFontSize(11);
+      doc.setFont("helvetica", "bold");
+      doc.text("TOTAL GENERAL", 18, y + 7);
+      doc.text(fmt(data.totalEfectivoCaja), w - 18, y + 7, { align: "right" });
+      y += 14;
+
+      // Diferencia
+      const diferencia = nuevoInicioVal - data.totalEfectivoCaja;
+      const diffLabel = diferencia >= 0 ? "SOBRANTE" : "FALTANTE";
+      doc.setFillColor(diferencia >= 0 ? 232 : 255, diferencia >= 0 ? 245 : 235, diferencia >= 0 ? 233 : 238);
+      doc.roundedRect(14, y, w - 28, 8, 2, 2, "F");
+      doc.setTextColor(diferencia >= 0 ? 22 : 220, diferencia >= 0 ? 163 : 38, diferencia >= 0 ? 74 : 38);
+      doc.setFontSize(10);
+      doc.text(diffLabel, 18, y + 6);
+      doc.text((diferencia >= 0 ? "+" : "") + fmt(Math.abs(diferencia)), w - 18, y + 6, { align: "right" });
+      y += 12;
+
+      // Inicio siguiente
+      doc.setFillColor(251, 154, 71);
+      doc.roundedRect(14, y, w - 28, 10, 2, 2, "F");
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(11);
+      doc.setFont("helvetica", "bold");
+      doc.text("INICIO DE CAJA SIGUIENTE", 18, y + 7);
+      doc.text(fmt(nuevoInicioVal), w - 18, y + 7, { align: "right" });
+
+      serverPdf = doc.output("datauristring").split(",")[1];
+    } catch (pdfErr) {
+      console.error("Server PDF generation error:", pdfErr);
+      serverPdf = pdfBase64 || ""; // fallback to browser PDF
+    }
+
+    const finalPdf = serverPdf || pdfBase64 || "";
+
     // Send email via Resend API (only if PunTouch succeeded)
     let emailSent = false;
     const resendKey = process.env.RESEND_API_KEY || "";
-    if (emailTo && pdfBase64 && resendKey) {
+    if (emailTo && finalPdf && resendKey) {
       try {
         const resend = new Resend(resendKey);
         const fecha = new Date().toLocaleDateString("es-AR");
@@ -232,7 +345,7 @@ export async function POST(req: NextRequest) {
           attachments: [
             {
               filename,
-              content: pdfBase64,
+              content: finalPdf,
             },
             ...allFotos.map((foto: string, i: number) => ({
               filename: `Ticket-Posnet-${i + 1}-${new Date().toISOString().slice(0, 10)}.jpg`,
@@ -256,14 +369,14 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Enqueue print job for silent printing
-    if (pdfBase64) {
+    // Enqueue print job for silent printing (use server PDF)
+    if (finalPdf) {
       try {
         await prisma.printJob.create({
           data: {
             tipo: "cierre",
             filename: `CierreCaja-Suc${suc}-${new Date().toISOString().slice(0, 10)}.pdf`,
-            pdfBase64,
+            pdfBase64: finalPdf,
             sucursal: suc,
           },
         });
