@@ -576,3 +576,23 @@ model PosTerminal {
 
   @@map("pos_terminales")
 }
+
+// WhatsApp broadcast campaigns
+model Difusion {
+  id          Int       @id @default(autoincrement())
+  mensaje     String    @db.Text
+  imagenUrl   String?   @db.VarChar(500)
+  filtro      String    @db.VarChar(30)  // "todos" | "zona:LUNES" | "reparto" etc.
+  programada  DateTime?                  // null = send immediately
+  estado      String    @default("pendiente") @db.VarChar(20) // pendiente | enviando | completada | cancelada
+  enviados    Int       @default(0)
+  fallidos    Int       @default(0)
+  total       Int       @default(0)
+  creadoPor   String    @db.VarChar(60)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([estado])
+  @@index([programada])
+  @@map("difusiones")
+}

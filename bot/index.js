@@ -704,10 +704,16 @@ const httpServer = http.createServer(async (req, res) => {
     req.on("data", (c) => body += c);
     req.on("end", async () => {
       try {
-        const { chatId, message, addToContext, sender } = JSON.parse(body);
-        if (!chatId || !message) { res.writeHead(400); res.end('{"error":"chatId and message required"}'); return; }
+        const { chatId, message, addToContext, sender, mediaUrl, mediaCaption } = JSON.parse(body);
+        if (!chatId || (!message && !mediaUrl)) { res.writeHead(400); res.end('{"error":"chatId and message/mediaUrl required"}'); return; }
         inboxReplying.add(chatId);
-        await client.sendMessage(chatId, message);
+        if (mediaUrl) {
+          const { MessageMedia } = pkg;
+          const media = await MessageMedia.fromUrl(mediaUrl, { unsafeMime: true });
+          await client.sendMessage(chatId, media, { caption: mediaCaption || message || "" });
+        } else {
+          await client.sendMessage(chatId, message);
+        }
         storeMessage(chatId, "out", message, sender || "human");
         console.log(`[INBOX] ${chatId}: ${message.substring(0, 60)}`);
         // If requested, seed conversation so Claude has context when the client replies

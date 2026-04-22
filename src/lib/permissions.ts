@@ -22,6 +22,7 @@ export const ALL_PERMISSIONS = [
   { key: "cierre-caja", label: "Cierre de Caja" },
   { key: "usuarios", label: "Usuarios" },
   { key: "terminales", label: "Terminales POS" },
+  { key: "difusion", label: "Difusion WhatsApp" },
 ] as const;
 
 // Special flags (not page permissions, but user config options)
@@ -66,6 +67,7 @@ export const PAGE_PERMISSION_MAP: Record<string, Permission> = {
   "/admin/usuarios": "usuarios",
   "/admin/reparto": "reparto",
   "/admin/terminales": "terminales",
+  "/admin/difusion": "difusion",
 };
 
 export function hasPermission(

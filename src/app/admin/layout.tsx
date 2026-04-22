@@ -80,6 +80,7 @@ const MENU_CATEGORIES: MenuCategory[] = [
     label: "Config", icon: HiOutlineCog, items: [
       { href: "/admin/etiquetas", label: "Etiquetas", perm: "etiquetas" },
       { href: "/admin/terminales", label: "Terminales POS", perm: "terminales" },
+      { href: "/admin/difusion", label: "Difusion WhatsApp", perm: "difusion" },
     ],
   },
 ];
