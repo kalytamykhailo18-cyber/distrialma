@@ -876,18 +876,17 @@ export default function CierreCajaPage() {
                         <td className="p-3 text-right font-bold">${Number(c.totalVentas).toLocaleString("es-AR", { minimumFractionDigits: 2 })}</td>
                         <td className="p-3 text-right">${Number(c.nuevoInicio || 0).toLocaleString("es-AR", { minimumFractionDigits: 0 })}</td>
                         <td className="p-3 text-center">
-                          {c.emailSent ? (
-                            <span className="text-green-600 text-xs font-medium">Enviado</span>
-                          ) : (
+                          <div className="flex items-center justify-center gap-2">
+                            {c.emailSent && <span className="text-green-600 text-xs font-medium">Enviado</span>}
                             <button
                               onClick={() => resendEmail(c.id)}
                               disabled={resending === c.id}
-                              className="flex items-center gap-1 text-xs text-brand-600 hover:text-brand-700 font-medium disabled:opacity-50 mx-auto"
+                              className="flex items-center gap-1 text-xs text-brand-600 hover:text-brand-700 font-medium disabled:opacity-50"
                             >
                               <HiOutlineRefresh className={`w-3.5 h-3.5 ${resending === c.id ? "animate-spin" : ""}`} />
-                              {resending === c.id ? "Enviando..." : "Reenviar"}
+                              {resending === c.id ? "..." : "Reenviar"}
                             </button>
-                          )}
+                          </div>
                         </td>
                       </tr>
                     ))}
