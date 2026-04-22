@@ -6,30 +6,12 @@ import { formatPrice } from "@/lib/utils";
 import {
   HiOutlineSearch, HiOutlineTrash, HiOutlinePlus, HiOutlineMinus,
   HiOutlineUser, HiOutlineUserGroup, HiOutlineDesktopComputer,
-  HiOutlineShoppingCart, HiOutlineCash, HiOutlineCreditCard,
-  HiOutlineQrcode, HiOutlineLibrary, HiOutlineClipboardList, HiOutlineBookOpen,
+  HiOutlineShoppingCart,
 } from "react-icons/hi";
-
-interface Terminal {
-  id: number; nombre: string; sucursal: string; sucursalNombre: string;
-  listas: string; cuit: string; flujo: string; requiereCliente: boolean; esCajero: boolean; modoPrueba: boolean; permisoPrecio: boolean;
-}
-interface Pendiente {
-  boleta: string; nroped: string; total: number; cant: number; fecha: string; hora: string;
-  clienteCod: string; clienteNombre: string; empleadoNombre: string; origen: string; notas: string;
-  items: Array<{ sku: string; nombre: string; cantidad: number; precio: number; impo: number; lista: number }>;
-}
-interface Empleado { cod: string; nombre: string; }
-interface Cliente { cod: string; nombre: string; cuit: string; zona: string; listaPrecios: string; }
-interface PosPromo { desde: number; precio: number; tipo: "por-unidad" | "precio-fijo"; label: string; }
-interface PosProduct {
-  sku: string; nombre: string; unidad: string; precios: Record<number, number>;
-  stock: number; codBarra: string; cantPorCaja: number; images: string[]; promos: PosPromo[];
-}
-interface CartItem { sku: string; nombre: string; unidad: string; cantidad: number; precio: number; originalPrecio?: number; lista: number; images: string[]; }
-
-const LISTA_LABELS: Record<number, string> = { 1: "Minorista", 2: "Mayorista", 3: "Especial", 4: "Caja Cerrada", 5: "PedidosYa" };
-const STORAGE_KEY = "pos_cart_";
+import type { Terminal, Pendiente, Empleado, Cliente, PosProduct, CartItem } from "./types";
+import { LISTA_LABELS, STORAGE_KEY } from "./types";
+import PosPendientes from "./components/PosPendientes";
+import PosPayment from "./components/PosPayment";
 
 export default function PosPage() {
   const params = useParams();
@@ -562,46 +544,12 @@ export default function PosPage() {
         {/* LEFT: search (top) + cart (bottom) OR pending list for cajero */}
         <div className="md:w-1/2 flex flex-col md:border-r">
           {terminal.esCajero && !selectedPendiente ? (
-            /* Cajero: pending orders list */
-            <div className="flex-1 overflow-y-auto p-3">
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="font-bold text-gray-900">Pendientes ({pendientes.length})</h2>
-                <button onClick={loadPendientes} disabled={loadingPendientes}
-                  className={`text-sm text-brand-600 hover:text-brand-700 ${loadingPendientes ? "animate-pulse" : ""}`}>
-                  {loadingPendientes ? "Cargando..." : "Actualizar"}
-                </button>
-              </div>
-              {pendientes.length === 0 ? (
-                <div className="text-center text-gray-400 py-12">
-                  <HiOutlineShoppingCart className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-                  <p>No hay pedidos pendientes</p>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {pendientes.map((p, i) => (
-                    <button key={p.boleta} onClick={() => loadPendienteToCart(p)}
-                      className="w-full text-left bg-white border rounded-xl p-3 hover:shadow-md transition-all duration-200"
-                      style={{ opacity: 0, animation: `cardIn 300ms ease ${i * 40}ms forwards` }}>
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs text-gray-400 font-mono">#{p.nroped || p.boleta}</span>
-                        <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${p.origen === "POS" ? "bg-cyan-100 text-cyan-700" : p.origen === "Web" ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-600"}`}>
-                          {p.origen}
-                        </span>
-                      </div>
-                      <div className="font-medium text-gray-900 text-sm">{p.clienteNombre || "Sin cliente"}</div>
-                      <div className="flex items-center justify-between mt-1">
-                        <span className="text-xs text-gray-500">{p.empleadoNombre} · {p.fecha} {p.hora}</span>
-                        <span className="font-bold text-brand-600">{formatPrice(p.total)}</span>
-                      </div>
-                      <div className="text-xs text-gray-400 mt-1">{p.items.length} items · {p.cant} unidades</div>
-                      {p.notas && p.notas.startsWith("PeYa:") && (
-                        <div className="text-xs font-medium text-amber-600 mt-1">{p.notas}</div>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+            <PosPendientes
+              pendientes={pendientes}
+              loadingPendientes={loadingPendientes}
+              onRefresh={loadPendientes}
+              onSelect={loadPendienteToCart}
+            />
           ) : (
           <>
           {/* Search area */}
@@ -946,143 +894,17 @@ export default function PosPage() {
           onClick={(e) => { if (e.target === e.currentTarget && !paying) setShowPayment(false); }}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden"
             style={{ animation: "fadeIn 200ms ease" }}>
-            {paySuccess ? (
-              <div className="p-8 text-center" style={{ animation: "fadeIn 300ms ease" }}>
-                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <svg className="w-8 h-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
-                </div>
-                <h2 className="text-xl font-bold text-gray-900 mb-2">Venta registrada</h2>
-                <p className="text-gray-600">{paySuccess}</p>
-              </div>
-            ) : (
-              <>
-                <div className="p-5 border-b flex items-center justify-between">
-                  <h2 className="text-lg font-bold text-gray-900">Cobrar</h2>
-                  <button onClick={() => setShowPayment(false)} disabled={paying}
-                    className="text-gray-400 hover:text-gray-600 text-xl">x</button>
-                </div>
-
-                <div className="p-5">
-                  {/* Total + Remaining */}
-                  {(() => {
-                    const paid = payLines.reduce((s, l) => s + l.amount, 0);
-                    const rem = total - paid;
-                    return (
-                      <div className="text-center mb-4">
-                        <div className="text-sm text-gray-500">Total a cobrar</div>
-                        <div className="text-3xl font-bold text-gray-900">{formatPrice(total)}</div>
-                        {paid > 0 && (
-                          <div className={`text-lg font-bold mt-1 ${rem <= 0.01 ? "text-green-600" : "text-red-500"}`}>
-                            {rem <= 0.01 ? "Completo" : `Restante: ${formatPrice(rem)}`}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })()}
-
-                  {/* Payment lines added */}
-                  {payLines.length > 0 && (
-                    <div className="mb-4 space-y-1">
-                      {payLines.map((line, i) => {
-                        const METHOD_LABELS: Record<string, string> = { efectivo: "Efectivo", debito: "Debito", credito: "Credito", cuotas: "Cuotas", qr: "QR", transferencia: "Transfer.", cuenta: "Cta. Cte." };
-                        return (
-                          <div key={i} className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2">
-                            <span className="text-sm font-medium text-gray-700">{METHOD_LABELS[line.method] || line.method}</span>
-                            <div className="flex items-center gap-2">
-                              <span className="font-bold text-gray-900">{formatPrice(line.amount)}</span>
-                              <button onClick={() => { setPayLines((prev) => prev.filter((_, j) => j !== i)); setPayConfirm(false); }}
-                                className="text-red-400 hover:text-red-600 text-xs">✕</button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  {/* Payment methods */}
-                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 mb-4">
-                    {[
-                      { key: "efectivo", label: "Efectivo", Icon: HiOutlineCash, color: "bg-green-100 text-green-700", active: "bg-green-600" },
-                      { key: "debito", label: "Debito", Icon: HiOutlineCreditCard, color: "bg-blue-100 text-blue-700", active: "bg-blue-600" },
-                      { key: "credito", label: "Credito", Icon: HiOutlineCreditCard, color: "bg-purple-100 text-purple-700", active: "bg-purple-600" },
-                      { key: "cuotas", label: "Cuotas", Icon: HiOutlineClipboardList, color: "bg-indigo-100 text-indigo-700", active: "bg-indigo-600" },
-                      { key: "qr", label: "QR", Icon: HiOutlineQrcode, color: "bg-cyan-100 text-cyan-700", active: "bg-cyan-600" },
-                      { key: "transferencia", label: "Transfer.", Icon: HiOutlineLibrary, color: "bg-amber-100 text-amber-700", active: "bg-amber-600" },
-                      { key: "cuenta", label: "Cta. Cte.", Icon: HiOutlineBookOpen, color: "bg-red-100 text-red-700", active: "bg-red-600" },
-                    ].map((m) => (
-                      <button key={m.key} onClick={() => { setPayMethod(m.key); setPayAmount(""); setPayError(""); setPayConfirm(false); }}
-                        className={`p-2 rounded-xl text-center transition-all duration-200 ${
-                          payMethod === m.key ? `${m.active} text-white shadow-md scale-105` : `${m.color} hover:opacity-80`
-                        }`}>
-                        <m.Icon className="w-5 h-5 mx-auto mb-0.5" />
-                        <div className="text-xs font-medium">{m.label}</div>
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Amount input + Add button */}
-                  {payMethod && (
-                    <div className="mb-4" style={{ animation: "fadeIn 200ms ease" }}>
-                      {payMethod === "cuenta" && !selectedCliente ? (
-                        <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm">Se requiere seleccionar un cliente</div>
-                      ) : (
-                        <div className="flex gap-2">
-                          <div className="flex-1">
-                            <input type="text" inputMode="decimal" value={payAmount}
-                              onChange={(e) => setPayAmount(e.target.value.replace(/[^0-9.,]/g, ""))}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") {
-                                  e.preventDefault();
-                                  const amt = parseFloat(payAmount) || (total - payLines.reduce((s, l) => s + l.amount, 0));
-                                  if (amt > 0) { setPayLines((prev) => [...prev, { method: payMethod, amount: amt }]); setPayMethod(""); setPayAmount(""); setPayConfirm(false); }
-                                }
-                              }}
-                              placeholder={formatPrice(Math.max(0, total - payLines.reduce((s, l) => s + l.amount, 0)))}
-                              className="w-full text-xl font-bold text-center border-2 border-gray-300 rounded-xl py-2 focus:outline-none focus:border-brand-500"
-                              autoFocus />
-                          </div>
-                          <button onClick={() => {
-                            const amt = parseFloat(payAmount) || (total - payLines.reduce((s, l) => s + l.amount, 0));
-                            if (amt > 0) { setPayLines((prev) => [...prev, { method: payMethod, amount: amt }]); setPayMethod(""); setPayAmount(""); setPayConfirm(false); }
-                          }} className="px-4 py-2 bg-brand-500 text-white rounded-xl font-bold hover:bg-brand-600 shrink-0">
-                            Agregar
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Vuelto preview */}
-                  {(() => {
-                    const paid = payLines.reduce((s, l) => s + l.amount, 0);
-                    const cashPaid = payLines.filter((l) => l.method === "efectivo").reduce((s, l) => s + l.amount, 0);
-                    const nonCash = paid - cashPaid;
-                    const vuelto = Math.max(0, cashPaid - (total - nonCash));
-                    return vuelto > 0.01 ? (
-                      <div className="mb-4 text-center text-green-600 font-bold text-lg">Vuelto: {formatPrice(vuelto)}</div>
-                    ) : null;
-                  })()}
-
-                  {/* Error */}
-                  {payError && (
-                    <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm text-center">
-                      {payError}
-                    </div>
-                  )}
-                </div>
-
-                {/* Confirm button */}
-                <div className="p-5 border-t bg-gray-50">
-                  <button onClick={() => { if (payConfirm) { confirmPayment(); } else { setPayConfirm(true); } }}
-                    disabled={paying || payLines.length === 0 || (total - payLines.reduce((s, l) => s + l.amount, 0)) > 0.01}
-                    className={`w-full py-3 text-white rounded-xl text-lg font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
-                      payConfirm ? "bg-red-600 hover:bg-red-700 animate-pulse" : "bg-green-600 hover:bg-green-700"
-                    }`}>
-                    {paying ? "Procesando..." : payConfirm ? "CONFIRMAR — Registrar venta" : `Confirmar pago (${payLines.length} medio${payLines.length !== 1 ? "s" : ""})`}
-                  </button>
-                </div>
-              </>
-            )}
+            <PosPayment
+              total={total} payMethod={payMethod} setPayMethod={setPayMethod}
+              payAmount={payAmount} setPayAmount={setPayAmount}
+              payLines={payLines} setPayLines={setPayLines}
+              payError={payError} setPayError={setPayError}
+              payConfirm={payConfirm} setPayConfirm={setPayConfirm}
+              paying={paying} paySuccess={paySuccess}
+              selectedCliente={selectedCliente}
+              onConfirm={confirmPayment}
+              onClose={() => setShowPayment(false)}
+            />
           </div>
         </div>
       )}
