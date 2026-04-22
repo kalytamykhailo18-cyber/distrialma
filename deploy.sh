@@ -1,14 +1,43 @@
 #!/bin/bash
 # Zero-downtime deploy for Distrialma
-# Build in background, only restart when build succeeds
+# Builds in a temp copy, swaps .next folder, restarts PM2
+# Total downtime: ~1 second (only pm2 restart)
 
 set -e
 cd /home/distrialma
 
-echo "Building..."
-npm run build
+echo "[deploy] Starting zero-downtime build..."
 
-echo "Restarting (instant swap)..."
-pm2 restart distrialma --update-env
+# Build in temp directory
+BUILD_DIR="/tmp/distrialma-build"
+rm -rf "$BUILD_DIR"
+mkdir -p "$BUILD_DIR"
 
-echo "Done! Downtime: ~2 seconds"
+# Copy only what's needed for build (not node_modules, not .next)
+echo "[deploy] Copying source files..."
+rsync -a --exclude='.next' --exclude='.next-old' --exclude='node_modules' --exclude='.git' --exclude='bot' . "$BUILD_DIR/"
+
+# Symlink node_modules (don't copy — too slow)
+ln -s /home/distrialma/node_modules "$BUILD_DIR/node_modules"
+
+# Build in temp directory
+echo "[deploy] Building..."
+cd "$BUILD_DIR"
+npm run build 2>&1
+
+# Swap .next folders
+echo "[deploy] Swapping .next folder..."
+cd /home/distrialma
+rm -rf .next-old
+mv .next .next-old 2>/dev/null || true
+mv "$BUILD_DIR/.next" .next
+
+# Restart PM2 (instant, ~1 second)
+echo "[deploy] Restarting PM2..."
+pm2 restart distrialma
+
+# Cleanup
+rm -rf "$BUILD_DIR"
+rm -rf .next-old
+
+echo "[deploy] Done — zero downtime!"
