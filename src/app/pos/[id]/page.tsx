@@ -720,7 +720,7 @@ export default function PosPage() {
               ))}
             </div>
             {/* PeYa code (suc 3 only) */}
-            {terminal.sucursal.trim() === "3" && terminal.flujo === "pendiente" && (
+            {terminal.sucursal.trim() === "1" && terminal.flujo === "pendiente" && (
               <div className="border-t px-3 py-2 bg-amber-50">
                 <input type="text" value={peyaCode} onChange={(e) => setPeyaCode(e.target.value)}
                   placeholder="Codigo PeYa..."
