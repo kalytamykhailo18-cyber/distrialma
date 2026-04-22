@@ -51,12 +51,15 @@ const ESTADO_LABELS: Record<string, { label: string; color: string; bg: string }
 
 function formatDate(s: string): string {
   if (!s) return "";
-  const d = new Date(s + (s.length === 10 ? "T12:00:00" : ""));
-  return d.toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric" });
+  // Extract YYYY-MM-DD and ignore timezone to prevent day shift
+  const dateStr = s.slice(0, 10);
+  const [y, m, d] = dateStr.split("-");
+  return `${d}/${m}/${y}`;
 }
 
 function daysUntil(s: string): number {
-  const d = new Date(s + (s.length === 10 ? "T12:00:00" : ""));
+  const dateStr = s.slice(0, 10);
+  const d = new Date(dateStr + "T12:00:00");
   const now = new Date();
   now.setHours(0, 0, 0, 0);
   d.setHours(0, 0, 0, 0);
