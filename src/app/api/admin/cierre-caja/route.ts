@@ -245,14 +245,33 @@ export async function POST(req: NextRequest) {
         ["Inicio de caja:", fmt(data.inicioCaja), "Total tarjeta/otros:", fmt(data.ventas.tarjeta)],
         ["Ventas en efectivo:", fmt(data.ventas.efectivo), "Total Cta. Cte.:", fmt(data.ventas.deuda)],
         ["Retiros:", fmt(data.retiros), "", ""],
-        ["Ingresos:", fmt(data.ingresos), "", ""],
-        ["Pagos proveedores:", fmt(data.pagos), "", ""],
-        ["TOTAL EFECTIVO EN CAJA:", fmt(data.totalEfectivoCaja), "", ""],
       ];
       for (const line of lines) {
         doc.text(line[0], 18, y);
         doc.text(line[1], 90, y, { align: "right" });
         if (line[2]) { doc.text(line[2], 110, y); doc.text(line[3], w - 18, y, { align: "right" }); }
+        y += 5;
+      }
+      // Retiros detail
+      if (data.retirosDetalle && data.retirosDetalle.length > 0) {
+        doc.setFontSize(7);
+        doc.setTextColor(120, 120, 120);
+        for (const r of data.retirosDetalle) {
+          doc.text(`  · ${r.concepto}`, 22, y);
+          doc.text(fmt(r.total), 90, y, { align: "right" });
+          y += 4;
+        }
+        doc.setFontSize(9);
+        doc.setTextColor(60, 60, 60);
+      }
+      const lines2 = [
+        ["Ingresos:", fmt(data.ingresos), "", ""],
+        ["Pagos proveedores:", fmt(data.pagos), "", ""],
+        ["TOTAL EFECTIVO EN CAJA:", fmt(data.totalEfectivoCaja), "", ""],
+      ];
+      for (const line of lines2) {
+        doc.text(line[0], 18, y);
+        doc.text(line[1], 90, y, { align: "right" });
         y += 5;
       }
       y += 4;
