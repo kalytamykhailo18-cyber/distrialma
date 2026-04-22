@@ -305,6 +305,44 @@ export async function POST(req: NextRequest) {
       doc.setFont("helvetica", "bold");
       doc.text("INICIO DE CAJA SIGUIENTE", 18, y + 7);
       doc.text(fmt(nuevoInicioVal), w - 18, y + 7, { align: "right" });
+      y += 16;
+
+      // Movimientos de Caja table
+      if (data.movimientos && data.movimientos.length > 0) {
+        const pageH = doc.internal.pageSize.getHeight();
+        if (y + 20 > pageH - 15) { doc.addPage(); y = 15; }
+
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(30, 30, 30);
+        doc.text("Movimientos de Caja", 14, y);
+        y += 6;
+
+        // Table header
+        doc.setFillColor(245, 245, 245);
+        doc.rect(14, y, w - 28, 6, "F");
+        doc.setFontSize(7);
+        doc.setTextColor(100, 100, 100);
+        doc.text("Tipo", 16, y + 4);
+        doc.text("Concepto", 40, y + 4);
+        doc.text("Hora", w - 55, y + 4);
+        doc.text("Monto", w - 16, y + 4, { align: "right" });
+        y += 8;
+
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(50, 50, 50);
+        for (const m of data.movimientos) {
+          if (y + 5 > pageH - 15) { doc.addPage(); y = 15; }
+          const hora = m.fechora?.length >= 12 ? `${m.fechora.slice(6, 8)}/${m.fechora.slice(4, 6)} ${m.fechora.slice(8, 10)}:${m.fechora.slice(10, 12)}` : "";
+          doc.text(m.tipo, 16, y);
+          doc.text((m.concepto || "").substring(0, 30), 40, y);
+          doc.text(hora, w - 55, y);
+          doc.text(fmt(m.monto), w - 16, y, { align: "right" });
+          doc.setDrawColor(235, 235, 235);
+          doc.line(14, y + 1.5, w - 14, y + 1.5);
+          y += 5;
+        }
+      }
 
       serverPdf = doc.output("datauristring").split(",")[1];
     } catch (pdfErr) {
