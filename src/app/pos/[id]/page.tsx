@@ -12,7 +12,7 @@ import {
 
 interface Terminal {
   id: number; nombre: string; sucursal: string; sucursalNombre: string;
-  listas: string; cuit: string; flujo: string; requiereCliente: boolean; esCajero: boolean; modoPrueba: boolean;
+  listas: string; cuit: string; flujo: string; requiereCliente: boolean; esCajero: boolean; modoPrueba: boolean; permisoPrecio: boolean;
 }
 interface Pendiente {
   boleta: string; nroped: string; total: number; cant: number; fecha: string; hora: string;
@@ -26,7 +26,7 @@ interface PosProduct {
   sku: string; nombre: string; unidad: string; precios: Record<number, number>;
   stock: number; codBarra: string; cantPorCaja: number; images: string[]; promos: PosPromo[];
 }
-interface CartItem { sku: string; nombre: string; unidad: string; cantidad: number; precio: number; lista: number; images: string[]; }
+interface CartItem { sku: string; nombre: string; unidad: string; cantidad: number; precio: number; originalPrecio?: number; lista: number; images: string[]; }
 
 const LISTA_LABELS: Record<number, string> = { 1: "Minorista", 2: "Mayorista", 3: "Especial", 4: "Caja Cerrada", 5: "PedidosYa" };
 const STORAGE_KEY = "pos_cart_";
@@ -694,7 +694,11 @@ export default function PosPage() {
                   }}>
                   <div className="flex-1 min-w-0">
                     <div className="text-xs font-medium text-gray-900 truncate">{item.nombre}</div>
-                    <div className="text-xs text-gray-400">{formatPrice(item.precio)}/{item.unidad === "KG" ? "kg" : "un"}</div>
+                    <div className="text-xs text-gray-400">
+                      {item.originalPrecio && item.originalPrecio !== item.precio ? (
+                        <><span className="line-through text-gray-300">{formatPrice(item.originalPrecio)}</span> <span className="text-orange-600 font-medium">{formatPrice(item.precio)}</span></>
+                      ) : formatPrice(item.precio)}/{item.unidad === "KG" ? "kg" : "un"}
+                    </div>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
                     <button onClick={(e) => { e.stopPropagation(); updateQty(item.sku, -1); }}
@@ -711,7 +715,25 @@ export default function PosPage() {
                       <HiOutlinePlus className="w-3 h-3" />
                     </button>
                   </div>
-                  <span className="font-bold text-sm text-gray-900 w-20 text-right shrink-0">{formatPrice(item.precio * item.cantidad)}</span>
+                  <div className="text-right shrink-0 w-24">
+                    {terminal.permisoPrecio ? (
+                      <input type="text" inputMode="decimal"
+                        value={item.precio}
+                        onClick={(e) => { e.stopPropagation(); (e.target as HTMLInputElement).select(); }}
+                        onChange={(e) => {
+                          const parsed = parseFloat(e.target.value);
+                          if (!isNaN(parsed) && parsed >= 0) {
+                            setCart((prev) => prev.map((c) => c.sku === item.sku && c.lista === item.lista
+                              ? { ...c, originalPrecio: c.originalPrecio || c.precio, precio: parsed }
+                              : c));
+                          }
+                        }}
+                        className={`w-full text-right text-xs font-bold border rounded py-0.5 px-1 focus:outline-none focus:border-brand-500 ${item.originalPrecio && item.originalPrecio !== item.precio ? "text-orange-600 border-orange-300 bg-orange-50" : "text-gray-900 border-gray-200"}`}
+                      />
+                    ) : (
+                      <span className="font-bold text-sm text-gray-900">{formatPrice(item.precio * item.cantidad)}</span>
+                    )}
+                  </div>
                   <button onClick={(e) => { e.stopPropagation(); removeFromCart(item.sku); }}
                     className="text-gray-300 hover:text-red-500 shrink-0">
                     <HiOutlineTrash className="w-3.5 h-3.5" />
