@@ -409,12 +409,11 @@ async function getCajaData(sucursal: string) {
     ORDER BY Fechora DESC
   `);
 
-  const cierreCod = lastCierre.recordset[0]?.cod?.trim() || "0";
   const desde = lastCierre.recordset[0]?.Fechora?.trim() || "20260101000000";
   const inicioCaja = lastCierre.recordset[0]?.InicioCaja || 0;
 
   // Filter by Cod > cierre Cod (captures all sales after the cierre record, regardless of timestamp)
-  const ventas = await pool.request().input("suc", sucursal).input("cierreCod", parseInt(cierreCod) || 0).query(`
+  const ventas = await pool.request().input("suc", sucursal).input("desde", desde).query(`
     SELECT
       COUNT(*) AS cantVentas,
       SUM(ISNULL(Efectivo, 0)) AS efectivo,
@@ -426,11 +425,11 @@ async function getCajaData(sucursal: string) {
     FROM [${dbTransas}].dbo.Transas
     WHERE Tipo = 'V'
       AND LTRIM(RTRIM(Sucursal)) = @suc
-      AND CAST(LTRIM(RTRIM(Cod)) AS BIGINT) > @cierreCod
+      AND Fechora > @desde
       AND (Anulado IS NULL OR LTRIM(RTRIM(Anulado)) = '' OR Anulado = ' ')
   `);
 
-  const movimientos = await pool.request().input("suc", sucursal).input("cierreCod", parseInt(cierreCod) || 0).query(`
+  const movimientos = await pool.request().input("suc", sucursal).input("desde", desde).query(`
     SELECT
       LTRIM(RTRIM(MovCaja)) AS tipo,
       LTRIM(RTRIM(ISNULL(Concepto, ''))) AS concepto,
@@ -440,23 +439,23 @@ async function getCajaData(sucursal: string) {
     FROM [${dbTransas}].dbo.Transas
     WHERE LTRIM(RTRIM(MovCaja)) IN ('R', 'I', 'P', 'p')
       AND LTRIM(RTRIM(Sucursal)) = @suc
-      AND CAST(LTRIM(RTRIM(Cod)) AS BIGINT) > @cierreCod
+      AND Fechora > @desde
     ORDER BY Fechora ASC
   `);
 
-  const anuladas = await pool.request().input("suc", sucursal).input("cierreCod", parseInt(cierreCod) || 0).query(`
+  const anuladas = await pool.request().input("suc", sucursal).input("desde", desde).query(`
     SELECT COUNT(*) AS cnt, SUM(ISNULL(Total, 0)) AS total
     FROM [${dbTransas}].dbo.Transas
     WHERE Tipo = 'V'
       AND LTRIM(RTRIM(Sucursal)) = @suc
-      AND CAST(LTRIM(RTRIM(Cod)) AS BIGINT) > @cierreCod
+      AND Fechora > @desde
       AND Anulado IS NOT NULL AND LTRIM(RTRIM(Anulado)) != '' AND Anulado != ' '
       AND ISNULL(Total, 0) > 0
   `);
 
   // Voided transaction details with employee names
   const dbEmpleados = getDbName("empleados");
-  const anuladasDetalle = await pool.request().input("suc", sucursal).input("cierreCod", parseInt(cierreCod) || 0).query(`
+  const anuladasDetalle = await pool.request().input("suc", sucursal).input("desde", desde).query(`
     SELECT
       LTRIM(RTRIM(t.Boleta)) AS boleta,
       LTRIM(RTRIM(ISNULL(t.Nombre,''))) AS cliente,
@@ -469,7 +468,7 @@ async function getCajaData(sucursal: string) {
     LEFT JOIN [${dbEmpleados}].dbo.Empleados ee ON ee.Cod COLLATE Modern_Spanish_CI_AS = t.Empleado COLLATE Modern_Spanish_CI_AS
     WHERE t.Tipo = 'V'
       AND LTRIM(RTRIM(t.Sucursal)) = @suc
-      AND CAST(LTRIM(RTRIM(t.Cod)) AS BIGINT) > @cierreCod
+      AND t.Fechora > @desde
       AND t.Anulado IS NOT NULL AND LTRIM(RTRIM(t.Anulado)) != '' AND t.Anulado != ' '
       AND ISNULL(t.Total, 0) > 0
     ORDER BY t.Fechora DESC
@@ -477,7 +476,7 @@ async function getCajaData(sucursal: string) {
 
   // Card payment breakdown by type
   const dbVarios = getDbName("transas").replace("BDTRANSAS", "BDVARIOS");
-  const tarjetasDetalle = await pool.request().input("suc", sucursal).input("cierreCod", parseInt(cierreCod) || 0).query(`
+  const tarjetasDetalle = await pool.request().input("suc", sucursal).input("desde", desde).query(`
     SELECT LTRIM(RTRIM(t.CodTarjeta)) AS cod,
       LTRIM(RTRIM(ISNULL(tj.[Desc], 'Otro'))) AS nombre,
       SUM(t.Tarjeta) AS total, COUNT(*) AS cnt
@@ -485,7 +484,7 @@ async function getCajaData(sucursal: string) {
     LEFT JOIN [${dbVarios}].dbo.Tarjetas tj ON tj.Cod COLLATE Modern_Spanish_CI_AS = t.CodTarjeta COLLATE Modern_Spanish_CI_AS
     WHERE t.Tipo = 'V' AND t.Tarjeta > 0
       AND LTRIM(RTRIM(t.Sucursal)) = @suc
-      AND CAST(LTRIM(RTRIM(t.Cod)) AS BIGINT) > @cierreCod
+      AND t.Fechora > @desde
       AND (t.Anulado IS NULL OR LTRIM(RTRIM(t.Anulado)) = '' OR t.Anulado = ' ')
     GROUP BY t.CodTarjeta, tj.[Desc]
     ORDER BY SUM(t.Tarjeta) DESC
