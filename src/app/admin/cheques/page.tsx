@@ -69,9 +69,15 @@ export default function ChequesPage() {
   const [cuentas, setCuentas] = useState<Cuenta[]>([]);
   const [proveedores, setProveedores] = useState<Proveedor[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<"propio" | "tercero" | "flujo">("propio");
+  const [tab, setTab] = useState<"propio" | "tercero" | "flujo" | "informes">("propio");
   const [flujoData, setFlujoData] = useState<{ weeks: Array<{ label: string; totalSalidas: number; totalEntradas: number; balance: number; salidas: Array<{ numero: string; monto: number; proveedor: string }>; entradas: Array<{ numero: string; monto: number; librador: string }> }>; vencidos: { propios: Array<{ numero: string; monto: number; proveedor: string }>; terceros: Array<{ numero: string; monto: number; librador: string }>; totalPropios: number; totalTerceros: number }; totales: { totalSalidas: number; totalEntradas: number } } | null>(null);
   const [loadingFlujo, setLoadingFlujo] = useState(false);
+  const [informesData, setInformesData] = useState<{
+    porProveedor: Array<{ nombre: string; cantidad: number; total: number; pagados: number; pendientes: number }>;
+    rechazados: Array<{ id: number; numero: string; banco: string; monto: number; tipo: string; fechaCobro: string; fechaEstado: string; proveedor: string; librador: string; reemplazadoPor: string | null }>;
+    resumenMensual: Array<{ mes: string; propiosEmitidos: number; propiosTotal: number; tercerosRecibidos: number; tercerosTotal: number }>;
+  } | null>(null);
+  const [loadingInformes, setLoadingInformes] = useState(false);
   const [chequePage, setChequePage] = useState(1);
   const CHEQUES_PER_PAGE = 12;
   const [estadoFiltro, setEstadoFiltro] = useState("");
@@ -112,6 +118,7 @@ export default function ChequesPage() {
 
   async function loadCheques() {
     if (tab === "flujo") { loadFlujo(); return; }
+    if (tab === "informes") { loadInformes(); return; }
     setLoading(true);
     const params = new URLSearchParams({ tipo: tab });
     if (estadoFiltro) params.set("estado", estadoFiltro);
@@ -134,6 +141,16 @@ export default function ChequesPage() {
       setFlujoData(d);
     } catch {}
     setLoadingFlujo(false);
+  }
+
+  async function loadInformes() {
+    setLoadingInformes(true);
+    try {
+      const res = await fetch("/api/admin/cheques/informes");
+      const d = await res.json();
+      setInformesData(d);
+    } catch {}
+    setLoadingInformes(false);
   }
 
   async function loadCuentas() {
@@ -371,6 +388,11 @@ export default function ChequesPage() {
             className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${springBtn} ${tab === "flujo" ? "bg-purple-500 text-white" : "bg-white border text-gray-700 hover:bg-gray-50"}`}>
             <HiOutlineCalendar className="w-4 h-4 inline mr-1" />
             Flujo
+          </button>
+          <button onClick={() => { setTab("informes"); }}
+            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${springBtn} ${tab === "informes" ? "bg-teal-500 text-white" : "bg-white border text-gray-700 hover:bg-gray-50"}`}>
+            <HiOutlineDocumentText className="w-4 h-4 inline mr-1" />
+            Informes
           </button>
           <div className="flex-1" />
           <button onClick={openNew} className={`flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded-xl text-sm font-semibold hover:bg-green-600 ${springBtn}`}>
@@ -814,7 +836,7 @@ export default function ChequesPage() {
       })()}
 
       {/* Pagination */}
-      {tab !== "flujo" && cheques.length > CHEQUES_PER_PAGE && (
+      {tab !== "flujo" && tab !== "informes" && cheques.length > CHEQUES_PER_PAGE && (
         <div className="flex items-center justify-center gap-3 mt-4">
           <button onClick={() => setChequePage((p) => Math.max(1, p - 1))} disabled={chequePage === 1}
             className={`px-3 py-1.5 rounded-lg text-sm font-medium ${springBtn} ${chequePage === 1 ? "bg-gray-100 text-gray-400" : "bg-white border text-gray-700 hover:bg-gray-50"}`}>
@@ -927,6 +949,116 @@ export default function ChequesPage() {
                   )}
                 </div>
               </>
+            )}
+          </div>
+        </Stagger>
+      )}
+
+      {/* Informes */}
+      {tab === "informes" && (
+        <Stagger delay={100}>
+          <div>
+            {loadingInformes ? <LoadingCenter /> : !informesData ? (
+              <p className="text-gray-400 text-center py-8">No hay datos</p>
+            ) : (
+              <div className="space-y-6">
+                {/* Resumen mensual */}
+                <div className="bg-white border rounded-xl shadow-sm p-4">
+                  <h3 className="font-bold text-gray-900 mb-3">Resumen mensual</h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm min-w-[500px]">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="text-left px-3 py-2 font-medium text-gray-600">Mes</th>
+                          <th className="text-right px-3 py-2 font-medium text-orange-600">Propios emitidos</th>
+                          <th className="text-right px-3 py-2 font-medium text-orange-600">Total propios</th>
+                          <th className="text-right px-3 py-2 font-medium text-blue-600">Terceros recibidos</th>
+                          <th className="text-right px-3 py-2 font-medium text-blue-600">Total terceros</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {informesData.resumenMensual.map((m) => (
+                          <tr key={m.mes} className="hover:bg-gray-50">
+                            <td className="px-3 py-2 font-medium">{m.mes}</td>
+                            <td className="px-3 py-2 text-right text-orange-700">{m.propiosEmitidos}</td>
+                            <td className="px-3 py-2 text-right font-semibold text-orange-700">{formatPrice(m.propiosTotal)}</td>
+                            <td className="px-3 py-2 text-right text-blue-700">{m.tercerosRecibidos}</td>
+                            <td className="px-3 py-2 text-right font-semibold text-blue-700">{formatPrice(m.tercerosTotal)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Por proveedor */}
+                <div className="bg-white border rounded-xl shadow-sm p-4">
+                  <h3 className="font-bold text-gray-900 mb-3">Por proveedor ({informesData.porProveedor.length})</h3>
+                  {informesData.porProveedor.length === 0 ? (
+                    <p className="text-gray-400 text-sm">No hay cheques con proveedor asignado</p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm min-w-[500px]">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="text-left px-3 py-2 font-medium text-gray-600">Proveedor</th>
+                            <th className="text-right px-3 py-2 font-medium text-gray-600">Cheques</th>
+                            <th className="text-right px-3 py-2 font-medium text-gray-600">Total</th>
+                            <th className="text-right px-3 py-2 font-medium text-green-600">Pagados</th>
+                            <th className="text-right px-3 py-2 font-medium text-amber-600">Pendientes</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y">
+                          {informesData.porProveedor.map((p) => (
+                            <tr key={p.nombre} className="hover:bg-gray-50">
+                              <td className="px-3 py-2 font-medium">{p.nombre}</td>
+                              <td className="px-3 py-2 text-right">{p.cantidad}</td>
+                              <td className="px-3 py-2 text-right font-semibold">{formatPrice(p.total)}</td>
+                              <td className="px-3 py-2 text-right text-green-600">{p.pagados}</td>
+                              <td className="px-3 py-2 text-right text-amber-600">{p.pendientes}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+
+                {/* Rechazados */}
+                <div className="bg-white border rounded-xl shadow-sm p-4">
+                  <h3 className="font-bold text-gray-900 mb-3">Rechazados ({informesData.rechazados.length})</h3>
+                  {informesData.rechazados.length === 0 ? (
+                    <p className="text-gray-400 text-sm">No hay cheques rechazados</p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm min-w-[500px]">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="text-left px-3 py-2 font-medium text-gray-600">Numero</th>
+                            <th className="text-left px-3 py-2 font-medium text-gray-600">Banco</th>
+                            <th className="text-right px-3 py-2 font-medium text-gray-600">Monto</th>
+                            <th className="text-left px-3 py-2 font-medium text-gray-600">Fecha rechazo</th>
+                            <th className="text-left px-3 py-2 font-medium text-gray-600">De / Para</th>
+                            <th className="text-left px-3 py-2 font-medium text-gray-600">Reemplazado</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y">
+                          {informesData.rechazados.map((r) => (
+                            <tr key={r.id} className="hover:bg-gray-50">
+                              <td className="px-3 py-2 font-mono text-xs">#{r.numero}</td>
+                              <td className="px-3 py-2">{r.banco}</td>
+                              <td className="px-3 py-2 text-right font-semibold text-red-600">{formatPrice(r.monto)}</td>
+                              <td className="px-3 py-2">{r.fechaEstado}</td>
+                              <td className="px-3 py-2 text-xs">{r.tipo === "propio" ? r.proveedor : r.librador}</td>
+                              <td className="px-3 py-2">{r.reemplazadoPor ? <span className="text-green-600 text-xs">#{r.reemplazadoPor}</span> : <span className="text-red-400 text-xs">No</span>}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </div>
             )}
           </div>
         </Stagger>
