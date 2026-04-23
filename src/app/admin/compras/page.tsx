@@ -71,7 +71,7 @@ export default function ComprasPage() {
       fetch("/api/admin/stock-entries?estado=costeado&today=true&withItems=true&limit=100")
         .then((r) => r.json())
         .then((data) => {
-          const summary = (data.entries || []).map((e: { proveedorName: string; items?: { productName: string; cantidad: number }[] }) => ({
+          const summary = (data.entries || []).filter((e: { tipo?: string }) => e.tipo !== "devolucion").map((e: { proveedorName: string; items?: { productName: string; cantidad: number }[] }) => ({
             proveedorName: e.proveedorName,
             items: (e.items || []).map((it: { productName: string; cantidad: number }) => ({ productName: it.productName, cantidad: it.cantidad })),
           }));
