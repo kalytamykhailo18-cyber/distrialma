@@ -139,6 +139,54 @@ export async function GET(req: NextRequest) {
         AND LTRIM(RTRIM(t.Sucursal)) = '7'
     `);
 
+    // Fetch OLD facturadas (past 7 days before sinceStr, sucursal 7) that were NOT delivered
+    const oldSince = new Date(sinceDate);
+    oldSince.setDate(oldSince.getDate() - 7);
+    const oldSinceStr = oldSince.getUTCFullYear().toString()
+      + String(oldSince.getUTCMonth() + 1).padStart(2, "0")
+      + String(oldSince.getUTCDate()).padStart(2, "0") + "000000";
+
+    const oldTransReq = pool.request();
+    allClientIds.forEach((id, i) => oldTransReq.input(`ot${i}`, id.padStart(7, " ")));
+    oldTransReq.input("oldSince", oldSinceStr);
+    oldTransReq.input("oldUntil", sinceStr);
+    const oldTransPlaceholders = allClientIds.map((_, i) => `@ot${i}`).join(",");
+
+    const oldTransResult = await oldTransReq.query(`
+      SELECT LTRIM(RTRIM(t.Cliente)) AS clienteCod,
+             LTRIM(RTRIM(t.Boleta)) AS boleta,
+             LTRIM(RTRIM(t.Fechora)) AS fechora,
+             t.Total AS total,
+             t.Cant AS cant,
+             'facturado' AS origen
+      FROM [${dbTransas}].dbo.Transas t
+      WHERE t.Tipo IN ('N', 'V')
+        AND (LTRIM(RTRIM(t.Itm)) = '0' OR LTRIM(RTRIM(t.Itm)) = '')
+        AND t.Cliente IN (${oldTransPlaceholders})
+        AND t.Fechora >= @oldSince
+        AND t.Fechora < @oldUntil
+        AND LTRIM(RTRIM(t.Sucursal)) = '7'
+    `);
+
+    // Get delivery statuses for past 7 days to exclude already-delivered
+    const oldDeliveryStatuses = await prisma.deliveryStatus.findMany({
+      where: {
+        clientId: { in: allClientIds },
+        fecha: { gte: oldSince, lt: sinceDate },
+        estado: "entregado",
+      },
+      select: { clientId: true, fecha: true },
+    });
+    const deliveredSet = new Set(
+      oldDeliveryStatuses.map((s) => `${s.clientId}_${s.fecha.toISOString().slice(0, 10)}`)
+    );
+
+    // Filter old facturadas: exclude those whose client was marked entregado on that date
+    const oldUndelivered = oldTransResult.recordset.filter((o: { clienteCod: string; fechora: string }) => {
+      const dateStr = `${o.fechora.slice(0, 4)}-${o.fechora.slice(4, 6)}-${o.fechora.slice(6, 8)}`;
+      return !deliveredSet.has(`${o.clienteCod}_${dateStr}`);
+    });
+
     // For clients with multiple delivery days, only show pending orders
     // on the NEXT upcoming delivery day (not on past days)
     // Find which clients have multiple delivery days
@@ -168,7 +216,7 @@ export async function GET(req: NextRequest) {
     };
 
     // Merge both sources
-    const allOrders = [...ordersResult.recordset, ...transResult.recordset];
+    const allOrders = [...ordersResult.recordset, ...transResult.recordset, ...oldUndelivered];
 
     // Group orders by client — filter pending orders for multi-day clients
     const ordersByClient = new Map<string, { boleta: string; fechora: string; total: number; cant: number; origen: string }[]>();

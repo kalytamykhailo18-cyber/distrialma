@@ -5,16 +5,6 @@ import { getPool, getDbName } from "@/lib/mssql";
 
 export const dynamic = "force-dynamic";
 
-function toWaChatId(phone: string): string | null {
-  let num = phone.replace(/\D/g, "");
-  if (!num) return null;
-  if (num.startsWith("0")) num = num.slice(1);
-  if (num.startsWith("549")) { /* ok */ }
-  else if (num.startsWith("54")) { num = "549" + num.slice(2); }
-  else { num = "549" + num; }
-  return `${num}@c.us`;
-}
-
 // GET: list campaigns
 export async function GET() {
   if (!(await requireStaff())) {
@@ -29,7 +19,7 @@ export async function GET() {
   return NextResponse.json({ difusiones });
 }
 
-// POST: create and optionally send campaign
+// POST: create campaign (immediate or scheduled)
 export async function POST(req: NextRequest) {
   const session = await requireStaff();
   if (!session) {
@@ -37,7 +27,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { mensaje, imagenUrl, filtro, programada, enviarAhora } = await req.json();
+    const { mensaje, imagenUrl, filtro, programada, enviarAhora, rangoDesde, rangoHasta, soloMostrador } = await req.json();
 
     if (!mensaje?.trim()) {
       return NextResponse.json({ error: "Mensaje requerido" }, { status: 400 });
@@ -55,7 +45,6 @@ export async function POST(req: NextRequest) {
     if (filtro === "todos") {
       whereClause = "";
     } else if (filtro === "reparto") {
-      // Only clients with day-based zones
       const zonesResult = await pool.request().query(`
         SELECT Cod FROM [${dbClientes}].dbo.Zonas
         WHERE ${DAY_NAMES.map((d) => `LTRIM(RTRIM([Desc])) LIKE '%${d}%'`).join(" OR ")}
@@ -63,13 +52,28 @@ export async function POST(req: NextRequest) {
       const zoneCods = zonesResult.recordset.map((z: { Cod: string }) => `'${z.Cod}'`).join(",");
       whereClause = zoneCods ? `AND c.Zona IN (${zoneCods})` : "AND 1=0";
     } else if (filtro?.startsWith("zona:")) {
-      const zonaName = filtro.slice(5);
+      const zonaName = filtro.slice(5).replace(/[^A-Za-z]/g, "");
       const zonesResult = await pool.request().query(`
         SELECT Cod FROM [${dbClientes}].dbo.Zonas
         WHERE LTRIM(RTRIM([Desc])) LIKE '%${zonaName}%'
       `);
       const zoneCods = zonesResult.recordset.map((z: { Cod: string }) => `'${z.Cod}'`).join(",");
       whereClause = zoneCods ? `AND c.Zona IN (${zoneCods})` : "AND 1=0";
+    } else if (filtro === "rango") {
+      const desde = parseInt(rangoDesde) || 0;
+      const hasta = parseInt(rangoHasta) || 999999;
+      whereClause = `AND TRY_CAST(LTRIM(RTRIM(c.Cod)) AS INT) BETWEEN ${desde} AND ${hasta}`;
+    }
+
+    if (soloMostrador && filtro !== "reparto") {
+      const repartoZones = await pool.request().query(`
+        SELECT Cod FROM [${dbClientes}].dbo.Zonas
+        WHERE ${DAY_NAMES.map((d) => `LTRIM(RTRIM([Desc])) LIKE '%${d}%'`).join(" OR ")}
+      `);
+      const repartoCods = repartoZones.recordset.map((z: { Cod: string }) => `'${z.Cod}'`).join(",");
+      if (repartoCods) {
+        whereClause += ` AND (c.Zona IS NULL OR LTRIM(RTRIM(c.Zona)) = '' OR c.Zona NOT IN (${repartoCods}))`;
+      }
     }
 
     const clients = await pool.request().query(`
@@ -83,88 +87,49 @@ export async function POST(req: NextRequest) {
 
     const totalRecipients = clients.recordset.length;
 
-    // Create campaign
+    // Preview only — just return the count
+    if (!enviarAhora && !programada) {
+      return NextResponse.json({ ok: true, totalRecipients });
+    }
+
+    const filtroLabel = (filtro === "rango" ? `rango:${parseInt(rangoDesde) || 0}-${parseInt(rangoHasta) || 999999}` : (filtro || "todos")) + (soloMostrador ? " +mostrador" : "");
+    const isScheduled = !!programada && !enviarAhora;
+
+    // Create campaign + recipients in one transaction
     const difusion = await prisma.difusion.create({
       data: {
         mensaje,
         imagenUrl: imagenUrl || null,
-        filtro: filtro || "todos",
+        filtro: filtroLabel,
         programada: programada ? new Date(programada) : null,
-        estado: enviarAhora ? "enviando" : "pendiente",
+        estado: isScheduled ? "programada" : "enviando",
         total: totalRecipients,
         creadoPor: userName,
+        recipients: {
+          createMany: {
+            data: clients.recordset.map((c: { cod: string; nombre: string; telefono: string }) => ({
+              clientId: c.cod,
+              nombre: c.nombre,
+              telefono: c.telefono,
+              estado: "pendiente",
+            })),
+          },
+        },
       },
     });
 
-    // Send immediately if requested
-    if (enviarAhora) {
-      // Run in background
-      (async () => {
-        let enviados = 0;
-        let fallidos = 0;
-
-        // Check 24h duplicate
-        const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
-        const recentLogs = await prisma.notificationLog.findMany({
-          where: { tipo: "difusion", ok: true, createdAt: { gte: since24h } },
-          select: { clientId: true },
-        });
-        const recentlySent = new Set(recentLogs.map((l) => l.clientId));
-
-        for (const client of clients.recordset) {
-          if (recentlySent.has(client.cod)) { fallidos++; continue; }
-
-          const chatId = toWaChatId(client.telefono);
-          if (!chatId) { fallidos++; continue; }
-
-          // Personalize message
-          const firstName = client.nombre.split(" ")[0];
-          const body = mensaje.replace(/\{nombre\}/g, firstName).replace(/\{nombre_completo\}/g, client.nombre);
-
-          try {
-            const sendBody: Record<string, unknown> = { chatId, message: body };
-
-            // Send image if provided
-            if (imagenUrl) {
-              sendBody.mediaUrl = imagenUrl;
-              sendBody.mediaCaption = body;
-            }
-
-            const res = await fetch("http://127.0.0.1:3099/send", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(sendBody),
-            });
-
-            if (res.ok) {
-              enviados++;
-              await prisma.notificationLog.create({
-                data: { clientId: client.cod, tipo: "difusion", mensaje: body, telefono: client.telefono, enviadoPor: userName, ok: true },
-              });
-            } else {
-              fallidos++;
-            }
-          } catch {
-            fallidos++;
-          }
-
-          // Rate limit: 5 seconds between messages
-          await new Promise((r) => setTimeout(r, 5000));
-        }
-
-        // Update campaign
-        await prisma.difusion.update({
-          where: { id: difusion.id },
-          data: { estado: "completada", enviados, fallidos },
-        });
-      })();
+    // For immediate sends, trigger processing in background
+    if (!isScheduled) {
+      fetch(`http://127.0.0.1:3000/api/admin/difusion/cron?secret=${process.env.CRON_SECRET || (process.env.RESEND_API_KEY || "").substring(0, 16)}`, {
+        method: "POST",
+      }).catch(() => {});
     }
 
     return NextResponse.json({
       ok: true,
       id: difusion.id,
       totalRecipients,
-      estado: enviarAhora ? "enviando" : "pendiente",
+      estado: isScheduled ? "programada" : "enviando",
     });
   } catch (error) {
     console.error("Difusion error:", error);

@@ -31,6 +31,24 @@ export default function DifusionPage() {
   const [sendConfirm, setSendConfirm] = useState(false);
   const [toast, setToast] = useState("");
   const [previewCount, setPreviewCount] = useState<number | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [rangoDesde, setRangoDesde] = useState("");
+  const [rangoHasta, setRangoHasta] = useState("");
+  const [soloMostrador, setSoloMostrador] = useState(false);
+  const [modo, setModo] = useState<"ahora" | "programar">("ahora");
+  const [programadaFecha, setProgramadaFecha] = useState("");
+  const [programadaHora, setProgramadaHora] = useState("08:00");
+  const [horaArg, setHoraArg] = useState("");
+
+  // Current Argentina time
+  useEffect(() => {
+    function update() {
+      setHoraArg(new Date().toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", hour: "2-digit", minute: "2-digit", second: "2-digit" }));
+    }
+    update();
+    const interval = setInterval(update, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   async function loadDifusiones() {
     setLoading(true);
@@ -48,15 +66,22 @@ export default function DifusionPage() {
     if (!sendConfirm) { setSendConfirm(true); return; }
     setSending(true);
     try {
+      const body: Record<string, unknown> = { mensaje, imagenUrl: imagenUrl || null, filtro, rangoDesde, rangoHasta, soloMostrador };
+      if (modo === "programar" && programadaFecha && programadaHora) {
+        body.programada = `${programadaFecha}T${programadaHora}:00-03:00`;
+        body.enviarAhora = false;
+      } else {
+        body.enviarAhora = true;
+      }
       const res = await fetch("/api/admin/difusion", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mensaje, imagenUrl: imagenUrl || null, filtro, enviarAhora: true }),
+        body: JSON.stringify(body),
       });
       const d = await res.json();
       if (d.ok) {
-        setToast(`Enviando a ${d.totalRecipients} clientes...`);
-        setTimeout(() => setToast(""), 3000);
+        setToast(modo === "programar" ? `Programada para ${programadaFecha} ${programadaHora} — ${d.totalRecipients} clientes` : `Enviando a ${d.totalRecipients} clientes...`);
+        setTimeout(() => setToast(""), 4000);
         setMensaje("Hola {nombre}! ");
         setImagenUrl("");
         setSendConfirm(false);
@@ -73,45 +98,78 @@ export default function DifusionPage() {
         const res = await fetch("/api/admin/difusion", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ mensaje: "test", filtro, enviarAhora: false }),
+          body: JSON.stringify({ mensaje: "test", filtro, enviarAhora: false, rangoDesde, rangoHasta, soloMostrador }),
         });
         const d = await res.json();
         setPreviewCount(d.totalRecipients || 0);
       } catch { setPreviewCount(null); }
     }, 500);
     return () => clearTimeout(timeout);
-  }, [filtro]);
+  }, [filtro, rangoDesde, rangoHasta, soloMostrador]);
+
+  async function uploadImage(file: File) {
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("image", file);
+      formData.append("sku", "difusion");
+      const res = await fetch("/api/admin/upload", { method: "POST", body: formData });
+      const d = await res.json();
+      if (d.filename) setImagenUrl(d.filename);
+    } catch {}
+    setUploading(false);
+  }
 
   const FILTROS = [
     { value: "todos", label: "Todos los clientes" },
     { value: "reparto", label: "Solo reparto (dias de entrega)" },
-    { value: "zona:LUNES", label: "Lunes" },
-    { value: "zona:MARTES", label: "Martes" },
-    { value: "zona:MIERCOLES", label: "Miercoles" },
-    { value: "zona:JUEVES", label: "Jueves" },
-    { value: "zona:VIERNES", label: "Viernes" },
-    { value: "zona:SABADO", label: "Sabado" },
+    { value: "zona:MERLO", label: "Zona: Merlo" },
+    { value: "zona:PONTEVEDRA", label: "Zona: Pontevedra" },
+    { value: "zona:LIBERTAD", label: "Zona: Libertad" },
+    { value: "zona:MORENO", label: "Zona: Moreno" },
+    { value: "zona:ITUZAINGO", label: "Zona: Ituzaingo" },
+    { value: "zona:PADUA", label: "Zona: Padua" },
+    { value: "zona:PARQUE", label: "Zona: Parque San Martin" },
+    { value: "zona:EMPLEADOS", label: "Zona: Empleados" },
+    { value: "zona:LUNES", label: "Reparto: Lunes" },
+    { value: "zona:MARTES", label: "Reparto: Martes" },
+    { value: "zona:MIERCOLES", label: "Reparto: Miercoles" },
+    { value: "zona:JUEVES", label: "Reparto: Jueves" },
+    { value: "zona:VIERNES", label: "Reparto: Viernes" },
+    { value: "zona:SABADO", label: "Reparto: Sabado" },
+    { value: "rango", label: "Por rango de cliente" },
   ];
 
   return (
     <PageTransition className="max-w-3xl mx-auto px-4 py-6">
       <Stagger delay={0} y={-8}>
-        <h1 className="text-2xl font-bold text-gray-900 mb-1">Difusion WhatsApp</h1>
+        <div className="flex items-center justify-between mb-1">
+          <h1 className="text-2xl font-bold text-gray-900">Difusion WhatsApp</h1>
+          {horaArg && <span className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-lg font-mono">{horaArg} ARG</span>}
+        </div>
         <p className="text-sm text-gray-500 mb-6">Envia mensajes con imagen a los clientes por WhatsApp.</p>
       </Stagger>
 
       {/* Form */}
       <Stagger delay={50}>
         <div className="bg-white border rounded-xl shadow-sm p-5 mb-6 space-y-4">
-          {/* Image URL */}
+          {/* Image */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               <HiOutlinePhotograph className="w-4 h-4 inline mr-1" />
-              Imagen (URL o subir)
+              Imagen
             </label>
-            <input type="text" value={imagenUrl} onChange={(e) => setImagenUrl(e.target.value)}
-              placeholder="https://... o pegar URL de la imagen"
-              className="w-full px-3 py-2 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600" />
+            <div className="flex gap-2">
+              <label className={`flex-1 flex items-center justify-center px-4 py-3 border-2 border-dashed border-brand-300 rounded-lg cursor-pointer hover:border-brand-500 transition-colors ${uploading ? "opacity-50" : ""}`}>
+                <input type="file" accept="image/*" className="hidden"
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadImage(f); }}
+                  disabled={uploading} />
+                <span className="text-sm text-gray-500">{uploading ? "Subiendo..." : imagenUrl ? "Cambiar imagen" : "Subir imagen"}</span>
+              </label>
+              {imagenUrl && (
+                <button onClick={() => setImagenUrl("")} className="text-xs text-red-500 hover:text-red-700 px-2">Quitar</button>
+              )}
+            </div>
             {imagenUrl && (
               <div className="mt-2 p-2 bg-gray-50 rounded-lg">
                 <img src={imagenUrl} alt="Preview" className="max-h-40 rounded mx-auto" />
@@ -141,18 +199,69 @@ export default function DifusionPage() {
               className="w-full px-3 py-2 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600">
               {FILTROS.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
             </select>
+            {filtro === "rango" && (
+              <div className="flex gap-2 mt-2">
+                <input type="number" value={rangoDesde} onChange={(e) => setRangoDesde(e.target.value)}
+                  placeholder="Desde (ej: 1)" className="flex-1 px-3 py-2 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600" />
+                <input type="number" value={rangoHasta} onChange={(e) => setRangoHasta(e.target.value)}
+                  placeholder="Hasta (ej: 1000)" className="flex-1 px-3 py-2 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600" />
+              </div>
+            )}
+            {filtro !== "reparto" && (
+              <label className="flex items-center gap-2 mt-2 cursor-pointer">
+                <input type="checkbox" checked={soloMostrador} onChange={(e) => { setSoloMostrador(e.target.checked); setSendConfirm(false); }}
+                  className="w-4 h-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500" />
+                <span className="text-sm text-gray-700">Solo mostrador <span className="text-gray-400">(excluir reparto)</span></span>
+              </label>
+            )}
             {previewCount !== null && (
               <p className="text-xs text-gray-500 mt-1">{previewCount} clientes con telefono</p>
             )}
           </div>
 
-          {/* Send */}
-          <button onClick={send} disabled={sending || !mensaje.trim()}
+          {/* Reset dedup for testing */}
+          {filtro === "zona:EMPLEADOS" && (
+            <button onClick={async () => {
+              await fetch("/api/admin/difusion/reset", { method: "POST" });
+              setToast("Historial de envios a empleados limpiado");
+              setTimeout(() => setToast(""), 3000);
+            }} className={`w-full py-2 text-sm text-amber-700 bg-amber-50 border border-amber-300 rounded-xl font-medium ${springBtn} hover:bg-amber-100`}>
+              Resetear envios a empleados (para probar)
+            </button>
+          )}
+
+          {/* Send mode toggle */}
+          <div className="flex gap-2">
+            <button onClick={() => { setModo("ahora"); setSendConfirm(false); }}
+              className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${modo === "ahora" ? "bg-green-100 text-green-800 border-2 border-green-500" : "bg-gray-50 text-gray-500 border border-gray-200"}`}>
+              Enviar ahora
+            </button>
+            <button onClick={() => { setModo("programar"); setSendConfirm(false); }}
+              className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${modo === "programar" ? "bg-blue-100 text-blue-800 border-2 border-blue-500" : "bg-gray-50 text-gray-500 border border-gray-200"}`}>
+              <HiOutlineClock className="w-4 h-4 inline mr-1" />
+              Programar
+            </button>
+          </div>
+
+          {/* Schedule picker */}
+          {modo === "programar" && (
+            <div className="flex gap-2">
+              <input type="date" value={programadaFecha} onChange={(e) => { setProgramadaFecha(e.target.value); setSendConfirm(false); }}
+                className="flex-1 px-3 py-2 border border-blue-400 rounded-lg text-sm focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600" />
+              <input type="time" value={programadaHora} onChange={(e) => { setProgramadaHora(e.target.value); setSendConfirm(false); }}
+                className="w-28 px-3 py-2 border border-blue-400 rounded-lg text-sm focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600" />
+            </div>
+          )}
+
+          {/* Send / Schedule button */}
+          <button onClick={send} disabled={sending || !mensaje.trim() || (modo === "programar" && !programadaFecha)}
             className={`w-full py-3 text-white rounded-xl font-bold text-lg transition-all disabled:opacity-40 ${springBtn} ${
-              sendConfirm ? "bg-red-600 hover:bg-red-700 animate-pulse" : "bg-green-600 hover:bg-green-700"
+              sendConfirm ? "bg-red-600 hover:bg-red-700 animate-pulse" : modo === "programar" ? "bg-blue-600 hover:bg-blue-700" : "bg-green-600 hover:bg-green-700"
             }`}>
-            <HiOutlinePaperAirplane className="w-5 h-5 inline mr-2" />
-            {sending ? "Enviando..." : sendConfirm ? `CONFIRMAR — Enviar a ${previewCount || "?"} clientes` : "Enviar ahora"}
+            {modo === "programar" ? <HiOutlineClock className="w-5 h-5 inline mr-2" /> : <HiOutlinePaperAirplane className="w-5 h-5 inline mr-2" />}
+            {sending ? "Enviando..." : sendConfirm
+              ? (modo === "programar" ? `CONFIRMAR — Programar para ${previewCount || "?"} clientes` : `CONFIRMAR — Enviar a ${previewCount || "?"} clientes`)
+              : (modo === "programar" ? `Programar envio` : "Enviar ahora")}
           </button>
         </div>
       </Stagger>
@@ -171,11 +280,13 @@ export default function DifusionPage() {
                   <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
                     d.estado === "completada" ? "bg-green-100 text-green-700" :
                     d.estado === "enviando" ? "bg-amber-100 text-amber-700 animate-pulse" :
+                    d.estado === "programada" ? "bg-blue-100 text-blue-700" :
                     d.estado === "cancelada" ? "bg-red-100 text-red-700" :
                     "bg-gray-100 text-gray-600"
                   }`}>
                     {d.estado === "completada" ? <><HiOutlineCheck className="w-3 h-3 inline mr-1" />{d.enviados}/{d.total}</> :
                      d.estado === "enviando" ? <><HiOutlineClock className="w-3 h-3 inline mr-1" />Enviando {d.enviados}/{d.total}</> :
+                     d.estado === "programada" ? <><HiOutlineClock className="w-3 h-3 inline mr-1" />Programada {d.programada ? new Date(d.programada).toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : ""}</> :
                      d.estado}
                   </span>
                 </div>

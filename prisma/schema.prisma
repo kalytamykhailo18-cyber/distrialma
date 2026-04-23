@@ -592,7 +592,24 @@ model Difusion {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
+  recipients DifusionRecipient[]
+
   @@index([estado])
   @@index([programada])
   @@map("difusiones")
+}
+
+model DifusionRecipient {
+  id          Int      @id @default(autoincrement())
+  difusionId  Int
+  clientId    String   @db.VarChar(10)
+  nombre      String   @db.VarChar(120)
+  telefono    String   @db.VarChar(30)
+  estado      String   @default("pendiente") @db.VarChar(20) // pendiente | enviado | fallido | dedup
+  error       String?  @db.VarChar(200)
+  sentAt      DateTime?
+  difusion    Difusion @relation(fields: [difusionId], references: [id], onDelete: Cascade)
+
+  @@index([difusionId, estado])
+  @@map("difusion_recipients")
 }

@@ -425,6 +425,9 @@ client.on("disconnected", async (reason) => {
   } catch (e) {
     console.error("[ALERT] Error enviando email:", e.message);
   }
+  // Exit so PM2 auto-restarts and reconnects
+  console.log("Reiniciando bot en 10 segundos...");
+  setTimeout(() => process.exit(1), 10000);
 });
 
 // Recruitment flow state: chatId → { step, data }
@@ -714,8 +717,9 @@ const httpServer = http.createServer(async (req, res) => {
         } else {
           await client.sendMessage(chatId, message);
         }
-        storeMessage(chatId, "out", message, sender || "human");
-        console.log(`[INBOX] ${chatId}: ${message.substring(0, 60)}`);
+        const logMsg = mediaCaption || message || "";
+        storeMessage(chatId, "out", logMsg, sender || "human");
+        console.log(`[INBOX] ${chatId}: ${logMsg.substring(0, 60)}`);
         // If requested, seed conversation so Claude has context when the client replies
         if (addToContext) {
           const existing = conversations.get(chatId) || [];

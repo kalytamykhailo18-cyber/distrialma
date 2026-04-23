@@ -434,7 +434,7 @@ export default function RepartoPage() {
 
         {/* Search + Export + delivery filter */}
         <Stagger delay={100}>
-          <div className="flex flex-wrap gap-2 mb-4">
+          <div className="flex flex-wrap gap-2 mb-2">
             <input
               type="text"
               value={filter}
@@ -452,8 +452,10 @@ export default function RepartoPage() {
                 ))}
               </div>
             )}
+          </div>
+          <div className="flex items-center gap-2 mb-4">
             <div className="flex items-center gap-1 bg-white border rounded-lg px-2">
-              <span className="text-xs text-gray-500 hidden sm:inline">Orden:</span>
+              <span className="text-xs font-semibold text-gray-900 bg-gray-200 px-2 py-1.5 rounded">Orden</span>
               {[{k: "nombre", l: "Nombre"}, {k: "zona", l: "Zona"}, {k: "estado", l: "Estado"}].map((o) => (
                 <button key={o.k} onClick={() => setSortBy(o.k as "nombre" | "zona" | "estado")}
                   className={`px-2 py-1.5 rounded text-xs font-medium ${springBtn} ${sortBy === o.k ? "bg-brand-500 text-white" : "text-gray-600 hover:bg-gray-50"}`}>
