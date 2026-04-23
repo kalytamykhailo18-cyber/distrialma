@@ -319,6 +319,26 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: "Solo se pueden eliminar ingresos pendientes" }, { status: 400 });
     }
 
+    // Reverse stock in PunTouch for each item
+    const items = await prisma.stockEntryItem.findMany({ where: { entryId: parseInt(id) } });
+    const isDevolucion = entry.tipo === "devolucion";
+
+    if (!isDevolucion && items.length > 0) {
+      const pool = await getPool();
+      const dbProd = getDbName("productos");
+      for (const item of items) {
+        const codPadded = item.sku.padStart(7, " ");
+        await pool.request()
+          .input("cod", codPadded)
+          .input("cant", Number(item.cantidad))
+          .query(`
+            UPDATE [${dbProd}].dbo.Stock
+            SET Stk = ISNULL(Stk, 0) - @cant
+            WHERE LTRIM(RTRIM(CodProducto)) = LTRIM(RTRIM(@cod)) AND LTRIM(RTRIM(Deposito)) = '0' AND (TalleColor IS NULL OR LTRIM(RTRIM(TalleColor)) = '')
+          `);
+      }
+    }
+
     // Delete items first, then entry
     await prisma.stockEntryItem.deleteMany({ where: { entryId: parseInt(id) } });
     await prisma.stockEntry.delete({ where: { id: parseInt(id) } });

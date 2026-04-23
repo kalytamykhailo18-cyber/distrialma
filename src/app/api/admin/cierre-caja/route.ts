@@ -252,6 +252,18 @@ export async function POST(req: NextRequest) {
         if (line[2]) { doc.text(line[2], 110, y); doc.text(line[3], w - 18, y, { align: "right" }); }
         y += 5;
       }
+      // Tarjeta detail by type
+      if (data.tarjetasDetalle && data.tarjetasDetalle.length > 0) {
+        doc.setFontSize(7);
+        doc.setTextColor(120, 120, 120);
+        for (const t of data.tarjetasDetalle) {
+          doc.text(`  ${t.nombre} (${t.cantidad})`, 110, y);
+          doc.text(fmt(t.total), w - 18, y, { align: "right" });
+          y += 4;
+        }
+        doc.setFontSize(9);
+        doc.setTextColor(60, 60, 60);
+      }
       // Retiros detail
       if (data.retirosDetalle && data.retirosDetalle.length > 0) {
         doc.setFontSize(7);
