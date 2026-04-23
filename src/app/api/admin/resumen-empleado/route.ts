@@ -49,10 +49,12 @@ export async function GET(req: NextRequest) {
       select: { id: true, sucursal: true, responsable: true, usuario: true, diferencia: true, cantVentas: true, createdAt: true, chargedAt: true, chargedBy: true },
     });
 
+    type DescuentoItem = { nombre: string; cantidad: number; costo: number };
     type Descuento = {
       fecha: string;
       concepto: string;
       detalle: string;
+      items: DescuentoItem[];
       monto: number;
       origen: "movimiento" | "faltante";
       cargadoPor: string;
@@ -69,6 +71,7 @@ export async function GET(req: NextRequest) {
     // Movements
     for (const mov of movements) {
       const productos = mov.items.map((i) => `${i.productName} x${Number(i.cantidad)}`).join(", ");
+      const itemsList: DescuentoItem[] = mov.items.map((i) => ({ nombre: i.productName, cantidad: Number(i.cantidad), costo: Number(i.costo || 0) }));
       const fecha = mov.createdAt.toISOString();
       const montoTotal = mov.items.reduce((sum, i) => sum + Number(i.costo || 0) * Number(i.cantidad), 0);
 
@@ -81,6 +84,7 @@ export async function GET(req: NextRequest) {
             fecha,
             concepto: mov.destino || "Descuento",
             detalle: productos + (shareCount > 1 ? ` (compartido con ${shareCount})` : ""),
+            items: itemsList,
             monto: montoPorEmp,
             origen: "movimiento",
             cargadoPor: mov.usuario || "",
@@ -95,6 +99,7 @@ export async function GET(req: NextRequest) {
             fecha,
             concepto: "Descuento global",
             detalle: productos + ` (prorrateado entre ${totalEmpleados} empleados)`,
+            items: itemsList,
             monto: montoPorEmp,
             origen: "movimiento",
             cargadoPor: mov.usuario || "",
@@ -122,6 +127,7 @@ export async function GET(req: NextRequest) {
         fecha: c.createdAt.toISOString(),
         concepto: "Faltante de caja",
         detalle: `Suc ${c.sucursal} - ${c.cantVentas} ventas`,
+        items: [],
         monto: Math.abs(dif),
         origen: "faltante",
         cargadoPor: (c.chargedBy || c.usuario || "").toString(),

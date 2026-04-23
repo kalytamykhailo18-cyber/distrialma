@@ -88,8 +88,7 @@ export async function POST(req: NextRequest) {
       doc.setTextColor(80, 80, 80);
       doc.text("Fecha", 14, y);
       doc.text("Concepto", 38, y);
-      doc.text("Detalle", 72, y);
-      doc.text("Cargado por", 145, y);
+      doc.text("Cargado por", 135, y);
       doc.text("Monto", w - 14, y, { align: "right" });
       y += 2;
       doc.line(14, y, w - 14, y); y += 5;
@@ -98,21 +97,56 @@ export async function POST(req: NextRequest) {
       doc.setFont("helvetica", "normal");
       doc.setTextColor(30, 30, 30);
       for (const d of emp.descuentos) {
-        if (y > pageH - 30) { doc.addPage(); y = 20; }
+        // Check if we need a new page (estimate row height)
+        const itemCount = d.items?.length || 0;
+        const rowH = itemCount > 0 ? 6 + itemCount * 4 : 6;
+        if (y + rowH > pageH - 25) { doc.addPage(); y = 20; }
+
         const fechaStr = new Date(d.fecha).toLocaleDateString("es-AR", { timeZone: "America/Argentina/Buenos_Aires" });
+        doc.setFontSize(9);
+        doc.setTextColor(30, 30, 30);
         doc.text(fechaStr, 14, y);
-        doc.text(d.concepto.substring(0, 18), 38, y);
-        const detalleLines = doc.splitTextToSize(d.detalle.substring(0, 150), 55);
-        for (let i = 0; i < Math.min(detalleLines.length, 2); i++) {
-          doc.text(detalleLines[i], 72, y + (i * 4));
-        }
+        doc.text(d.concepto.substring(0, 25), 38, y);
         doc.setTextColor(100, 100, 100);
-        doc.text((d.cargadoPor || "").substring(0, 15), 145, y);
+        doc.text((d.cargadoPor || "").substring(0, 15), 135, y);
         doc.setTextColor(30, 30, 30);
         doc.setFont("helvetica", "bold");
         doc.text(`$${d.monto.toLocaleString("es-AR", { minimumFractionDigits: 2 })}`, w - 14, y, { align: "right" });
         doc.setFont("helvetica", "normal");
-        y += Math.max(5, detalleLines.length * 4);
+        y += 5;
+
+        // Product items detail
+        if (d.items && d.items.length > 0) {
+          doc.setFontSize(7.5);
+          doc.setTextColor(80, 80, 80);
+          for (const item of d.items) {
+            if (y > pageH - 20) { doc.addPage(); y = 20; }
+            const cant = item.cantidad % 1 === 0 ? String(Math.round(item.cantidad)) : item.cantidad.toFixed(1);
+            const subtotal = item.costo * item.cantidad;
+            doc.text(`  ${item.nombre}`, 40, y);
+            doc.text(`x${cant}`, 145, y);
+            doc.text(`$${subtotal.toLocaleString("es-AR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`, w - 14, y, { align: "right" });
+            y += 4;
+          }
+          if (d.detalle.includes("compartido")) {
+            doc.setFontSize(7);
+            doc.setTextColor(140, 140, 140);
+            doc.text(`  ${d.detalle.match(/\(compartido.*?\)/)?.[0] || ""}`, 40, y);
+            y += 4;
+          }
+          doc.setFontSize(9);
+        } else if (d.concepto === "Faltante de caja") {
+          doc.setFontSize(7.5);
+          doc.setTextColor(80, 80, 80);
+          doc.text(`  ${d.detalle}`, 40, y);
+          y += 4;
+          doc.setFontSize(9);
+        }
+
+        // Separator line
+        doc.setDrawColor(230, 230, 230);
+        doc.line(14, y, w - 14, y);
+        y += 3;
       }
 
       y += 3;
