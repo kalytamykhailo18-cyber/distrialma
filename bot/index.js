@@ -202,6 +202,17 @@ async function callClaude(chatId, userMessage, clientInfo, phoneNumber) {
   const timeStr = `${diasSemana[now.getDay()]} ${now.getDate()} de ${meses[now.getMonth()]} de ${now.getFullYear()}, ${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
 
   let systemWithContext = SYSTEM_PROMPT + `\n\nFECHA Y HORA ACTUAL: ${timeStr}`;
+
+  // Add latest difusion context so bot knows about recent broadcast messages
+  try {
+    const recentDifusion = await prisma.difusion.findFirst({
+      where: { estado: { in: ["completada", "enviando"] }, createdAt: { gte: new Date(Date.now() - 48 * 60 * 60 * 1000) } },
+      orderBy: { createdAt: "desc" },
+    });
+    if (recentDifusion) {
+      systemWithContext += `\n\nDIFUSION RECIENTE: Hoy se envió un mensaje masivo a clientes: "${recentDifusion.mensaje.substring(0, 200)}". ${recentDifusion.imagenUrl ? "Incluía una imagen promocional." : ""} Si el cliente pregunta sobre esto, confirmá la promo y ofrecé ayuda.`;
+    }
+  } catch { /* ignore */ }
   if (clientInfo) {
     if (clientInfo.accounts) {
       systemWithContext += `\n\nESTÁS HABLANDO CON UN CLIENTE REGISTRADO QUE TIENE ${clientInfo.accounts.length} CUENTAS:`;
@@ -384,21 +395,30 @@ const client = new Client({
   },
 });
 
+let latestQR = null;
+let botStatus = "iniciando";
+
 client.on("qr", (qr) => {
   console.log("\n========== ESCANEAR QR ==========\n");
   qrcode.generate(qr, { small: true });
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(qr)}`;
   console.log(`\nQR como imagen: ${qrUrl}\n`);
   console.log("=================================\n");
+  latestQR = qr;
+  botStatus = "esperando_qr";
 });
 
 client.on("ready", () => {
   console.log("✓ Bot conectado a WhatsApp");
   console.log("✓ Esperando mensajes...");
+  latestQR = null;
+  botStatus = "conectado";
 });
 
 client.on("authenticated", () => {
   console.log("✓ Autenticado");
+  latestQR = null;
+  botStatus = "autenticado";
 });
 
 client.on("auth_failure", (msg) => {
@@ -702,6 +722,12 @@ client.on("message_create", async (msg) => {
 // HTTP server for inbox API to send messages through the bot
 import http from "http";
 const httpServer = http.createServer(async (req, res) => {
+  if (req.method === "GET" && req.url === "/status") {
+    const qrUrl = latestQR ? `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(latestQR)}` : null;
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ status: botStatus, qrUrl, needsQR: botStatus === "esperando_qr" }));
+    return;
+  }
   if (req.method === "POST" && req.url === "/send") {
     let body = "";
     req.on("data", (c) => body += c);
