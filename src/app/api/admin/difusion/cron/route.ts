@@ -23,7 +23,7 @@ async function populateRecipients(difusionId: number, filtroRaw: string) {
   const DAY_NAMES = ["LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO", "DOMINGO"];
 
   const soloMostrador = filtroRaw.includes("+mostrador");
-  const filtro = filtroRaw.replace(" +mostrador", "");
+  const filtro = filtroRaw.replace(/ \+mostrador/g, "").replace(/ \+activos\d+d/g, "");
 
   let whereClause = "";
   if (filtro === "todos") {
@@ -61,6 +61,23 @@ async function populateRecipients(difusionId: number, filtroRaw: string) {
     }
   }
 
+  // Active clients filter from stored filtro label
+  let activosJoin = "";
+  const activosMatch = filtroRaw.match(/\+activos(\d+)d/);
+  if (activosMatch) {
+    const dias = parseInt(activosMatch[1]) || 30;
+    const dbTransas = getDbName("transas");
+    const since = new Date(Date.now() - dias * 24 * 60 * 60 * 1000);
+    const sinceStr = since.getUTCFullYear().toString()
+      + String(since.getUTCMonth() + 1).padStart(2, "0")
+      + String(since.getUTCDate()).padStart(2, "0") + "000000";
+    activosJoin = `AND c.Cod IN (
+      SELECT DISTINCT t.Cliente FROM [${dbTransas}].dbo.Transas t
+      WHERE t.Tipo = 'V' AND t.Fechora >= '${sinceStr}'
+        AND (LTRIM(RTRIM(t.Itm)) = '0' OR LTRIM(RTRIM(t.Itm)) = '')
+    )`;
+  }
+
   const clients = await pool.request().query(`
     SELECT LTRIM(RTRIM(c.Cod)) AS cod, LTRIM(RTRIM(c.Nombre)) AS nombre,
       LTRIM(RTRIM(ISNULL(c.Telclave3, ISNULL(c.TelClave1, '')))) AS telefono
@@ -68,6 +85,7 @@ async function populateRecipients(difusionId: number, filtroRaw: string) {
     WHERE (LTRIM(RTRIM(ISNULL(c.Telclave3, ''))) <> '' OR LTRIM(RTRIM(ISNULL(c.TelClave1, ''))) <> '')
       AND (c.DeBaja = 0 OR c.DeBaja IS NULL)
       ${whereClause}
+      ${activosJoin}
   `);
 
   await prisma.difusionRecipient.createMany({
@@ -119,6 +137,19 @@ export async function POST(req: NextRequest) {
   console.log(`[DIFUSION-CRON] active campaigns: ${active.length}`);
   if (active.length === 0) {
     return NextResponse.json({ ok: true, processed: 0 });
+  }
+
+  // Daily limit check
+  const DAILY_LIMIT = 300;
+  const todayStart = new Date();
+  todayStart.setUTCHours(3, 0, 0, 0); // midnight ARG
+  if (todayStart > new Date()) todayStart.setDate(todayStart.getDate() - 1);
+  const sentToday = await prisma.notificationLog.count({
+    where: { tipo: "difusion", ok: true, createdAt: { gte: todayStart } },
+  });
+  if (sentToday >= DAILY_LIMIT) {
+    console.log(`[DIFUSION-CRON] daily limit reached: ${sentToday}/${DAILY_LIMIT}`);
+    return NextResponse.json({ ok: true, processed: 0, dailyLimitReached: true, sentToday });
   }
 
   // Bot health check — if bot is down, skip this tick entirely

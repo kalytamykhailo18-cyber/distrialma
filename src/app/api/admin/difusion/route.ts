@@ -5,10 +5,20 @@ import { getPool, getDbName } from "@/lib/mssql";
 
 export const dynamic = "force-dynamic";
 
-// GET: list campaigns
-export async function GET() {
+// GET: list campaigns or fetch failed recipients
+export async function GET(req: NextRequest) {
   if (!(await requireStaff())) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  }
+
+  const fallidosId = req.nextUrl.searchParams.get("fallidos");
+  if (fallidosId) {
+    const recipients = await prisma.difusionRecipient.findMany({
+      where: { difusionId: parseInt(fallidosId), estado: "fallido" },
+      select: { clientId: true, nombre: true, telefono: true, error: true },
+      orderBy: { id: "asc" },
+    });
+    return NextResponse.json({ recipients });
   }
 
   const difusiones = await prisma.difusion.findMany({
@@ -27,7 +37,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { mensaje, imagenUrl, filtro, programada, enviarAhora, rangoDesde, rangoHasta, soloMostrador } = await req.json();
+    const { mensaje, imagenUrl, filtro, programada, enviarAhora, rangoDesde, rangoHasta, soloMostrador, soloActivos, activosDias } = await req.json();
 
     if (!mensaje?.trim()) {
       return NextResponse.json({ error: "Mensaje requerido" }, { status: 400 });
@@ -76,6 +86,22 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Active clients filter: only those who purchased in last N days
+    let activosJoin = "";
+    if (soloActivos) {
+      const dias = parseInt(activosDias) || 30;
+      const dbTransas = getDbName("transas");
+      const since = new Date(Date.now() - dias * 24 * 60 * 60 * 1000);
+      const sinceStr = since.getUTCFullYear().toString()
+        + String(since.getUTCMonth() + 1).padStart(2, "0")
+        + String(since.getUTCDate()).padStart(2, "0") + "000000";
+      activosJoin = `AND c.Cod IN (
+        SELECT DISTINCT t.Cliente FROM [${dbTransas}].dbo.Transas t
+        WHERE t.Tipo = 'V' AND t.Fechora >= '${sinceStr}'
+          AND (LTRIM(RTRIM(t.Itm)) = '0' OR LTRIM(RTRIM(t.Itm)) = '')
+      )`;
+    }
+
     const clients = await pool.request().query(`
       SELECT LTRIM(RTRIM(c.Cod)) AS cod, LTRIM(RTRIM(c.Nombre)) AS nombre,
         LTRIM(RTRIM(ISNULL(c.Telclave3, ISNULL(c.TelClave1, '')))) AS telefono
@@ -83,6 +109,7 @@ export async function POST(req: NextRequest) {
       WHERE (LTRIM(RTRIM(ISNULL(c.Telclave3, ''))) <> '' OR LTRIM(RTRIM(ISNULL(c.TelClave1, ''))) <> '')
         AND (c.DeBaja = 0 OR c.DeBaja IS NULL)
         ${whereClause}
+        ${activosJoin}
     `);
 
     const totalRecipients = clients.recordset.length;
@@ -92,8 +119,28 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true, totalRecipients });
     }
 
-    const filtroLabel = (filtro === "rango" ? `rango:${parseInt(rangoDesde) || 0}-${parseInt(rangoHasta) || 999999}` : (filtro || "todos")) + (soloMostrador ? " +mostrador" : "");
+    const filtroLabel = (filtro === "rango" ? `rango:${parseInt(rangoDesde) || 0}-${parseInt(rangoHasta) || 999999}` : (filtro || "todos")) + (soloMostrador ? " +mostrador" : "") + (soloActivos ? ` +activos${parseInt(activosDias) || 30}d` : "");
     const isScheduled = !!programada && !enviarAhora;
+
+    // Daily limit: max 300 messages per day
+    const DAILY_LIMIT = 300;
+    const todayStart = new Date();
+    todayStart.setHours(todayStart.getHours() - 3); // Argentina
+    todayStart.setUTCHours(3, 0, 0, 0); // midnight ARG = 03:00 UTC
+    const sentToday = await prisma.notificationLog.count({
+      where: { tipo: "difusion", ok: true, createdAt: { gte: todayStart } },
+    });
+    const remaining = Math.max(0, DAILY_LIMIT - sentToday);
+    if (totalRecipients > remaining && remaining < DAILY_LIMIT) {
+      return NextResponse.json({
+        ok: false,
+        error: `Limite diario: ya se enviaron ${sentToday} hoy, quedan ${remaining} de ${DAILY_LIMIT}. Reduce la cantidad o programa para mañana.`,
+        sentToday,
+        remaining,
+        dailyLimit: DAILY_LIMIT,
+        totalRecipients,
+      }, { status: 400 });
+    }
 
     // Create campaign + recipients in one transaction
     const difusion = await prisma.difusion.create({

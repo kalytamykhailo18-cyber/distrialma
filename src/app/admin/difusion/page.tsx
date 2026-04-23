@@ -35,10 +35,14 @@ export default function DifusionPage() {
   const [rangoDesde, setRangoDesde] = useState("");
   const [rangoHasta, setRangoHasta] = useState("");
   const [soloMostrador, setSoloMostrador] = useState(false);
+  const [soloActivos, setSoloActivos] = useState(true);
+  const [activosDias, setActivosDias] = useState("30");
   const [modo, setModo] = useState<"ahora" | "programar">("ahora");
   const [programadaFecha, setProgramadaFecha] = useState("");
   const [programadaHora, setProgramadaHora] = useState("08:00");
   const [horaArg, setHoraArg] = useState("");
+  const [expandedFallidos, setExpandedFallidos] = useState<number | null>(null);
+  const [fallidosList, setFallidosList] = useState<{ clientId: string; nombre: string; telefono: string; error: string }[]>([]);
 
   // Current Argentina time
   useEffect(() => {
@@ -66,7 +70,7 @@ export default function DifusionPage() {
     if (!sendConfirm) { setSendConfirm(true); return; }
     setSending(true);
     try {
-      const body: Record<string, unknown> = { mensaje, imagenUrl: imagenUrl || null, filtro, rangoDesde, rangoHasta, soloMostrador };
+      const body: Record<string, unknown> = { mensaje, imagenUrl: imagenUrl || null, filtro, rangoDesde, rangoHasta, soloMostrador, soloActivos, activosDias };
       if (modo === "programar" && programadaFecha && programadaHora) {
         body.programada = `${programadaFecha}T${programadaHora}:00-03:00`;
         body.enviarAhora = false;
@@ -86,6 +90,10 @@ export default function DifusionPage() {
         setImagenUrl("");
         setSendConfirm(false);
         loadDifusiones();
+      } else if (d.error) {
+        setToast(d.error);
+        setTimeout(() => setToast(""), 6000);
+        setSendConfirm(false);
       }
     } catch {}
     setSending(false);
@@ -98,14 +106,14 @@ export default function DifusionPage() {
         const res = await fetch("/api/admin/difusion", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ mensaje: "test", filtro, enviarAhora: false, rangoDesde, rangoHasta, soloMostrador }),
+          body: JSON.stringify({ mensaje: "test", filtro, enviarAhora: false, rangoDesde, rangoHasta, soloMostrador, soloActivos, activosDias }),
         });
         const d = await res.json();
         setPreviewCount(d.totalRecipients || 0);
       } catch { setPreviewCount(null); }
     }, 500);
     return () => clearTimeout(timeout);
-  }, [filtro, rangoDesde, rangoHasta, soloMostrador]);
+  }, [filtro, rangoDesde, rangoHasta, soloMostrador, soloActivos, activosDias]);
 
   async function uploadImage(file: File) {
     setUploading(true);
@@ -214,8 +222,27 @@ export default function DifusionPage() {
                 <span className="text-sm text-gray-700">Solo mostrador <span className="text-gray-400">(excluir reparto)</span></span>
               </label>
             )}
+            <div className="flex items-center gap-2 mt-2">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={soloActivos} onChange={(e) => { setSoloActivos(e.target.checked); setSendConfirm(false); }}
+                  className="w-4 h-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500" />
+                <span className="text-sm text-gray-700">Solo clientes activos</span>
+              </label>
+              {soloActivos && (
+                <select value={activosDias} onChange={(e) => { setActivosDias(e.target.value); setSendConfirm(false); }}
+                  className="px-2 py-1 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600">
+                  <option value="15">15 dias</option>
+                  <option value="30">30 dias</option>
+                  <option value="60">60 dias</option>
+                  <option value="90">90 dias</option>
+                </select>
+              )}
+            </div>
             {previewCount !== null && (
-              <p className="text-xs text-gray-500 mt-1">{previewCount} clientes con telefono</p>
+              <p className="text-xs text-gray-500 mt-1">
+                {previewCount} clientes con telefono
+                {previewCount > 300 && <span className="text-amber-600 font-medium"> — limite diario: 300</span>}
+              </p>
             )}
           </div>
 
@@ -292,7 +319,27 @@ export default function DifusionPage() {
                 </div>
                 <p className="text-sm text-gray-800 line-clamp-2">{d.mensaje}</p>
                 {d.imagenUrl && <span className="text-xs text-blue-500">Con imagen</span>}
-                {d.fallidos > 0 && <span className="text-xs text-red-500 ml-2">{d.fallidos} fallidos</span>}
+                {d.fallidos > 0 && (
+                  <button onClick={async () => {
+                    if (expandedFallidos === d.id) { setExpandedFallidos(null); return; }
+                    setExpandedFallidos(d.id);
+                    try {
+                      const res = await fetch(`/api/admin/difusion?fallidos=${d.id}`);
+                      const data = await res.json();
+                      setFallidosList(data.recipients || []);
+                    } catch { setFallidosList([]); }
+                  }} className="text-xs text-red-500 ml-2 hover:text-red-700 underline">{d.fallidos} fallidos</button>
+                )}
+                {expandedFallidos === d.id && fallidosList.length > 0 && (
+                  <div className="mt-2 bg-red-50 border border-red-200 rounded-lg p-2 max-h-48 overflow-y-auto">
+                    {fallidosList.map((f) => (
+                      <div key={f.clientId} className="text-xs text-gray-700 py-0.5 flex justify-between">
+                        <span>{f.clientId} — {f.nombre}</span>
+                        <span className="text-red-400 ml-2 shrink-0">{f.telefono}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             ))}
           </div>
