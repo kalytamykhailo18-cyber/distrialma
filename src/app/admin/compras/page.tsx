@@ -55,6 +55,8 @@ export default function ComprasPage() {
   const [entries, setEntries] = useState<StockEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("pendiente");
+  const [todaySummary, setTodaySummary] = useState<{ proveedorName: string; items: { productName: string; cantidad: number }[] }[]>([]);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -63,7 +65,43 @@ export default function ComprasPage() {
       .then((data) => setEntries(data.entries || []))
       .catch(() => setEntries([]))
       .finally(() => setLoading(false));
+
+    // Load today's costed with items for summary
+    if (tab === "costeado") {
+      fetch("/api/admin/stock-entries?estado=costeado&today=true&withItems=true&limit=100")
+        .then((r) => r.json())
+        .then((data) => {
+          const summary = (data.entries || []).map((e: { proveedorName: string; items?: { productName: string; cantidad: number }[] }) => ({
+            proveedorName: e.proveedorName,
+            items: (e.items || []).map((it: { productName: string; cantidad: number }) => ({ productName: it.productName, cantidad: it.cantidad })),
+          }));
+          setTodaySummary(summary);
+        })
+        .catch(() => setTodaySummary([]));
+    }
   }, [tab]);
+
+  function buildSummaryText(): string {
+    if (todaySummary.length === 0) return "";
+    const today = new Date().toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric" });
+    let text = `📦 *Costeados ${today}*\n`;
+    for (const entry of todaySummary) {
+      text += `\n*${entry.proveedorName}*\n`;
+      for (const item of entry.items) {
+        const cant = item.cantidad % 1 === 0 ? item.cantidad.toFixed(0) : item.cantidad.toFixed(1);
+        text += `• ${item.productName} — ${cant}\n`;
+      }
+    }
+    return text.trim();
+  }
+
+  function copySummary() {
+    const text = buildSummaryText();
+    if (!text) return;
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
 
   async function deleteEntry(id: number, e: React.MouseEvent) {
     e.preventDefault();
@@ -262,13 +300,13 @@ export default function ComprasPage() {
 
       {/* Tabs */}
       <Stagger delay={100}>
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-fit shadow-sm">
+        <div className="flex flex-wrap items-center gap-2 mb-4">
+          <div className="flex gap-1 bg-gray-100 rounded-xl p-1 shadow-sm">
             {(Object.keys(TAB_LABELS) as Tab[]).map((t) => (
               <button
                 key={t}
                 onClick={() => setTab(t)}
-                className={`px-4 py-1.5 text-sm rounded-md transition-colors ${springBtn} ${
+                className={`px-3 sm:px-4 py-1.5 text-sm rounded-md transition-colors ${springBtn} ${
                   tab === t
                     ? "bg-white text-gray-900 shadow-sm font-medium"
                     : "text-gray-500 hover:text-gray-700"
@@ -281,7 +319,7 @@ export default function ComprasPage() {
 
           {/* Export buttons */}
           {entries.length > 0 && (
-            <div className="flex gap-2">
+            <div className="flex gap-2 ml-auto">
               <button
                 onClick={exportPDF}
                 className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 border border-red-200 rounded-xl hover:bg-red-100 transition-colors ${springBtn}`}
@@ -300,6 +338,22 @@ export default function ComprasPage() {
           )}
         </div>
       </Stagger>
+
+      {/* Today's costed summary for WhatsApp */}
+      {tab === "costeado" && todaySummary.length > 0 && (
+        <Stagger delay={120}>
+          <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-4">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-bold text-green-800">Costeados de hoy</h3>
+              <button onClick={copySummary}
+                className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${springBtn} ${copied ? "bg-green-600 text-white" : "bg-white text-green-700 border border-green-300 hover:bg-green-100"}`}>
+                {copied ? "Copiado ✓" : "Copiar para WhatsApp"}
+              </button>
+            </div>
+            <pre className="text-xs text-green-900 whitespace-pre-wrap font-sans leading-relaxed">{buildSummaryText()}</pre>
+          </div>
+        </Stagger>
+      )}
 
       {loading ? (
         <LoadingCenter text="Cargando ingresos..." />

@@ -15,16 +15,24 @@ export async function GET(req: NextRequest) {
   const page = parseInt(req.nextUrl.searchParams.get("page") || "1");
   const limit = parseInt(req.nextUrl.searchParams.get("limit") || "50");
   const skip = (page - 1) * limit;
+  const withItems = req.nextUrl.searchParams.get("withItems") === "true";
+  const today = req.nextUrl.searchParams.get("today") === "true";
 
   try {
     const where: Record<string, unknown> = {};
     if (estado !== "all") where.estado = estado;
     if (proveedor) where.proveedorCod = proveedor;
+    if (today) {
+      const now = new Date(Date.now() - 3 * 60 * 60 * 1000); // Argentina time
+      const todayStart = new Date(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+      todayStart.setHours(todayStart.getHours() + 3); // back to UTC
+      where.createdAt = { gte: todayStart };
+    }
 
     const [entries, total] = await Promise.all([
       prisma.stockEntry.findMany({
         where,
-        include: { items: { select: { id: true } } },
+        include: { items: withItems ? { select: { id: true, sku: true, productName: true, cantidad: true, costo: true, costeado: true } } : { select: { id: true } } },
         orderBy: { createdAt: "desc" },
         skip,
         take: limit,
@@ -48,6 +56,7 @@ export async function GET(req: NextRequest) {
       nroFactura: e.nroFactura,
       createdAt: e.createdAt.toISOString(),
       itemCount: e.items.length,
+      ...(withItems ? { items: (e.items as { sku: string; productName: string; cantidad: unknown; costo: unknown; costeado: boolean }[]).map((it) => ({ sku: it.sku, productName: it.productName, cantidad: Number(it.cantidad), costo: Number(it.costo || 0), costeado: it.costeado })) } : {}),
     }));
 
     return NextResponse.json({ entries: result, total, page, limit });

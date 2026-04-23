@@ -116,6 +116,7 @@ export async function POST(req: NextRequest) {
     where: { estado: "enviando" },
   });
 
+  console.log(`[DIFUSION-CRON] active campaigns: ${active.length}`);
   if (active.length === 0) {
     return NextResponse.json({ ok: true, processed: 0 });
   }
@@ -127,9 +128,9 @@ export async function POST(req: NextRequest) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ chatId: "healthcheck", message: "" }),
     });
-    // Bot responds (even with 400 = alive, connection refused = dead)
-  } catch {
-    // Bot unreachable — skip this tick, retry next minute
+    console.log("[DIFUSION-CRON] bot health check passed");
+  } catch (e) {
+    console.log(`[DIFUSION-CRON] bot down: ${(e as Error).message}`);
     return NextResponse.json({ ok: true, processed: 0, botDown: true });
   }
 
@@ -143,6 +144,7 @@ export async function POST(req: NextRequest) {
       orderBy: { id: "asc" },
     });
 
+    console.log(`[DIFUSION-CRON] campaign ${campaign.id}: ${pending.length} pending recipients`);
     if (pending.length === 0) {
       // All done — finalize campaign
       const counts = await prisma.difusionRecipient.groupBy({
@@ -223,11 +225,17 @@ export async function POST(req: NextRequest) {
           recentlySent.add(recipient.clientId);
         } else {
           const errText = await res.text().catch(() => "");
-          // Bot returned error — leave as pendiente to retry next tick
-          // (bot might be reconnecting to WhatsApp)
           console.error(`[DIFUSION] Bot error for ${recipient.clientId}: ${res.status} ${errText.substring(0, 100)}`);
-          botFailed = true;
-          break;
+          if (res.status === 500 && errText.includes("getChat")) {
+            // Bot alive but WhatsApp client not ready — stop batch, retry next tick
+            botFailed = true;
+            break;
+          }
+          // Other errors (invalid number, not on WhatsApp, etc.) — mark as failed, continue
+          await prisma.difusionRecipient.update({
+            where: { id: recipient.id },
+            data: { estado: "fallido", error: `Bot ${res.status}: ${errText.substring(0, 150)}` },
+          });
         }
       } catch (e) {
         // Bot unreachable — leave as pendiente, stop batch, retry next tick
