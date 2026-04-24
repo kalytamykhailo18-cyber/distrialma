@@ -52,6 +52,16 @@ export async function GET(req: NextRequest) {
 
       const client = clientResult.recordset[0];
 
+      // Calculate real saldo from Transas (source of truth, Saldo field can be stale)
+      const saldoReal = await pool.request().input("codSaldo", codPadded).query(`
+        SELECT ISNULL(SUM(Deuda), 0) AS saldo
+        FROM [${dbTransas}].dbo.Transas
+        WHERE Cliente = @codSaldo
+          AND (LTRIM(RTRIM(Itm)) = '0' OR LTRIM(RTRIM(Itm)) = '')
+          AND (Anulado IS NULL OR LTRIM(RTRIM(Anulado)) = '' OR Anulado = ' ')
+      `);
+      client.saldo = Number(saldoReal.recordset[0].saldo);
+
       // Get recent invoices (last 50)
       const invoicesResult = await pool.request().input("cod", codPadded).query(`
         SELECT TOP 50

@@ -128,12 +128,11 @@ export async function GET() {
       items: itemsByBoleta.get(h.boleta) || [],
     }));
 
-    // Get client account balance (saldo)
-    const dbClientes = getDbName("clientes");
+    // Get client account balance (saldo) — calculated from Transas, not Saldo field
     let saldo = 0;
     try {
       const saldoResult = await pool.request().input("cliente", clientePadded).query(
-        `SELECT ISNULL(Saldo, 0) AS saldo FROM [${dbClientes}].dbo.Clientes WHERE Cod = @cliente`
+        `SELECT ISNULL(SUM(Deuda), 0) AS saldo FROM [${dbTransas}].dbo.Transas WHERE Cliente = @cliente AND (LTRIM(RTRIM(Itm)) = '0' OR LTRIM(RTRIM(Itm)) = '') AND (Anulado IS NULL OR LTRIM(RTRIM(Anulado)) = '' OR Anulado = ' ')`
       );
       saldo = saldoResult.recordset[0]?.saldo || 0;
     } catch { /* silent */ }

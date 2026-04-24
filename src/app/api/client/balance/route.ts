@@ -38,6 +38,16 @@ export async function GET() {
 
     const client = clientResult.recordset[0];
 
+    // Calculate real saldo from Transas (source of truth)
+    const saldoReal = await pool.request().input("codSaldo", user.clientId.padStart(7, " ")).query(`
+      SELECT ISNULL(SUM(Deuda), 0) AS saldo
+      FROM [${dbTransas}].dbo.Transas
+      WHERE Cliente = @codSaldo
+        AND (LTRIM(RTRIM(Itm)) = '0' OR LTRIM(RTRIM(Itm)) = '')
+        AND (Anulado IS NULL OR LTRIM(RTRIM(Anulado)) = '' OR Anulado = ' ')
+    `);
+    client.saldo = Number(saldoReal.recordset[0].saldo);
+
     // Get monthly purchases (current month, Argentina time UTC-3)
     const now = new Date(Date.now() - 3 * 60 * 60 * 1000);
     const monthStart = `${now.getUTCFullYear()}${String(now.getUTCMonth() + 1).padStart(2, "0")}01000000`;
