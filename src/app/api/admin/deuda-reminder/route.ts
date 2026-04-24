@@ -28,23 +28,18 @@ function formatPrice(n: number): string {
 async function getDeudores(minSaldo: number) {
   const pool = await getPool();
   const dbClientes = getDbName("clientes");
-  const dbTransas = getDbName("transas");
 
   const result = await pool.request().input("minSaldo", minSaldo).query(`
-    SELECT cod, nombre, telefono, saldo FROM (
-      SELECT
-        LTRIM(RTRIM(c.Cod)) AS cod,
-        LTRIM(RTRIM(c.Nombre)) AS nombre,
-        LTRIM(RTRIM(ISNULL(c.Telclave3, ISNULL(c.TelClave1, '')))) AS telefono,
-        ISNULL((SELECT SUM(Deuda) FROM [${dbTransas}].dbo.Transas
-          WHERE Cliente = c.Cod AND (LTRIM(RTRIM(Itm)) = '0' OR LTRIM(RTRIM(Itm)) = '')
-          AND (Anulado IS NULL OR LTRIM(RTRIM(Anulado)) = '' OR Anulado = ' ')), 0) AS saldo
-      FROM [${dbClientes}].dbo.Clientes c
-      WHERE (c.DeBaja = 0 OR c.DeBaja IS NULL)
-        AND (LTRIM(RTRIM(ISNULL(c.Telclave3, ''))) <> '' OR LTRIM(RTRIM(ISNULL(c.TelClave1, ''))) <> '')
-    ) sub
-    WHERE saldo > @minSaldo
-    ORDER BY saldo DESC
+    SELECT
+      LTRIM(RTRIM(c.Cod)) AS cod,
+      LTRIM(RTRIM(c.Nombre)) AS nombre,
+      LTRIM(RTRIM(ISNULL(c.Telclave3, ISNULL(c.TelClave1, '')))) AS telefono,
+      ISNULL(c.Saldo, 0) AS saldo
+    FROM [${dbClientes}].dbo.Clientes c
+    WHERE (c.DeBaja = 0 OR c.DeBaja IS NULL)
+      AND ISNULL(c.Saldo, 0) > @minSaldo
+      AND (LTRIM(RTRIM(ISNULL(c.Telclave3, ''))) <> '' OR LTRIM(RTRIM(ISNULL(c.TelClave1, ''))) <> '')
+    ORDER BY c.Saldo DESC
   `);
 
   return result.recordset.map((r: { cod: string; nombre: string; telefono: string; saldo: number }) => ({
@@ -86,8 +81,20 @@ export async function GET(req: NextRequest) {
   });
   const recentlyReminded = new Set(recentReminders.map((r) => r.clientId));
 
+  // Exclude reparto clients who had delivery today or yesterday (they pay next day)
+  const dayNames = ["DOMINGO", "LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO"];
+  const todayName = dayNames[now.getDay()];
+  const yesterdayIdx = now.getDay() === 0 ? 6 : now.getDay() - 1;
+  const yesterdayName = dayNames[yesterdayIdx];
+
+  const repartoToday = await prisma.clientDeliveryDay.findMany({
+    where: { day: { in: [todayName, yesterdayName] } },
+    select: { clientId: true },
+  });
+  const repartoExcluded = new Set(repartoToday.map((r) => r.clientId));
+
   const eligible = deudores
-    .filter((d) => !recentlyReminded.has(d.cod))
+    .filter((d) => !recentlyReminded.has(d.cod) && !repartoExcluded.has(d.cod))
     .slice(0, maxPerRun);
 
   return NextResponse.json({
@@ -146,8 +153,19 @@ export async function POST(req: NextRequest) {
   });
   const recentlyReminded = new Set(recentReminders.map((r) => r.clientId));
 
+  // Exclude reparto clients who had delivery today or yesterday
+  const dayNames = ["DOMINGO", "LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO"];
+  const todayName = dayNames[now.getDay()];
+  const yesterdayIdx = now.getDay() === 0 ? 6 : now.getDay() - 1;
+  const yesterdayName = dayNames[yesterdayIdx];
+  const repartoToday = await prisma.clientDeliveryDay.findMany({
+    where: { day: { in: [todayName, yesterdayName] } },
+    select: { clientId: true },
+  });
+  const repartoExcluded = new Set(repartoToday.map((r) => r.clientId));
+
   const eligible = deudores
-    .filter((d) => !recentlyReminded.has(d.cod))
+    .filter((d) => !recentlyReminded.has(d.cod) && !repartoExcluded.has(d.cod))
     .slice(0, maxPerRun);
 
   let sent = 0;
