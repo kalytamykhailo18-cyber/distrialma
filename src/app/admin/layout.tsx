@@ -67,7 +67,7 @@ const MENU_CATEGORIES: MenuCategory[] = [
       { href: "/admin/inbox", label: "Inbox", perm: "informes" },
       { href: "/admin/notificaciones", label: "Deudas", perm: "notificaciones" },
       { href: "/admin/notificaciones/reactivar", label: "Reactivar clientes", perm: "notificaciones" },
-      { href: "/admin/bot-qr", label: "Bot QR", perm: "informes" },
+      { href: "/admin/bot-qr", label: "Bot QR", perm: "clientes" },
     ],
   },
   {
