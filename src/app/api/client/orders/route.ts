@@ -132,7 +132,7 @@ export async function GET() {
     let saldo = 0;
     try {
       const saldoResult = await pool.request().input("cliente", clientePadded).query(
-        `SELECT ISNULL(SUM(CASE WHEN FillerBit1 = 1 THEN Deuda * 100 ELSE Deuda END), 0) AS saldo FROM [${dbTransas}].dbo.Transas WHERE Cliente = @cliente AND (LTRIM(RTRIM(Itm)) = '0' OR LTRIM(RTRIM(Itm)) = '') AND (Anulado IS NULL OR LTRIM(RTRIM(Anulado)) = '' OR Anulado = ' ')`
+        `SELECT ISNULL(SUM(Deuda), 0) AS saldo FROM [${dbTransas}].dbo.Transas WHERE Cliente = @cliente AND (LTRIM(RTRIM(Itm)) = '0' OR LTRIM(RTRIM(Itm)) = '') AND (Anulado IS NULL OR LTRIM(RTRIM(Anulado)) = '' OR Anulado = ' ')`
       );
       saldo = saldoResult.recordset[0]?.saldo || 0;
     } catch { /* silent */ }

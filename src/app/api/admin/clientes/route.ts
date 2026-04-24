@@ -54,7 +54,7 @@ export async function GET(req: NextRequest) {
 
       // Calculate real saldo from Transas (source of truth, Saldo field can be stale)
       const saldoReal = await pool.request().input("codSaldo", codPadded).query(`
-        SELECT ISNULL(SUM(CASE WHEN FillerBit1 = 1 THEN Deuda * 100 ELSE Deuda END), 0) AS saldo
+        SELECT ISNULL(SUM(Deuda), 0) AS saldo
         FROM [${dbTransas}].dbo.Transas
         WHERE Cliente = @codSaldo
           AND (LTRIM(RTRIM(Itm)) = '0' OR LTRIM(RTRIM(Itm)) = '')
@@ -202,7 +202,7 @@ export async function GET(req: NextRequest) {
           LTRIM(RTRIM(c.Nombre)) AS nombre,
           LTRIM(RTRIM(ISNULL(c.Calle, ''))) AS calle,
           LTRIM(RTRIM(ISNULL(c.TelClave1, ISNULL(c.Telclave3, '')))) AS telefono,
-          ISNULL((SELECT SUM(CASE WHEN FillerBit1 = 1 THEN Deuda * 100 ELSE Deuda END) FROM [${dbTransas}].dbo.Transas WHERE Cliente = c.Cod AND (LTRIM(RTRIM(Itm)) = '0' OR LTRIM(RTRIM(Itm)) = '') AND (Anulado IS NULL OR LTRIM(RTRIM(Anulado)) = '' OR Anulado = ' ')), 0) AS saldo,
+          ISNULL((SELECT SUM(Deuda) FROM [${dbTransas}].dbo.Transas WHERE Cliente = c.Cod AND (LTRIM(RTRIM(Itm)) = '0' OR LTRIM(RTRIM(Itm)) = '') AND (Anulado IS NULL OR LTRIM(RTRIM(Anulado)) = '' OR Anulado = ' ')), 0) AS saldo,
           ISNULL(c.TotalVeces, 0) AS totalVeces
         FROM [${dbClientes}].dbo.Clientes c
         ${where}
