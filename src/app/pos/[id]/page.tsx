@@ -240,6 +240,14 @@ export default function PosPage() {
 
   function loadPendienteToCart(p: Pendiente) {
     setSelectedPendiente(p);
+    // Restore original vendedor from pending order
+    if (p.empleadoCod) {
+      const origEmp = empleados.find((e) => e.cod === p.empleadoCod);
+      if (origEmp) setSelectedEmpleado(origEmp);
+    }
+    if (p.clienteCod) {
+      setSelectedCliente({ cod: p.clienteCod, nombre: p.clienteNombre, cuit: "", zona: "", listaPrecios: "" });
+    }
     setCart(p.items.map((i) => ({
       sku: i.sku, nombre: i.nombre, unidad: "", cantidad: i.cantidad,
       precio: i.precio, lista: i.lista, images: [],
@@ -344,6 +352,7 @@ export default function PosPage() {
           items: cart.map((i) => ({ sku: i.sku, nombre: i.nombre, cantidad: i.cantidad, precio: i.precio, lista: i.lista })),
           payments: payLines,
           vuelto,
+          ...(terminal.esCajero && selectedPendiente ? { cajeroCod: terminal.nombre } : {}),
         }),
       });
       const d = await res.json();

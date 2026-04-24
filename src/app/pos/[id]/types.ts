@@ -6,7 +6,7 @@ export interface Terminal {
 
 export interface Pendiente {
   boleta: string; nroped: string; total: number; cant: number; fecha: string; hora: string;
-  clienteCod: string; clienteNombre: string; empleadoNombre: string; origen: string; notas: string;
+  clienteCod: string; clienteNombre: string; empleadoCod: string; empleadoNombre: string; origen: string; notas: string;
   items: Array<{ sku: string; nombre: string; cantidad: number; precio: number; impo: number; lista: number }>;
 }
 

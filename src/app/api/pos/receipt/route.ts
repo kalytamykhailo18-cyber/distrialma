@@ -26,7 +26,8 @@ export async function GET(req: NextRequest) {
       SELECT Total, Efectivo, Tarjeta, Deuda, Cant, Vuelto,
         LTRIM(RTRIM(Sucursal)) AS sucursal, LTRIM(RTRIM(Fechora)) AS fechora,
         LTRIM(RTRIM(ISNULL(Nombre, ''))) AS clienteNombre,
-        LTRIM(RTRIM(Empleado)) AS empleadoCod
+        LTRIM(RTRIM(Empleado)) AS empleadoCod,
+        LTRIM(RTRIM(ISNULL(Filler2, ''))) AS cajeroCod
       FROM [${dbTransas}].dbo.Transas WHERE Boleta = @bol AND Tipo = 'V'
     `);
     if (header.recordset.length === 0) {
@@ -48,6 +49,17 @@ export async function GET(req: NextRequest) {
     const terminal = await prisma.posTerminal.findFirst({
       where: { sucursal: sale.sucursal.trim() },
     });
+
+    // Resolve vendedor and cajero names
+    const dbEmpleados = getDbName("empleados");
+    let vendedorNombre = "";
+    if (sale.empleadoCod) {
+      const empRes = await pool.request().input("empCod", sale.empleadoCod.padStart(7, " ")).query(`
+        SELECT LTRIM(RTRIM(Nombre)) AS nombre FROM [${dbEmpleados}].dbo.Empleados WHERE Cod = @empCod
+      `);
+      vendedorNombre = empRes.recordset[0]?.nombre || sale.empleadoCod;
+    }
+    const cajeroCod = sale.cajeroCod || "";
 
     const fechora = sale.fechora;
     const fecha = fechora.length >= 8 ? `${fechora.slice(6, 8)}/${fechora.slice(4, 6)}/${fechora.slice(0, 4)}` : "";
@@ -82,6 +94,13 @@ export async function GET(req: NextRequest) {
         doc.setFontSize(10);
         doc.text(`Cliente: ${sale.clienteNombre}`, 14, y);
         y += 6;
+      }
+      // Vendedor and cajero
+      if (vendedorNombre) {
+        doc.setTextColor(100, 100, 100);
+        doc.setFontSize(8);
+        doc.text(`Vendedor: ${vendedorNombre}${cajeroCod ? `  |  Cajero: ${cajeroCod}` : ""}`, 14, y);
+        y += 5;
       }
 
       // Items table
@@ -163,6 +182,7 @@ export async function GET(req: NextRequest) {
       doc.text(`${fecha} ${hora}`, ticketW - 3, y, { align: "right" });
       y += 4;
       if (sale.clienteNombre) { doc.text(`Cliente: ${sale.clienteNombre}`, 3, y); y += 4; }
+      if (vendedorNombre) { doc.text(`Vend: ${vendedorNombre}`, 3, y); if (cajeroCod) { doc.text(`Caja: ${cajeroCod}`, ticketW - 3, y, { align: "right" }); } y += 4; }
       doc.line(3, y, ticketW - 3, y);
       y += 3;
 

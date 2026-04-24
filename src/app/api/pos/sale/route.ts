@@ -24,13 +24,14 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { sucursal, empleadoCod, clienteCod, items, payments, vuelto } = await req.json() as {
+    const { sucursal, empleadoCod, clienteCod, items, payments, vuelto, cajeroCod } = await req.json() as {
       sucursal: string;
       empleadoCod: string;
       clienteCod?: string;
       items: SaleItem[];
       payments: SalePayment[];
       vuelto: number;
+      cajeroCod?: string;
     };
 
     if (!items?.length || !payments?.length || !sucursal || !empleadoCod) {
@@ -130,6 +131,7 @@ export async function POST(req: NextRequest) {
     headerReq.input("cuit", clienteCuit.padEnd(14, " "));
     headerReq.input("iva", clienteIva.padEnd(1, " "));
     headerReq.input("telefono", clienteTelefono.padEnd(14, " "));
+    headerReq.input("cajero", cajeroCod ? cajeroCod.padStart(7, " ") : "");
 
     await headerReq.query(`
       INSERT INTO [${dbTransas}].dbo.Transas
@@ -151,7 +153,7 @@ export async function POST(req: NextRequest) {
          @telefono, @cliente, @nombre, @calle, @nume, @pisoDto, '', '',
          @localidad, @cuit, @iva, '              ', ' ', '',
          0, 0, 0, 0, 0, 0,
-         'POS', '', '', 0, 0, 0, 0, 0)
+         'POS', @cajero, '', 0, 0, 0, 0, 0)
     `);
 
     nextCod++;
