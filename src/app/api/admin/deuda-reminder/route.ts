@@ -1,0 +1,202 @@
+import { NextRequest, NextResponse } from "next/server";
+import { getPool, getDbName } from "@/lib/mssql";
+import { prisma } from "@/lib/prisma";
+
+export const dynamic = "force-dynamic";
+
+const CRON_SECRET = process.env.CRON_SECRET || (process.env.RESEND_API_KEY || "").substring(0, 16);
+
+function toWaChatId(phone: string): string | null {
+  let num = phone.replace(/\D/g, "");
+  if (!num) return null;
+  if (num.startsWith("0")) num = num.slice(1);
+  if (num.startsWith("549")) { /* ok */ }
+  else if (num.startsWith("54")) { num = "549" + num.slice(2); }
+  else { num = "549" + num; }
+  return `${num}@c.us`;
+}
+
+async function getSetting(key: string, defaultVal: string): Promise<string> {
+  const s = await prisma.setting.findUnique({ where: { key } });
+  return s?.value || defaultVal;
+}
+
+function formatPrice(n: number): string {
+  return "$" + n.toLocaleString("es-AR", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+}
+
+async function getDeudores(minSaldo: number) {
+  const pool = await getPool();
+  const dbClientes = getDbName("clientes");
+  const dbTransas = getDbName("transas");
+
+  const result = await pool.request().input("minSaldo", minSaldo).query(`
+    SELECT cod, nombre, telefono, saldo FROM (
+      SELECT
+        LTRIM(RTRIM(c.Cod)) AS cod,
+        LTRIM(RTRIM(c.Nombre)) AS nombre,
+        LTRIM(RTRIM(ISNULL(c.Telclave3, ISNULL(c.TelClave1, '')))) AS telefono,
+        ISNULL((SELECT SUM(Deuda) FROM [${dbTransas}].dbo.Transas
+          WHERE Cliente = c.Cod AND (LTRIM(RTRIM(Itm)) = '0' OR LTRIM(RTRIM(Itm)) = '')
+          AND (Anulado IS NULL OR LTRIM(RTRIM(Anulado)) = '' OR Anulado = ' ')), 0) AS saldo
+      FROM [${dbClientes}].dbo.Clientes c
+      WHERE (c.DeBaja = 0 OR c.DeBaja IS NULL)
+        AND (LTRIM(RTRIM(ISNULL(c.Telclave3, ''))) <> '' OR LTRIM(RTRIM(ISNULL(c.TelClave1, ''))) <> '')
+    ) sub
+    WHERE saldo > @minSaldo
+    ORDER BY saldo DESC
+  `);
+
+  return result.recordset.map((r: { cod: string; nombre: string; telefono: string; saldo: number }) => ({
+    cod: r.cod,
+    nombre: r.nombre,
+    telefono: r.telefono,
+    saldo: Number(r.saldo),
+  }));
+}
+
+// GET: preview who would be reminded
+export async function GET(req: NextRequest) {
+  const { searchParams } = new URL(req.url);
+  const secret = searchParams.get("secret");
+  if (secret !== CRON_SECRET) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  }
+
+  const minSaldo = parseFloat(await getSetting("deuda_reminder_min_saldo", "50000"));
+  const cooldownDays = parseInt(await getSetting("deuda_reminder_cooldown_days", "7"));
+  const maxPerRun = parseInt(await getSetting("deuda_reminder_max_per_run", "50"));
+  const enabled = (await getSetting("deuda_reminder_enabled", "true")) === "true";
+
+  // Check Argentina time
+  const now = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Argentina/Buenos_Aires" }));
+  const hour = now.getHours();
+
+  const deudores = await getDeudores(minSaldo);
+
+  // Check cooldown — exclude recently reminded
+  const cooldownDate = new Date(Date.now() - cooldownDays * 24 * 60 * 60 * 1000);
+  const recentReminders = await prisma.notificationLog.findMany({
+    where: {
+      tipo: { in: ["deuda", "deuda_auto"] },
+      ok: true,
+      createdAt: { gte: cooldownDate },
+    },
+    select: { clientId: true },
+  });
+  const recentlyReminded = new Set(recentReminders.map((r) => r.clientId));
+
+  const eligible = deudores
+    .filter((d) => !recentlyReminded.has(d.cod))
+    .slice(0, maxPerRun);
+
+  return NextResponse.json({
+    enabled,
+    hora: `${hour}:${String(now.getMinutes()).padStart(2, "0")}`,
+    dentroDeHorario: hour >= 9 && hour < 18,
+    minSaldo,
+    cooldownDays,
+    maxPerRun,
+    totalDeudores: deudores.length,
+    yaRemindados: recentlyReminded.size,
+    elegibles: eligible.length,
+    clientes: eligible,
+  });
+}
+
+// POST: send reminders
+export async function POST(req: NextRequest) {
+  const { searchParams } = new URL(req.url);
+  let secret = searchParams.get("secret");
+  if (!secret) {
+    try { const body = await req.json(); secret = body.secret; } catch { /* */ }
+  }
+  if (secret !== CRON_SECRET) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  }
+
+  const enabled = (await getSetting("deuda_reminder_enabled", "true")) === "true";
+  if (!enabled) {
+    return NextResponse.json({ ok: true, skipped: true, reason: "deshabilitado" });
+  }
+
+  // Check Argentina time (9am-6pm)
+  const now = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Argentina/Buenos_Aires" }));
+  const hour = now.getHours();
+  if (hour < 9 || hour >= 18) {
+    return NextResponse.json({ ok: true, skipped: true, reason: "fuera de horario" });
+  }
+
+  const minSaldo = parseFloat(await getSetting("deuda_reminder_min_saldo", "50000"));
+  const cooldownDays = parseInt(await getSetting("deuda_reminder_cooldown_days", "7"));
+  const maxPerRun = parseInt(await getSetting("deuda_reminder_max_per_run", "50"));
+  const messageTemplate = await getSetting("deuda_reminder_message",
+    "Hola {nombre}, te recordamos que tenes un saldo pendiente de {saldo} en Distrialma. Podes abonar por transferencia o acercarte al local. Cualquier consulta estamos a disposicion. Gracias!");
+
+  const deudores = await getDeudores(minSaldo);
+
+  const cooldownDate = new Date(Date.now() - cooldownDays * 24 * 60 * 60 * 1000);
+  const recentReminders = await prisma.notificationLog.findMany({
+    where: {
+      tipo: { in: ["deuda", "deuda_auto"] },
+      ok: true,
+      createdAt: { gte: cooldownDate },
+    },
+    select: { clientId: true },
+  });
+  const recentlyReminded = new Set(recentReminders.map((r) => r.clientId));
+
+  const eligible = deudores
+    .filter((d) => !recentlyReminded.has(d.cod))
+    .slice(0, maxPerRun);
+
+  let sent = 0;
+  let failed = 0;
+  let skipped = 0;
+
+  for (const client of eligible) {
+    // Per-client dedup check (race condition guard)
+    const alreadySent = await prisma.notificationLog.findFirst({
+      where: { clientId: client.cod, tipo: { in: ["deuda", "deuda_auto"] }, ok: true, createdAt: { gte: cooldownDate } },
+    });
+    if (alreadySent) { skipped++; continue; }
+
+    const chatId = toWaChatId(client.telefono);
+    if (!chatId) { failed++; continue; }
+
+    const firstName = client.nombre.split(" ")[0];
+    const body = messageTemplate
+      .replace(/\{nombre\}/g, firstName)
+      .replace(/\{nombre_completo\}/g, client.nombre)
+      .replace(/\{saldo\}/g, formatPrice(client.saldo));
+
+    try {
+      const res = await fetch("http://127.0.0.1:3099/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chatId, message: body, addToContext: true, sender: "bot" }),
+      });
+
+      if (res.ok) {
+        sent++;
+        await prisma.notificationLog.create({
+          data: { clientId: client.cod, tipo: "deuda_auto", mensaje: body, telefono: client.telefono, enviadoPor: "sistema", ok: true },
+        });
+      } else {
+        failed++;
+        await prisma.notificationLog.create({
+          data: { clientId: client.cod, tipo: "deuda_auto", mensaje: body, telefono: client.telefono, enviadoPor: "sistema", ok: false },
+        });
+      }
+    } catch {
+      failed++;
+    }
+
+    // Rate limit: 1 second between messages
+    await new Promise((r) => setTimeout(r, 1000));
+  }
+
+  console.log(`[DEUDA-REMINDER] Sent: ${sent}, Failed: ${failed}, Skipped: ${skipped}, Eligible: ${eligible.length}`);
+
+  return NextResponse.json({ ok: true, sent, failed, skipped, total: eligible.length });
+}
