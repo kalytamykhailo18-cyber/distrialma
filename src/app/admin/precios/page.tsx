@@ -73,6 +73,7 @@ export default function PreciosPage() {
   const [error, setError] = useState("");
   const [form, setForm] = useState<Record<string, string>>({});
   const timerRef = useRef<ReturnType<typeof setTimeout>>();
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const productReady = useDataReady(product);
 
   function handleSearch(value: string) {
@@ -224,8 +225,9 @@ export default function PreciosPage() {
       const data = await res.json();
       if (res.ok) {
         setSuccess("Precios actualizados");
-        // Refresh product data
         selectProduct(product.sku);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        setTimeout(() => { searchInputRef.current?.focus(); searchInputRef.current?.select(); }, 300);
       } else {
         setError(data.error || "Error al guardar");
       }
@@ -257,6 +259,7 @@ export default function PreciosPage() {
                 else if (e.key === "Escape") { setSearchResults([]); setHlIdx(-1); }
               }
             }}
+            ref={searchInputRef}
             placeholder="Buscar por nombre, SKU o código de barras..."
             className="w-full pl-10 pr-4 py-2.5 border border-brand-400 rounded-xl text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
           />
