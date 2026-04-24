@@ -40,7 +40,7 @@ export async function GET() {
 
     // Calculate real saldo from Transas (source of truth)
     const saldoReal = await pool.request().input("codSaldo", user.clientId.padStart(7, " ")).query(`
-      SELECT ISNULL(SUM(Deuda), 0) AS saldo
+      SELECT ISNULL(SUM(CASE WHEN FillerBit1 = 1 THEN Deuda * 100 ELSE Deuda END), 0) AS saldo
       FROM [${dbTransas}].dbo.Transas
       WHERE Cliente = @codSaldo
         AND (LTRIM(RTRIM(Itm)) = '0' OR LTRIM(RTRIM(Itm)) = '')
