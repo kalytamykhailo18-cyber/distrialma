@@ -261,6 +261,20 @@ export async function GET(req: NextRequest) {
       ORDER BY hora
     `;
 
+    // ── 8. Facturacion breakdown ──
+    const facturacionQuery = `
+      SELECT
+        CASE WHEN LTRIM(RTRIM(ISNULL(t.TipoFac, ''))) = 'F' THEN 'Facturado' ELSE 'Sin factura' END AS tipo,
+        SUM(t.Impo) AS total,
+        COUNT(DISTINCT t.Boleta) AS cantidad
+      FROM [${dbTransas}].dbo.Transas t
+      WHERE t.Tipo = 'V' AND LTRIM(RTRIM(t.Itm)) = '0'
+        AND t.Fechora >= @desde AND t.Fechora < @hasta
+        ${sucFilter}
+        ${ANULADO_FILTER}
+      GROUP BY CASE WHEN LTRIM(RTRIM(ISNULL(t.TipoFac, ''))) = 'F' THEN 'Facturado' ELSE 'Sin factura' END
+    `;
+
     // ── Execute all queries in parallel ──
     const [
       ventasDiariasRes,
@@ -274,6 +288,7 @@ export async function GET(req: NextRequest) {
       horariosPicoRes,
       topProductosMargenRes,
       comparativoSucursalesRes,
+      facturacionRes,
     ] = await Promise.all([
       pool.request().input("desde", desde).input("hasta", hasta).query(ventasDiariasQuery),
       pool.request().input("desdeAnt", desdeAnterior).input("hastaAnt", hastaAnterior).query(ventasDiariasAnteriorQuery),
@@ -286,6 +301,7 @@ export async function GET(req: NextRequest) {
       pool.request().input("desde", desde).input("hasta", hasta).query(horariosPicoQuery),
       pool.request().input("desde", desde).input("hasta", hasta).query(topProductosMargenQuery),
       pool.request().input("desde", desde).input("hasta", hasta).query(comparativoSucursalesQuery),
+      pool.request().input("desde", desde).input("hasta", hasta).query(facturacionQuery),
     ]);
 
     // ── Format: ventas diarias ──
@@ -428,6 +444,12 @@ export async function GET(req: NextRequest) {
       };
     });
 
+    const facturacion = facturacionRes.recordset.map((r: { tipo: string; total: number; cantidad: number }) => ({
+      tipo: r.tipo,
+      total: Number(r.total) || 0,
+      cantidad: Number(r.cantidad) || 0,
+    }));
+
     return NextResponse.json({
       ventasDiarias,
       ventasDiariasMesAnterior,
@@ -438,6 +460,7 @@ export async function GET(req: NextRequest) {
       horariosPico,
       topProductosMargen,
       comparativoSucursales,
+      facturacion,
     });
   } catch (error) {
     console.error("Dashboard API error:", error);

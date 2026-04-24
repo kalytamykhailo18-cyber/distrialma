@@ -28,6 +28,7 @@ interface DashData {
   horariosPico: Array<Record<string, number>>;
   topProductosMargen?: Array<{ sku: string; nombre: string; marca: string; cantidad: number; totalVenta: number; totalCosto: number; ganancia: number; margen: string }>;
   comparativoSucursales?: Array<{ sucursal: string; ventas: number; ganancia: number; cantTickets: number; margen: string }>;
+  facturacion?: Array<{ tipo: string; total: number; cantidad: number }>;
 }
 
 export default function DashboardPage() {
@@ -343,6 +344,24 @@ export default function DashboardPage() {
                           <div className="text-gray-400">Margen</div>
                         </div>
                       </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </Stagger>
+          )}
+
+          {/* Facturacion */}
+          {data.facturacion && data.facturacion.length > 0 && (
+            <Stagger delay={240}>
+              <div className="bg-white border rounded-xl shadow-sm p-4 mb-6">
+                <h3 className="text-sm font-bold text-gray-700 mb-3">Facturacion</h3>
+                <div className="grid grid-cols-2 gap-3">
+                  {data.facturacion.map((f) => (
+                    <div key={f.tipo} className={`rounded-xl p-3 border ${f.tipo === "Facturado" ? "bg-green-50 border-green-200" : "bg-gray-50 border-gray-200"}`}>
+                      <div className="text-xs text-gray-500 mb-1">{f.tipo}</div>
+                      <div className={`text-lg font-bold ${f.tipo === "Facturado" ? "text-green-700" : "text-gray-700"}`}>{fmt(f.total)}</div>
+                      <div className="text-xs text-gray-400">{f.cantidad} ventas</div>
                     </div>
                   ))}
                 </div>
