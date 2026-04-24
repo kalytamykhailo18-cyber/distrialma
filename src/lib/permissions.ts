@@ -68,6 +68,7 @@ export const PAGE_PERMISSION_MAP: Record<string, Permission> = {
   "/admin/reparto": "reparto",
   "/admin/terminales": "terminales",
   "/admin/difusion": "difusion",
+  "/admin/bot-qr": "clientes",
 };
 
 export function hasPermission(
