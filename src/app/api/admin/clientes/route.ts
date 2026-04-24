@@ -202,7 +202,7 @@ export async function GET(req: NextRequest) {
           LTRIM(RTRIM(c.Nombre)) AS nombre,
           LTRIM(RTRIM(ISNULL(c.Calle, ''))) AS calle,
           LTRIM(RTRIM(ISNULL(c.TelClave1, ISNULL(c.Telclave3, '')))) AS telefono,
-          ISNULL(c.Saldo, 0) AS saldo,
+          ISNULL((SELECT SUM(Deuda) FROM [${dbTransas}].dbo.Transas WHERE Cliente = c.Cod AND (LTRIM(RTRIM(Itm)) = '0' OR LTRIM(RTRIM(Itm)) = '') AND (Anulado IS NULL OR LTRIM(RTRIM(Anulado)) = '' OR Anulado = ' ')), 0) AS saldo,
           ISNULL(c.TotalVeces, 0) AS totalVeces
         FROM [${dbClientes}].dbo.Clientes c
         ${where}
