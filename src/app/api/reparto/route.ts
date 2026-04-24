@@ -249,9 +249,10 @@ export async function GET(req: NextRequest) {
       // Sum ALL orders for this client (not just the latest one)
       const totalPlata = orders.reduce((s, o) => s + (Number(o.total) || 0), 0);
       const totalMercaderia = orders.reduce((s, o) => s + (Number(o.cant) || 0), 0);
-      // Facturado-only totals for the summary
-      const facturadoPlata = orders.filter((o) => o.origen === "facturado").reduce((s, o) => s + (Number(o.total) || 0), 0);
-      const facturadoMercaderia = orders.filter((o) => o.origen === "facturado").reduce((s, o) => s + (Number(o.cant) || 0), 0);
+      // Facturado-only totals for the summary (exclude old orders)
+      const todayFacturado = orders.filter((o) => o.origen === "facturado" && o.fechora >= sinceStr);
+      const facturadoPlata = todayFacturado.reduce((s, o) => s + (Number(o.total) || 0), 0);
+      const facturadoMercaderia = todayFacturado.reduce((s, o) => s + (Number(o.cant) || 0), 0);
 
       // Detect old orders (before the delivery date window)
       const oldOrders = orders.filter((o) => o.fechora < sinceStr);
