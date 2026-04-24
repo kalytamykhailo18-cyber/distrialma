@@ -402,6 +402,55 @@ export async function PUT(
       throw innerError;
     }
 
+    // Publish WhatsApp status with costed products
+    if (allCosteado) {
+      try {
+        const entryWithItems = await prisma.stockEntry.findUnique({
+          where: { id },
+          include: { items: true },
+        });
+        if (entryWithItems) {
+          const productImages = await prisma.productImage.findMany({
+            where: { sku: { in: entryWithItems.items.map((i) => i.sku) } },
+            orderBy: { position: "asc" },
+          });
+          const imgMap = new Map<string, string>();
+          for (const img of productImages) {
+            if (!imgMap.has(img.sku)) imgMap.set(img.sku, img.filename);
+          }
+
+          // Get sale prices (Precio2 = mayorista)
+          const skuList = entryWithItems.items.map((i) => i.sku);
+          const priceReq = pool.request();
+          skuList.forEach((s, idx) => priceReq.input(`s${idx}`, s.padStart(7, " ")));
+          const priceResult = await priceReq.query(`
+            SELECT LTRIM(RTRIM(CodProducto)) AS sku, Precio2
+            FROM [${dbProd}].dbo.Stock
+            WHERE CodProducto IN (${skuList.map((_, idx) => `@s${idx}`).join(",")})
+            AND LTRIM(RTRIM(Deposito)) = '0'
+          `);
+          const priceMap = new Map<string, number>();
+          for (const p of priceResult.recordset) priceMap.set(p.sku, Number(p.Precio2));
+
+          const statusItems = entryWithItems.items
+            .filter((i) => priceMap.get(i.sku) && priceMap.get(i.sku)! > 0)
+            .map((i) => ({
+              nombre: i.productName,
+              imageUrl: imgMap.get(i.sku) || null,
+              precio: priceMap.get(i.sku) || 0,
+            }));
+
+          if (statusItems.length > 0) {
+            fetch("http://127.0.0.1:3099/publish-status", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ items: statusItems }),
+            }).catch(() => {});
+          }
+        }
+      } catch { /* silent — don't block costeo for status failure */ }
+    }
+
     return NextResponse.json({ success: true, allCosteado });
   } catch (error) {
     console.error("Error updating stock entry costeo:", error);
