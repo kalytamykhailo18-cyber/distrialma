@@ -92,9 +92,6 @@ export async function GET(req: NextRequest) {
     const sinceStr = sinceDate.getUTCFullYear().toString()
       + String(sinceDate.getUTCMonth() + 1).padStart(2, "0")
       + String(sinceDate.getUTCDate()).padStart(2, "0") + "000000";
-    const todayStr = now.getUTCFullYear().toString()
-      + String(now.getUTCMonth() + 1).padStart(2, "0")
-      + String(now.getUTCDate()).padStart(2, "0") + "000000";
     const nextDay = new Date(targetDate);
     nextDay.setDate(nextDay.getDate() + 1);
     const untilStr = nextDay.getUTCFullYear().toString()
@@ -252,8 +249,8 @@ export async function GET(req: NextRequest) {
       // Sum ALL orders for this client (not just the latest one)
       const totalPlata = orders.reduce((s, o) => s + (Number(o.total) || 0), 0);
       const totalMercaderia = orders.reduce((s, o) => s + (Number(o.cant) || 0), 0);
-      // Facturado-only totals for the summary (today only, not expanded window)
-      const todayFacturado = orders.filter((o) => o.origen === "facturado" && o.fechora >= todayStr);
+      // Facturado-only totals for the summary (delivery window only, excludes old undelivered)
+      const todayFacturado = orders.filter((o) => o.origen === "facturado" && o.fechora >= sinceStr);
       const facturadoPlata = todayFacturado.reduce((s, o) => s + (Number(o.total) || 0), 0);
       const facturadoMercaderia = todayFacturado.reduce((s, o) => s + (Number(o.cant) || 0), 0);
 
