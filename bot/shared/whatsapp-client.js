@@ -2,9 +2,15 @@ import pkg from "whatsapp-web.js";
 const { Client, LocalAuth } = pkg;
 import qrcode from "qrcode-terminal";
 
+import path from "path";
+import { fileURLToPath } from "url";
+
+const BOT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+
 export function createWhatsAppClient({ sessionPath, name, onDisconnect }) {
+  const absSessionPath = path.isAbsolute(sessionPath) ? sessionPath : path.join(BOT_ROOT, sessionPath);
   const client = new Client({
-    authStrategy: new LocalAuth({ dataPath: sessionPath }),
+    authStrategy: new LocalAuth({ dataPath: absSessionPath }),
     puppeteer: {
       headless: true,
       args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
