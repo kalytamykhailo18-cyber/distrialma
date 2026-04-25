@@ -440,6 +440,12 @@ export async function PUT(
       })();
     }
 
+    // Check for negative margins after costeo (fire and forget)
+    if (allCosteado) {
+      const cronSecret = process.env.CRON_SECRET || (process.env.RESEND_API_KEY || "").substring(0, 16);
+      fetch(`http://127.0.0.1:3000/api/admin/margin-alert?secret=${cronSecret}`, { method: "POST" }).catch(() => {});
+    }
+
     return NextResponse.json({ success: true, allCosteado });
   } catch (error) {
     console.error("Error updating stock entry costeo:", error);
