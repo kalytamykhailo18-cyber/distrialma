@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
       WHERE LTRIM(RTRIM(s.Deposito)) = '0'
         AND (s.TalleColor IS NULL OR LTRIM(RTRIM(s.TalleColor)) = '')
         AND (p.DeBaja = 0 OR p.DeBaja IS NULL)
-        AND s.Costo > 0 AND s.Stk > 0
+        AND s.Costo > 0 AND s.Stk <> 0
         AND (
           (s.Precio > 0 AND (s.Precio - s.Costo) * 100.0 / NULLIF(s.Precio, 0) < @minMargen) OR
           (s.Precio2 > 0 AND (s.Precio2 - s.Costo) * 100.0 / NULLIF(s.Precio2, 0) < @minMargen) OR
@@ -95,7 +95,7 @@ export async function POST(req: NextRequest) {
       WHERE LTRIM(RTRIM(s.Deposito)) = '0'
         AND (s.TalleColor IS NULL OR LTRIM(RTRIM(s.TalleColor)) = '')
         AND (p.DeBaja = 0 OR p.DeBaja IS NULL)
-        AND s.Costo > 0 AND s.Stk > 0
+        AND s.Costo > 0 AND s.Stk <> 0
         AND (
           (s.Precio > 0 AND s.Precio < s.Costo) OR
           (s.Precio2 > 0 AND s.Precio2 < s.Costo) OR
