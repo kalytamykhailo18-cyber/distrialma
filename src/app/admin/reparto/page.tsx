@@ -48,6 +48,8 @@ export default function RepartoPage() {
   const [deliveryStatuses, setDeliveryStatuses] = useState<Record<string, { estado: string; observaciones: string | null; deliveredBy: string | null }>>({});
   const [showDeliveryOnly, setShowDeliveryOnly] = useState<"all" | "pending" | "done">("all");
   const [sortBy, setSortBy] = useState<"nombre" | "zona" | "estado">("nombre");
+  const [sendingNotif, setSendingNotif] = useState(false);
+  const [notifResult, setNotifResult] = useState("");
 
   // Today's date for delivery tracking
   const todayDate = new Date().toISOString().slice(0, 10);
@@ -464,13 +466,35 @@ export default function RepartoPage() {
               ))}
             </div>
             {filtered.length > 0 && (
-              <button
-                onClick={exportPDF}
-                className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 shrink-0 ${springBtn}`}
-              >
-                <HiOutlineDocumentDownload className="w-4 h-4" />
-                PDF
-              </button>
+              <>
+                <button
+                  onClick={exportPDF}
+                  className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 shrink-0 ${springBtn}`}
+                >
+                  <HiOutlineDocumentDownload className="w-4 h-4" />
+                  PDF
+                </button>
+                <button
+                  onClick={async () => {
+                    setSendingNotif(true);
+                    setNotifResult("");
+                    try {
+                      const res = await fetch("/api/admin/reparto-facturado", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ secret: "trigger" }) });
+                      const d = await res.json();
+                      if (d.ok) setNotifResult(`Enviado a ${d.sent} clientes`);
+                      else setNotifResult(d.error || "Error");
+                    } catch { setNotifResult("Error"); }
+                    setSendingNotif(false);
+                    setTimeout(() => setNotifResult(""), 4000);
+                  }}
+                  disabled={sendingNotif}
+                  className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-green-600 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 shrink-0 ${springBtn} disabled:opacity-50`}
+                >
+                  <FaWhatsapp className="w-4 h-4" />
+                  {sendingNotif ? "Enviando..." : "Notificar facturado"}
+                </button>
+                {notifResult && <span className="text-xs text-green-600 font-medium">{notifResult}</span>}
+              </>
             )}
           </div>
         </Stagger>

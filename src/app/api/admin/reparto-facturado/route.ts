@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPool, getDbName } from "@/lib/mssql";
 import { prisma } from "@/lib/prisma";
+import { requireStaff } from "@/lib/api-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -42,7 +43,9 @@ export async function POST(req: NextRequest) {
   if (!secret) {
     try { const body = await req.json(); secret = body.secret; } catch { /* */ }
   }
-  if (secret !== CRON_SECRET) {
+  const isCron = secret === CRON_SECRET;
+  const isStaff = !isCron && !!(await requireStaff());
+  if (!isCron && !isStaff) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
