@@ -77,7 +77,7 @@ export async function GET(
     // Get product details (rubro, marca, unidad) for ALL items
     const productDetails: Record<
       string,
-      { rubro: string; marca: string; unidad: string; cantPorCaja: number }
+      { rubro: string; marca: string; unidad: string }
     > = {};
 
     if (skus.length > 0) {
@@ -87,8 +87,7 @@ export async function GET(
           LTRIM(RTRIM(Cod)) AS sku,
           LTRIM(RTRIM(ISNULL(Rubro,''))) AS rubro,
           LTRIM(RTRIM(ISNULL(Marca,''))) AS marca,
-          LTRIM(RTRIM(ISNULL(Unidad,''))) AS unidad,
-          ISNULL(CantxCaja, 0) AS cantPorCaja
+          LTRIM(RTRIM(ISNULL(Unidad,''))) AS unidad
         FROM [${dbProd}].dbo.Productos
         WHERE Cod IN (${skuList})
       `);
@@ -98,7 +97,6 @@ export async function GET(
           rubro: row.rubro,
           marca: row.marca,
           unidad: row.unidad,
-          cantPorCaja: row.cantPorCaja,
         };
       }
     }
@@ -124,7 +122,6 @@ export async function GET(
         ? {
             rubro: productDetails[i.sku].rubro,
             marca: productDetails[i.sku].marca,
-            cantPorCaja: productDetails[i.sku].cantPorCaja,
           }
         : {}),
     }));
