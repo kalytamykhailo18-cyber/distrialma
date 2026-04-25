@@ -8,7 +8,7 @@ import { createHttpServer } from "../shared/http-server.js";
 const PORT = 3098;
 
 const { client, getStatus } = createWhatsAppClient({
-  sessionPath: "./session-skynet",
+  sessionPath: "./skynet/session",
   name: "SKYNET",
 });
 
