@@ -75,6 +75,7 @@ const MENU_CATEGORIES: MenuCategory[] = [
       { href: "/admin/clientes", label: "Clientes", perm: "clientes" },
       { href: "/admin/vendedores", label: "Vendedores", perm: "vendedores" },
       { href: "/admin/usuarios", label: "Usuarios", perm: "usuarios" },
+      { href: "/admin/mis-descuentos", label: "Mis Descuentos", perm: "etiquetas" },
     ],
   },
   {
