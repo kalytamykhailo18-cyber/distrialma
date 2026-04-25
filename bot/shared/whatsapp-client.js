@@ -2,7 +2,7 @@ import pkg from "whatsapp-web.js";
 const { Client, LocalAuth } = pkg;
 import qrcode from "qrcode-terminal";
 
-export function createWhatsAppClient({ sessionPath, name }) {
+export function createWhatsAppClient({ sessionPath, name, onDisconnect }) {
   const client = new Client({
     authStrategy: new LocalAuth({ dataPath: sessionPath }),
     puppeteer: {
@@ -45,7 +45,9 @@ export function createWhatsAppClient({ sessionPath, name }) {
   client.on("disconnected", async (reason) => {
     console.log(`[${name}] Desconectado:`, reason);
     botStatus = "desconectado";
-    // Auto restart
+    if (onDisconnect) {
+      try { await onDisconnect(reason); } catch {}
+    }
     console.log(`[${name}] Reiniciando en 10 segundos...`);
     setTimeout(() => process.exit(1), 10000);
   });

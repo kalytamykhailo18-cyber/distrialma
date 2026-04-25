@@ -42,24 +42,23 @@ const AUTO_REPLY_PATTERNS = [
 const { client, getStatus } = createWhatsAppClient({
   sessionPath: "./mily/session",
   name: "MILY",
-});
-
-// Disconnect alert email
-client.on("disconnected", async (reason) => {
-  try {
-    const { Resend } = await import("resend");
-    const resendKey = process.env.RESEND_API_KEY || "";
-    const emailTo = process.env.BOT_ALERT_EMAIL || "despensaalma2020@gmail.com";
-    if (resendKey) {
-      const resend = new Resend(resendKey);
-      await resend.emails.send({
-        from: process.env.RESEND_FROM || "Distrialma <onboarding@resend.dev>",
-        to: emailTo,
-        subject: "Mily WhatsApp desconectada",
-        html: `<p>Mily se desconecto de WhatsApp.</p><p>Razon: ${reason}</p><p>Fecha: ${new Date().toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires" })}</p>`,
-      });
-    }
-  } catch {}
+  onDisconnect: async (reason) => {
+    try {
+      const { Resend } = await import("resend");
+      const resendKey = process.env.RESEND_API_KEY || "";
+      const emailTo = process.env.BOT_ALERT_EMAIL || "despensaalma2020@gmail.com";
+      if (resendKey) {
+        const resend = new Resend(resendKey);
+        await resend.emails.send({
+          from: process.env.RESEND_FROM || "Distrialma <onboarding@resend.dev>",
+          to: emailTo,
+          subject: "Mily WhatsApp desconectada",
+          html: `<p>Mily se desconecto de WhatsApp.</p><p>Razon: ${reason}</p><p>Fecha: ${new Date().toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires" })}</p>`,
+        });
+        console.log("[MILY] Email de desconexion enviado");
+      }
+    } catch {}
+  },
 });
 
 // Handle incoming messages
