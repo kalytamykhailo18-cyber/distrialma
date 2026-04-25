@@ -42,3 +42,4 @@ next-env.d.ts
 bot/mily/session/
 bot/skynet/session/
 bot/.wwebjs_cache/
+certs/bot/session/
