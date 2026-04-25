@@ -303,6 +303,7 @@ model InternalMovement {
   usuario     String   @db.VarChar(50)
   estado      String   @default("pendiente") @db.VarChar(20)
   notas       String?  @db.Text
+  imageUrl    String?  @db.VarChar(500)
   aprobadoPor String?  @db.VarChar(50)
   aprobadoAt  DateTime?
   createdAt   DateTime @default(now())

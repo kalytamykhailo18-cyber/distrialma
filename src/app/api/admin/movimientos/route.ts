@@ -64,6 +64,7 @@ export async function GET(req: NextRequest) {
       usuario: m.usuario,
       estado: m.estado,
       notas: m.notas,
+      imageUrl: m.imageUrl,
       aprobadoPor: m.aprobadoPor,
       aprobadoAt: m.aprobadoAt?.toISOString() || null,
       createdAt: m.createdAt.toISOString(),
@@ -155,6 +156,7 @@ export async function POST(req: NextRequest) {
         usuario,
         estado: "pendiente",
         notas: notas || null,
+        imageUrl: body.imageUrl || null,
         items: {
           create: itemsWithCost.map((item) => ({
             sku: item.sku,

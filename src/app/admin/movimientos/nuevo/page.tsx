@@ -47,6 +47,8 @@ export default function NuevoMovimiento() {
   const [sucursal, setSucursal] = useState("");
   const [motivo, setMotivo] = useState("");
   const [notas, setNotas] = useState("");
+  const [imageUrl, setImageUrl] = useState("");
+  const [uploading, setUploading] = useState(false);
   const [items, setItems] = useState<CartItem[]>([]);
   const [search, setSearch] = useState("");
   const [results, setResults] = useState<SearchProduct[]>([]);
@@ -272,6 +274,7 @@ export default function NuevoMovimiento() {
           sucursal,
           destino: motivo,
           notas,
+          imageUrl: imageUrl || null,
           items,
           empleados: (motivo === "Rotura de empleado" || motivo === "Descuento empleados") ? selectedEmpleados : null,
         }),
@@ -517,6 +520,31 @@ export default function NuevoMovimiento() {
             className="w-full border border-brand-400 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
             placeholder="Observaciones sobre el movimiento..."
           />
+          <div className="mt-3">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Foto (opcional)</label>
+            <div className="flex gap-2 items-center">
+              <label className={`flex-1 flex items-center justify-center px-4 py-2 border-2 border-dashed border-brand-300 rounded-lg cursor-pointer hover:border-brand-500 transition-colors text-sm text-gray-500 ${uploading ? "opacity-50" : ""}`}>
+                <input type="file" accept="image/*" className="hidden" disabled={uploading}
+                  onChange={async (e) => {
+                    const f = e.target.files?.[0];
+                    if (!f) return;
+                    setUploading(true);
+                    try {
+                      const fd = new FormData();
+                      fd.append("file", f);
+                      fd.append("folder", "movimientos");
+                      const res = await fetch("/api/admin/upload", { method: "POST", body: fd });
+                      const d = await res.json();
+                      if (d.url) setImageUrl(d.url);
+                    } catch {}
+                    setUploading(false);
+                  }} />
+                {uploading ? "Subiendo..." : imageUrl ? "Cambiar foto" : "Subir foto"}
+              </label>
+              {imageUrl && <button onClick={() => setImageUrl("")} className="text-xs text-red-500 hover:text-red-700">Quitar</button>}
+            </div>
+            {imageUrl && <img src={imageUrl} alt="Foto" className="mt-2 max-h-32 rounded-lg border" />}
+          </div>
         </div>
       </Stagger>
 

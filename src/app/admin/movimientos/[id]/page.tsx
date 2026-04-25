@@ -28,6 +28,7 @@ interface Movement {
   usuario: string;
   estado: string;
   notas: string | null;
+  imageUrl: string | null;
   aprobadoPor: string | null;
   aprobadoAt: string | null;
   createdAt: string;
@@ -207,6 +208,14 @@ export default function MovimientoDetail() {
               <div className="col-span-2">
                 <span className="text-gray-500">Notas:</span>
                 <span className="ml-2">{movement.notas}</span>
+              </div>
+            )}
+            {movement.imageUrl && (
+              <div className="col-span-2">
+                <span className="text-gray-500">Foto:</span>
+                <a href={movement.imageUrl} target="_blank" rel="noopener noreferrer">
+                  <img src={movement.imageUrl} alt="Foto del movimiento" className="mt-1 max-h-48 rounded-lg border cursor-pointer hover:opacity-80" />
+                </a>
               </div>
             )}
           </div>
