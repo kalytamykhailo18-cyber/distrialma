@@ -128,7 +128,7 @@ export async function POST(req: NextRequest) {
     // Send to Gaston's number
     const gastonChat = "5491122254949@c.us";
     try {
-      await fetch("http://127.0.0.1:3099/send", {
+      await fetch("http://127.0.0.1:3098/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ chatId: gastonChat, message: msg }),
