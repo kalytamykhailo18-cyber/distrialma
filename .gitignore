@@ -38,4 +38,4 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 .claude
-.wwebjs_cache/
+.wwebjs_cache/bot/session-skynet/
