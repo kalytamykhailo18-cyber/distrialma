@@ -781,41 +781,6 @@ const httpServer = http.createServer(async (req, res) => {
         res.writeHead(500); res.end('{"error":"' + e.message + '"}');
       }
     });
-  } else if (req.method === "POST" && req.url === "/publish-status") {
-    let body = "";
-    req.on("data", (c) => body += c);
-    req.on("end", async () => {
-      try {
-        const { items } = JSON.parse(body);
-        // items: [{ nombre, imageUrl, precio }]
-        if (!items?.length) { res.writeHead(400); res.end('{"error":"items required"}'); return; }
-
-        const { MessageMedia } = pkg;
-        let published = 0;
-
-        for (const item of items.slice(0, 5)) { // max 5 statuses per costeo
-          try {
-            if (item.imageUrl) {
-              const media = await MessageMedia.fromUrl(item.imageUrl, { unsafeMime: true });
-              const caption = `${item.nombre}\n$${Number(item.precio).toLocaleString("es-AR")}`;
-              await client.sendMessage("status@broadcast", media, { caption });
-            } else {
-              await client.sendMessage("status@broadcast", `${item.nombre} — $${Number(item.precio).toLocaleString("es-AR")}`);
-            }
-            published++;
-            await new Promise((r) => setTimeout(r, 2000));
-          } catch (e) {
-            console.error(`[STATUS] Error publishing ${item.nombre}:`, e.message);
-          }
-        }
-
-        console.log(`[STATUS] Published ${published}/${items.length} product statuses`);
-        res.writeHead(200); res.end(JSON.stringify({ ok: true, published }));
-      } catch (e) {
-        console.error("[STATUS] Error:", e.message);
-        res.writeHead(500); res.end('{"error":"' + e.message + '"}');
-      }
-    });
   } else {
     res.writeHead(404); res.end("not found");
   }
