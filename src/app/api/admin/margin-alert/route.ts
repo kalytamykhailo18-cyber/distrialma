@@ -24,32 +24,36 @@ export async function GET(req: NextRequest) {
 
     const result = await pool.request().input("minMargen", minMargen).query(`
       SELECT LTRIM(RTRIM(p.Cod)) AS sku, LTRIM(RTRIM(p.Nombre)) AS nombre,
-        LTRIM(RTRIM(ISNULL(m.[Desc], ''))) AS marca,
-        s.Costo AS costo, s.Precio2 AS precioMayorista, s.Precio AS precioMinorista,
-        s.Stk AS stock,
-        ROUND((s.Precio2 - s.Costo) * 100.0 / NULLIF(s.Precio2, 0), 1) AS margen
+        LTRIM(RTRIM(ISNULL(r.[Desc], ''))) AS marca,
+        s.Costo AS costo, s.Precio AS precioMinorista, s.Precio2 AS precioMayorista,
+        s.Precio3 AS precioEspecial, s.Precio4 AS precioCajaCerrada,
+        s.Stk AS stock
       FROM [${dbProd}].dbo.Stock s
       JOIN [${dbProd}].dbo.Productos p ON p.Cod = s.CodProducto
       LEFT JOIN [${dbProd}].dbo.Marcas ma ON ma.Cod = p.Marca
-      LEFT JOIN [${dbProd}].dbo.Rubros m ON m.Cod = p.Rubro
+      LEFT JOIN [${dbProd}].dbo.Rubros r ON r.Cod = p.Rubro
       WHERE LTRIM(RTRIM(s.Deposito)) = '0'
         AND (s.TalleColor IS NULL OR LTRIM(RTRIM(s.TalleColor)) = '')
         AND (p.DeBaja = 0 OR p.DeBaja IS NULL)
-        AND s.Costo > 0 AND s.Precio2 > 0 AND s.Stk > 0
-        AND (s.Precio2 - s.Costo) * 100.0 / s.Precio2 < @minMargen
-      ORDER BY (s.Precio2 - s.Costo) * 1.0 / s.Precio2 ASC
+        AND s.Costo > 0 AND s.Stk > 0
+        AND (
+          (s.Precio > 0 AND (s.Precio - s.Costo) * 100.0 / NULLIF(s.Precio, 0) < @minMargen) OR
+          (s.Precio2 > 0 AND (s.Precio2 - s.Costo) * 100.0 / NULLIF(s.Precio2, 0) < @minMargen) OR
+          (s.Precio3 > 0 AND (s.Precio3 - s.Costo) * 100.0 / NULLIF(s.Precio3, 0) < @minMargen) OR
+          (s.Precio4 > 0 AND (s.Precio4 - s.Costo) * 100.0 / NULLIF(s.Precio4, 0) < @minMargen)
+        )
+      ORDER BY CASE WHEN s.Precio2 > 0 THEN (s.Precio2 - s.Costo) * 1.0 / NULLIF(s.Precio2, 0) ELSE 0 END ASC
     `);
 
-    const productos = result.recordset.map((r: { sku: string; nombre: string; marca: string; costo: number; precioMayorista: number; precioMinorista: number; stock: number; margen: number }) => ({
-      sku: r.sku,
-      nombre: r.nombre,
-      marca: r.marca,
-      costo: Number(r.costo),
-      precioMayorista: Number(r.precioMayorista),
-      precioMinorista: Number(r.precioMinorista),
-      stock: Number(r.stock),
-      margen: Number(r.margen),
-    }));
+    const productos = result.recordset.map((r: { sku: string; nombre: string; marca: string; costo: number; precioMinorista: number; precioMayorista: number; precioEspecial: number; precioCajaCerrada: number; stock: number }) => {
+      const costo = Number(r.costo);
+      const listas: { nombre: string; precio: number; margen: number }[] = [];
+      for (const [nombre, precio] of [["Minorista", Number(r.precioMinorista)], ["Mayorista", Number(r.precioMayorista)], ["Especial", Number(r.precioEspecial)], ["Caja Cerrada", Number(r.precioCajaCerrada)]] as [string, number][]) {
+        if (precio > 0) listas.push({ nombre, precio, margen: Math.round((precio - costo) / precio * 1000) / 10 });
+      }
+      const worstMargen = Math.min(...listas.map((l) => l.margen));
+      return { sku: r.sku, nombre: r.nombre, marca: r.marca, costo, stock: Number(r.stock), listas, margen: worstMargen };
+    });
 
     const negativos = productos.filter((p) => p.margen < 0);
     const bajos = productos.filter((p) => p.margen >= 0);
@@ -75,33 +79,51 @@ export async function POST(req: NextRequest) {
     const pool = await getPool();
     const dbProd = getDbName("productos");
 
-    // Only alert on negative margins (selling below cost) with stock
+    // Check ALL price lists for negative margins
+    const LISTAS = [
+      { col: "Precio", name: "Minorista" },
+      { col: "Precio2", name: "Mayorista" },
+      { col: "Precio3", name: "Especial" },
+      { col: "Precio4", name: "Caja Cerrada" },
+    ];
+
     const result = await pool.request().query(`
-      SELECT LTRIM(RTRIM(p.Nombre)) AS nombre,
-        s.Costo AS costo, s.Precio2 AS precio, s.Stk AS stock,
-        ROUND((s.Precio2 - s.Costo) * 100.0 / NULLIF(s.Precio2, 0), 1) AS margen
+      SELECT LTRIM(RTRIM(p.Nombre)) AS nombre, s.Costo,
+        s.Precio, s.Precio2, s.Precio3, s.Precio4, s.Stk
       FROM [${dbProd}].dbo.Stock s
       JOIN [${dbProd}].dbo.Productos p ON p.Cod = s.CodProducto
       WHERE LTRIM(RTRIM(s.Deposito)) = '0'
         AND (s.TalleColor IS NULL OR LTRIM(RTRIM(s.TalleColor)) = '')
         AND (p.DeBaja = 0 OR p.DeBaja IS NULL)
-        AND s.Costo > 0 AND s.Precio2 > 0 AND s.Stk > 0
-        AND s.Precio2 < s.Costo
-      ORDER BY (s.Precio2 - s.Costo) ASC
+        AND s.Costo > 0 AND s.Stk > 0
+        AND (
+          (s.Precio > 0 AND s.Precio < s.Costo) OR
+          (s.Precio2 > 0 AND s.Precio2 < s.Costo) OR
+          (s.Precio3 > 0 AND s.Precio3 < s.Costo) OR
+          (s.Precio4 > 0 AND s.Precio4 < s.Costo)
+        )
+      ORDER BY s.Costo - ISNULL(NULLIF(s.Precio2, 0), s.Costo) DESC
     `);
 
     if (result.recordset.length === 0) {
       return NextResponse.json({ ok: true, alert: false, message: "No hay productos con margen negativo" });
     }
 
-    // Build WhatsApp message
-    let msg = `Alerta: ${result.recordset.length} producto${result.recordset.length > 1 ? "s" : ""} con margen negativo (vendiendo por debajo del costo):\n`;
+    // Build WhatsApp message with all lists that have negative margin
+    const alerts: string[] = [];
     for (const p of result.recordset) {
-      const costo = Number(p.costo);
-      const precio = Number(p.precio);
-      const perdida = costo - precio;
-      msg += `\n${p.nombre}\nCosto: $${costo.toLocaleString("es-AR")} → Precio: $${precio.toLocaleString("es-AR")} (pierde $${perdida.toLocaleString("es-AR")} por unidad)\n`;
+      const costo = Number(p.Costo);
+      let lines = `${p.nombre}\nCosto: $${costo.toLocaleString("es-AR")}`;
+      for (const lista of LISTAS) {
+        const precio = Number(p[lista.col]);
+        if (precio > 0 && precio < costo) {
+          lines += `\n  ${lista.name}: $${precio.toLocaleString("es-AR")} (pierde $${(costo - precio).toLocaleString("es-AR")})`;
+        }
+      }
+      alerts.push(lines);
     }
+
+    const msg = `Alerta: ${result.recordset.length} producto${result.recordset.length > 1 ? "s" : ""} con margen negativo:\n\n${alerts.join("\n\n")}\n`;
 
     // Send to Gaston's number
     const gastonChat = "5491122254949@c.us";
