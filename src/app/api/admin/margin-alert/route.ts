@@ -125,15 +125,20 @@ export async function POST(req: NextRequest) {
 
     const msg = `Alerta: ${result.recordset.length} producto${result.recordset.length > 1 ? "s" : ""} con margen negativo:\n\n${alerts.join("\n\n")}\n`;
 
-    // Send to Gaston's number
-    const gastonChat = "5491122254949@c.us";
+    // Send alert by email (private, not via WhatsApp)
     try {
-      await fetch("http://127.0.0.1:3098/send", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ chatId: gastonChat, message: msg }),
-      });
-    } catch { /* bot might be down */ }
+      const { Resend } = await import("resend");
+      const resendKey = process.env.RESEND_API_KEY || "";
+      if (resendKey) {
+        const resend = new Resend(resendKey);
+        await resend.emails.send({
+          from: process.env.RESEND_FROM || "Distrialma <onboarding@resend.dev>",
+          to: "gdpsistemas2012@gmail.com",
+          subject: `Alerta: ${result.recordset.length} productos con margen negativo`,
+          html: `<pre style="font-family:sans-serif;font-size:14px;white-space:pre-wrap;">${msg}</pre>`,
+        });
+      }
+    } catch { /* email might fail */ }
 
     console.log(`[MARGIN-ALERT] ${result.recordset.length} products with negative margin`);
     return NextResponse.json({ ok: true, alert: true, count: result.recordset.length });
