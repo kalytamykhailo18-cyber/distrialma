@@ -129,6 +129,12 @@ async function getFacturadosHoy() {
     + String(now.getMonth() + 1).padStart(2, "0")
     + String(now.getDate()).padStart(2, "0") + "000000";
 
+  // Get "VENTA ESPECIAL" zone codes
+  const ventaEspecialZones = await pool.request().query(`
+    SELECT Cod FROM [${dbClientes}].dbo.Zonas WHERE LTRIM(RTRIM([Desc])) LIKE '%VENTA ESPECIAL%'
+  `);
+  const veZoneCods = ventaEspecialZones.recordset.map((z: { Cod: string }) => `'${z.Cod}'`).join(",");
+
   const result = await pool.request().input("desde", todayStr).query(`
     SELECT LTRIM(RTRIM(t.Cliente)) AS clienteCod,
       LTRIM(RTRIM(c.Nombre)) AS nombre,
@@ -138,7 +144,7 @@ async function getFacturadosHoy() {
     FROM [${dbTransas}].dbo.Transas t
     INNER JOIN [${dbClientes}].dbo.Clientes c ON c.Cod = t.Cliente
     WHERE t.Tipo = 'V' AND LTRIM(RTRIM(t.Itm)) = '0'
-      AND LTRIM(RTRIM(t.Sucursal)) = '7'
+      AND (LTRIM(RTRIM(t.Sucursal)) = '7' ${veZoneCods ? `OR c.Zona IN (${veZoneCods})` : ""})
       AND t.Fechora >= @desde
       AND (t.Anulado IS NULL OR LTRIM(RTRIM(t.Anulado)) = '' OR t.Anulado = ' ')
       AND (LTRIM(RTRIM(ISNULL(c.Telclave3, ''))) <> '' OR LTRIM(RTRIM(ISNULL(c.TelClave1, ''))) <> '')
