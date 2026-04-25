@@ -39,3 +39,5 @@ yarn-error.log*
 next-env.d.ts
 .claude
 .wwebjs_cache/bot/session-skynet/
+bot/mily/session/
+bot/skynet/session/

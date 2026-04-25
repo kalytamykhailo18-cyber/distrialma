@@ -3,7 +3,8 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "start": "node --env-file=.env --env-file=/home/distrialma/.env --env-file=/home/distrialma/.env.local index.js"
+    "start:mily": "node --env-file=.env --env-file=/home/distrialma/.env --env-file=/home/distrialma/.env.local mily/index.js",
+    "start:skynet": "node --env-file=.env --env-file=/home/distrialma/.env --env-file=/home/distrialma/.env.local skynet/index.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.27.0",
