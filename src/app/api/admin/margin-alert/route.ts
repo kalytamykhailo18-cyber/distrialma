@@ -126,7 +126,7 @@ export async function POST(req: NextRequest) {
     const msg = `Alerta: ${result.recordset.length} producto${result.recordset.length > 1 ? "s" : ""} con margen negativo:\n\n${alerts.join("\n\n")}\n`;
 
     // Send alert via WhatsApp (Mily) to Gaston
-    const gastonChat = "5491122254949@c.us";
+    const gastonChat = (process.env.GASTON_PHONE || "5491122254949") + "@c.us";
     try {
       await fetch("http://127.0.0.1:3099/send", {
         method: "POST",
