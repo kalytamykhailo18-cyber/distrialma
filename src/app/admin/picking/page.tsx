@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import { formatPrice } from "@/lib/utils";
 import { HiOutlinePhone, HiOutlineLocationMarker } from "react-icons/hi";
+import { FaWhatsapp } from "react-icons/fa";
 import { PageTransition, Stagger, staggerStyle, springBtn, hoverRow, LoadingCenter, useDataReady, CollapsiblePanel } from "@/components/AnimateIn";
 
 interface OrderItem {
@@ -141,12 +142,31 @@ export default function PickingPage() {
           <h1 className="text-2xl font-bold text-gray-900">Picking</h1>
           <p className="text-sm text-gray-500">{orders.length} pedidos pendientes</p>
         </div>
-        <button
-          onClick={loadOrders}
-          className={`px-4 py-2 text-sm font-medium text-brand-600 bg-brand-50 border border-brand-200 rounded-lg hover:bg-brand-100 ${springBtn}`}
-        >
-          Actualizar
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={async () => {
+              const btn = document.getElementById("notif-btn") as HTMLButtonElement;
+              if (btn) { btn.disabled = true; btn.textContent = "Enviando..."; }
+              try {
+                const res = await fetch("/api/admin/reparto-facturado", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ secret: "trigger" }) });
+                const d = await res.json();
+                if (btn) btn.textContent = d.ok ? `Enviado a ${d.sent}` : "Error";
+              } catch { if (btn) btn.textContent = "Error"; }
+              setTimeout(() => { if (btn) { btn.disabled = false; btn.textContent = "Notificar facturado"; } }, 4000);
+            }}
+            id="notif-btn"
+            className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-green-600 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 ${springBtn} disabled:opacity-50`}
+          >
+            <FaWhatsapp className="w-4 h-4" />
+            Notificar facturado
+          </button>
+          <button
+            onClick={loadOrders}
+            className={`px-4 py-2 text-sm font-medium text-brand-600 bg-brand-50 border border-brand-200 rounded-lg hover:bg-brand-100 ${springBtn}`}
+          >
+            Actualizar
+          </button>
+        </div>
       </div>
       </Stagger>
 
