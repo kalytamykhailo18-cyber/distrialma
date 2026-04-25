@@ -1,6 +1,6 @@
 import http from "http";
 import { pkg } from "./whatsapp-client.js";
-import { storeMessage } from "./utils.js";
+import { storeMessage, toWaChatId } from "./utils.js";
 
 export function createHttpServer({ client, getStatus, port, name, onSend }) {
   const server = http.createServer(async (req, res) => {
@@ -17,7 +17,7 @@ export function createHttpServer({ client, getStatus, port, name, onSend }) {
         try {
           const data = JSON.parse(body);
           const { chatId, phone, message, mediaUrl, mediaCaption } = data;
-          const target = chatId || (phone ? phone.replace(/\D/g, "").replace(/^0/, "").replace(/^54(?!9)/, "549") + "@c.us" : null);
+          const target = chatId || (phone ? toWaChatId(phone) : null);
           if (!target || (!message && !mediaUrl)) {
             res.writeHead(400);
             res.end('{"error":"chatId/phone and message/mediaUrl required"}');
@@ -33,7 +33,7 @@ export function createHttpServer({ client, getStatus, port, name, onSend }) {
           }
 
           const logMsg = mediaCaption || message || "";
-          storeMessage(target, "out", logMsg, data.sender || name.toLowerCase());
+          storeMessage(target, "out", logMsg, data.sender || "human");
           console.log(`[${name}] Sent to ${target}: ${logMsg.substring(0, 60)}`);
 
           // Hook for extra logic (e.g. Mily conversation context)
