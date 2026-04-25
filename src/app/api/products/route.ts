@@ -64,8 +64,8 @@ export async function GET(request: NextRequest) {
       product.images = imageMap.get(product.sku) || [];
       product.description = descMap.get(product.sku);
       if (isReparto && REPARTO_MAYORISTA_ONLY.includes(product.sku)) {
-        product.precioCajaCerrada = 0;
-        product.cantidadPorCaja = 0;
+        product.precioCajaCerrada = product.precioMayorista;
+        if (product.precioEspecial) product.precioEspecial = product.precioMayorista;
       }
     }
 

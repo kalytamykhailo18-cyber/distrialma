@@ -41,8 +41,8 @@ export async function GET(
     if (user?.id && (userRole === "customer" || userRole === "especial") && REPARTO_MAYORISTA_ONLY.includes(product.sku)) {
       const deliveryDays = await prisma.clientDeliveryDay.count({ where: { clientId: user.id } });
       if (deliveryDays > 0) {
-        product.precioCajaCerrada = 0;
-        product.cantidadPorCaja = 0;
+        product.precioCajaCerrada = product.precioMayorista;
+        if (product.precioEspecial) product.precioEspecial = product.precioMayorista;
       }
     }
 

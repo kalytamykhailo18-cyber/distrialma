@@ -125,14 +125,14 @@ export async function POST(req: NextRequest) {
           });
         }
       } else {
-        const blockCaja = isReparto && REPARTO_MAYORISTA_ONLY.has(item.sku);
-        const isBox = !blockCaja && item.mode === "box" && item.precioCajaCerrada > 0;
-        const unitAutoBox = !blockCaja && item.mode === "unit" && item.precioCajaCerrada > 0 && item.cantidadPorCaja > 0 && item.quantity >= item.cantidadPorCaja;
+        const forceMayorista = isReparto && REPARTO_MAYORISTA_ONLY.has(item.sku);
+        const isBox = item.mode === "box" && item.precioCajaCerrada > 0;
+        const unitAutoBox = item.mode === "unit" && item.precioCajaCerrada > 0 && item.cantidadPorCaja > 0 && item.quantity >= item.cantidadPorCaja;
         expandedItems.push({
           sku: item.sku,
           name: item.name || item.sku,
           cant: isBox ? item.cantidadPorCaja * item.quantity : item.quantity,
-          price: isBox ? item.precioCajaCerrada : unitAutoBox ? item.precioCajaCerrada : item.precioMayorista,
+          price: forceMayorista ? item.precioMayorista : (isBox ? item.precioCajaCerrada : unitAutoBox ? item.precioCajaCerrada : item.precioMayorista),
           listaPrecio: (isBox || unitAutoBox) ? 4 : 2,
         });
       }
