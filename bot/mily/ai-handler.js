@@ -3,7 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import pkg from "whatsapp-web.js";
 import fs from "fs";
 import { prisma, formatPrice } from "../shared/utils.js";
-import { searchProducts, searchByBrand, searchCombos, findClientByPhone, registerClient, generatePriceListPDF } from "../products.js";
+import { searchProducts, searchByBrand, searchCombos, findClientByPhone, registerClient, generatePriceListPDF } from "../shared/products.js";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const MODEL = "claude-haiku-4-5-20251001";
