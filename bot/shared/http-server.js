@@ -16,15 +16,19 @@ export function createHttpServer({ client, getStatus, port, name, onSend }) {
       req.on("end", async () => {
         try {
           const data = JSON.parse(body);
-          const { chatId, phone, message, mediaUrl, mediaCaption } = data;
+          const { chatId, phone, message, mediaUrl, mediaBase64, mediaCaption, mediaMime, mediaFilename } = data;
           const target = chatId || (phone ? toWaChatId(phone) : null);
-          if (!target || (!message && !mediaUrl)) {
+          if (!target || (!message && !mediaUrl && !mediaBase64)) {
             res.writeHead(400);
-            res.end('{"error":"chatId/phone and message/mediaUrl required"}');
+            res.end('{"error":"chatId/phone and message/mediaUrl/mediaBase64 required"}');
             return;
           }
 
-          if (mediaUrl) {
+          if (mediaBase64) {
+            const { MessageMedia } = pkg;
+            const media = new MessageMedia(mediaMime || "application/pdf", mediaBase64, mediaFilename || "document.pdf");
+            await client.sendMessage(target, media, { caption: mediaCaption || "" });
+          } else if (mediaUrl) {
             const { MessageMedia } = pkg;
             const media = await MessageMedia.fromUrl(mediaUrl, { unsafeMime: true });
             await client.sendMessage(target, media, { caption: mediaCaption || message || "" });

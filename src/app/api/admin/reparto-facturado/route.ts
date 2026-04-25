@@ -59,6 +59,8 @@ export async function POST(req: NextRequest) {
     const now = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Argentina/Buenos_Aires" }));
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     todayStart.setHours(todayStart.getHours() + 3);
+    const todayStr = now.getFullYear().toString() + String(now.getMonth() + 1).padStart(2, "0") + String(now.getDate()).padStart(2, "0") + "000000";
+    const fecha = `${now.getDate()}/${now.getMonth() + 1}`;
     const alreadySent = await prisma.notificationLog.findMany({
       where: { tipo: "facturado_reparto", ok: true, createdAt: { gte: todayStart } },
       select: { clientId: true },
@@ -76,11 +78,29 @@ export async function POST(req: NextRequest) {
       const msg = `Hola ${firstName}, te informamos que hoy se facturaron tus pedidos por un total de ${formatPrice(cliente.total)}.\n\nPodes ver el detalle en distrialma.com.ar/mis-pedidos\n\nEste es un mensaje automatico (s.e.u.o.)`;
 
       try {
+        // Send text message
         const res = await fetch("http://127.0.0.1:3099/send", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ chatId, message: msg }),
         });
+
+        // Send PDF with boletas detail
+        if (res.ok) {
+          try {
+            const pdfRes = await fetch(`http://127.0.0.1:3000/api/admin/reparto-facturado/pdf?cliente=${encodeURIComponent(cliente.cod)}&desde=${todayStr}&secret=${CRON_SECRET}`);
+            if (pdfRes.ok) {
+              const pdfData = await pdfRes.json();
+              if (pdfData.pdf) {
+                await fetch("http://127.0.0.1:3099/send", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ chatId, mediaBase64: pdfData.pdf, mediaMime: "application/pdf", mediaFilename: `Boletas-${firstName}.pdf`, mediaCaption: `Boletas ${firstName} - ${fecha}` }),
+                });
+              }
+            }
+          } catch { /* PDF send failed, text was already sent */ }
+        }
         if (res.ok) {
           sent++;
           await prisma.notificationLog.create({
