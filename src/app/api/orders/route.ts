@@ -97,6 +97,9 @@ export async function POST(req: NextRequest) {
       listaPrecio: number;
     }
 
+    // Check if client is reparto — reparto clients can only use lista mayorista
+    const isReparto = (await prisma.clientDeliveryDay.count({ where: { clientId: user.clientId } })) > 0;
+
     const expandedItems: ExpandedItem[] = [];
 
     for (const item of items) {
@@ -121,8 +124,8 @@ export async function POST(req: NextRequest) {
           });
         }
       } else {
-        const isBox = item.mode === "box" && item.precioCajaCerrada > 0;
-        const unitAutoBox = item.mode === "unit" && item.precioCajaCerrada > 0 && item.cantidadPorCaja > 0 && item.quantity >= item.cantidadPorCaja;
+        const isBox = !isReparto && item.mode === "box" && item.precioCajaCerrada > 0;
+        const unitAutoBox = !isReparto && item.mode === "unit" && item.precioCajaCerrada > 0 && item.cantidadPorCaja > 0 && item.quantity >= item.cantidadPorCaja;
         expandedItems.push({
           sku: item.sku,
           name: item.name || item.sku,

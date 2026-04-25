@@ -7,8 +7,16 @@ import { prisma } from "@/lib/prisma";
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    const userRole = (session?.user as { role?: string } | undefined)?.role;
+    const user = session?.user as { role?: string; id?: string } | undefined;
+    const userRole = user?.role;
     const canSeeEspecial = userRole === "especial" || userRole === "admin";
+
+    // Check if client is reparto (has delivery days) — they can't see caja cerrada prices
+    let isReparto = false;
+    if (user?.id && (userRole === "customer" || userRole === "especial")) {
+      const deliveryDays = await prisma.clientDeliveryDay.count({ where: { clientId: user.id } });
+      isReparto = deliveryDays > 0;
+    }
 
     const { searchParams } = request.nextUrl;
     const page = parseInt(searchParams.get("page") || "1");
@@ -53,6 +61,10 @@ export async function GET(request: NextRequest) {
     for (const product of products) {
       product.images = imageMap.get(product.sku) || [];
       product.description = descMap.get(product.sku);
+      if (isReparto) {
+        product.precioCajaCerrada = 0;
+        product.cantidadPorCaja = 0;
+      }
     }
 
     return NextResponse.json({

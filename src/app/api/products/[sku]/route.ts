@@ -10,7 +10,8 @@ export async function GET(
 ) {
   try {
     const session = await getServerSession(authOptions);
-    const userRole = (session?.user as { role?: string } | undefined)?.role;
+    const user = session?.user as { role?: string; id?: string } | undefined;
+    const userRole = user?.role;
     const canSeeEspecial = userRole === "especial" || userRole === "admin";
 
     const product = await getProductBySku(params.sku, canSeeEspecial);
@@ -34,6 +35,15 @@ export async function GET(
 
     product.images = images.map((img) => ({ id: img.id, url: img.filename }));
     product.description = desc?.description;
+
+    // Reparto clients can't see caja cerrada prices
+    if (user?.id && (userRole === "customer" || userRole === "especial")) {
+      const deliveryDays = await prisma.clientDeliveryDay.count({ where: { clientId: user.id } });
+      if (deliveryDays > 0) {
+        product.precioCajaCerrada = 0;
+        product.cantidadPorCaja = 0;
+      }
+    }
 
     return NextResponse.json(product);
   } catch (error) {
