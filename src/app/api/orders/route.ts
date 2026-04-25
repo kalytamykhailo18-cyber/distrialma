@@ -97,7 +97,8 @@ export async function POST(req: NextRequest) {
       listaPrecio: number;
     }
 
-    // Check if client is reparto — reparto clients can only use lista mayorista
+    // Reparto restriction: specific SKUs forced to mayorista
+    const REPARTO_MAYORISTA_ONLY = new Set(["482"]);
     const isReparto = (await prisma.clientDeliveryDay.count({ where: { clientId: user.clientId } })) > 0;
 
     const expandedItems: ExpandedItem[] = [];
@@ -124,8 +125,9 @@ export async function POST(req: NextRequest) {
           });
         }
       } else {
-        const isBox = !isReparto && item.mode === "box" && item.precioCajaCerrada > 0;
-        const unitAutoBox = !isReparto && item.mode === "unit" && item.precioCajaCerrada > 0 && item.cantidadPorCaja > 0 && item.quantity >= item.cantidadPorCaja;
+        const blockCaja = isReparto && REPARTO_MAYORISTA_ONLY.has(item.sku);
+        const isBox = !blockCaja && item.mode === "box" && item.precioCajaCerrada > 0;
+        const unitAutoBox = !blockCaja && item.mode === "unit" && item.precioCajaCerrada > 0 && item.cantidadPorCaja > 0 && item.quantity >= item.cantidadPorCaja;
         expandedItems.push({
           sku: item.sku,
           name: item.name || item.sku,

@@ -36,8 +36,9 @@ export async function GET(
     product.images = images.map((img) => ({ id: img.id, url: img.filename }));
     product.description = desc?.description;
 
-    // Reparto clients can't see caja cerrada prices
-    if (user?.id && (userRole === "customer" || userRole === "especial")) {
+    // Reparto clients: restrict specific products to mayorista only
+    const REPARTO_MAYORISTA_ONLY = ["482"];
+    if (user?.id && (userRole === "customer" || userRole === "especial") && REPARTO_MAYORISTA_ONLY.includes(product.sku)) {
       const deliveryDays = await prisma.clientDeliveryDay.count({ where: { clientId: user.id } });
       if (deliveryDays > 0) {
         product.precioCajaCerrada = 0;

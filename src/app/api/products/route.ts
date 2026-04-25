@@ -11,12 +11,14 @@ export async function GET(request: NextRequest) {
     const userRole = user?.role;
     const canSeeEspecial = userRole === "especial" || userRole === "admin";
 
-    // Check if client is reparto (has delivery days) — they can't see caja cerrada prices
+    // Check if client is reparto (has delivery days)
     let isReparto = false;
     if (user?.id && (userRole === "customer" || userRole === "especial")) {
       const deliveryDays = await prisma.clientDeliveryDay.count({ where: { clientId: user.id } });
       isReparto = deliveryDays > 0;
     }
+    // SKUs restricted to mayorista-only for reparto clients (no caja cerrada)
+    const REPARTO_MAYORISTA_ONLY = ["482"];
 
     const { searchParams } = request.nextUrl;
     const page = parseInt(searchParams.get("page") || "1");
@@ -61,7 +63,7 @@ export async function GET(request: NextRequest) {
     for (const product of products) {
       product.images = imageMap.get(product.sku) || [];
       product.description = descMap.get(product.sku);
-      if (isReparto) {
+      if (isReparto && REPARTO_MAYORISTA_ONLY.includes(product.sku)) {
         product.precioCajaCerrada = 0;
         product.cantidadPorCaja = 0;
       }
