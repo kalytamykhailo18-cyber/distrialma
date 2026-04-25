@@ -74,15 +74,14 @@ export async function GET(
       }
     }
 
-    // Get product details for new products (rubro, marca, unidad)
+    // Get product details (rubro, marca, unidad) for ALL items
     const productDetails: Record<
       string,
       { rubro: string; marca: string; unidad: string; cantPorCaja: number }
     > = {};
 
-    const newSkus = entry.items.filter((i) => i.isNewProduct).map((i) => i.sku);
-    if (newSkus.length > 0) {
-      const skuList = newSkus.map((s) => `'${s.padStart(7, " ")}'`).join(",");
+    if (skus.length > 0) {
+      const skuList = skus.map((s) => `'${s.padStart(7, " ")}'`).join(",");
       const result = await pool.request().query(`
         SELECT
           LTRIM(RTRIM(Cod)) AS sku,
@@ -120,11 +119,11 @@ export async function GET(
       porceGan2: stockData[i.sku]?.porceGan2 || 0,
       porceGan3: stockData[i.sku]?.porceGan3 || 0,
       porceGan4: stockData[i.sku]?.porceGan4 || 0,
+      unidad: productDetails[i.sku]?.unidad || "",
       ...(i.isNewProduct && productDetails[i.sku]
         ? {
             rubro: productDetails[i.sku].rubro,
             marca: productDetails[i.sku].marca,
-            unidad: productDetails[i.sku].unidad,
             cantPorCaja: productDetails[i.sku].cantPorCaja,
           }
         : {}),
