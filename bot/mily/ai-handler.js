@@ -150,7 +150,7 @@ export async function callClaude(chatId, userMessage, clientInfo, phoneNumber, {
             try {
               const { fileURLToPath } = await import("url");
               const path = await import("path");
-              const stickerPath = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "sticker.png");
+              const stickerPath = path.join(path.dirname(fileURLToPath(import.meta.url)), "sticker.png");
               const stickerData = fs.readFileSync(stickerPath);
               const { MessageMedia } = pkg;
               const media = new MessageMedia("image/png", stickerData.toString("base64"), "sticker.png");

@@ -22,11 +22,13 @@ export async function storeMessage(chatId, direction, body, sender = "") {
     let contactPhone = chatId.replace("@c.us", "").replace("@lid", "");
     await prisma.whatsAppChat.upsert({
       where: { chatId },
-      create: { chatId, contactName, contactPhone },
-      update: {},
+      create: { chatId, contactName, contactPhone, lastMessage: (body || "").substring(0, 200), lastMessageAt: new Date(), unread: direction === "in" ? 1 : 0 },
+      update: { lastMessage: (body || "").substring(0, 200), lastMessageAt: new Date(), ...(direction === "in" ? { unread: { increment: 1 } } : {}) },
     });
     await prisma.whatsAppMessage.create({
       data: { chatId, direction, body: (body || "").substring(0, 2000), sender },
     });
-  } catch { /* silent */ }
+  } catch (e) {
+    console.error("[DB] Error storing message:", e.message);
+  }
 }

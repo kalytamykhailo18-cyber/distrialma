@@ -13,13 +13,13 @@ export async function GET(
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
-  // Sanitize path — only allow reading from /home/distrialma/bot/session/
+  // Sanitize path — allow reading from bot/mily/session/ and legacy bot/session/
   const relPath = params.path.join("/");
   if (relPath.includes("..")) {
     return NextResponse.json({ error: "Invalid path" }, { status: 400 });
   }
-  const absPath = path.join("/home/distrialma/bot/session", relPath);
-  if (!absPath.startsWith("/home/distrialma/bot/session/")) {
+  const absPath = path.join("/home/distrialma/bot/mily/session", relPath);
+  if (!absPath.startsWith("/home/distrialma/bot/mily/session/")) {
     return NextResponse.json({ error: "Invalid path" }, { status: 400 });
   }
 
