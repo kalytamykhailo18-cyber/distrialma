@@ -543,6 +543,20 @@ async function getCajaData(sucursal: string) {
     ORDER BY t.Fechora DESC
   `);
 
+  // Notas de credito (Tipo N) — reduce ventas
+  const notasCredito = await pool.request().input("suc", sucursal).input("desde", desde).query(`
+    SELECT COUNT(*) AS cnt,
+      SUM(ISNULL(Total, 0)) AS total,
+      SUM(ISNULL(Efectivo, 0)) AS efectivo,
+      SUM(ISNULL(Tarjeta, 0)) AS tarjeta,
+      SUM(ISNULL(Deuda, 0)) AS deuda
+    FROM [${dbTransas}].dbo.Transas
+    WHERE Tipo = 'N'
+      AND LTRIM(RTRIM(Sucursal)) = @suc
+      AND Fechora > @desde
+      AND (Anulado IS NULL OR LTRIM(RTRIM(Anulado)) = '' OR Anulado = ' ')
+  `);
+
   // Card payment breakdown by type
   const dbVarios = getDbName("transas").replace("BDTRANSAS", "BDVARIOS");
   const tarjetasDetalle = await pool.request().input("suc", sucursal).input("desde", desde).query(`
@@ -577,7 +591,8 @@ async function getCajaData(sucursal: string) {
     .filter((m: { tipo: string }) => m.tipo === "P" || m.tipo === "p")
     .reduce((s: number, m: { efectivo: number }) => s + Math.abs(m.efectivo), 0);
 
-  const totalEfectivoCaja = inicioCaja + v.efectivo - retiros + ingresos - pagos;
+  const nc = notasCredito.recordset[0] || { cnt: 0, total: 0, efectivo: 0, tarjeta: 0, deuda: 0 };
+  const totalEfectivoCaja = inicioCaja + v.efectivo - Number(nc.efectivo) - retiros + ingresos - pagos;
 
   const desdeStr = desde.length >= 12
     ? `${desde.slice(6, 8)}/${desde.slice(4, 6)}/${desde.slice(0, 4)} ${desde.slice(8, 10)}:${desde.slice(10, 12)}`
@@ -619,6 +634,13 @@ async function getCajaData(sucursal: string) {
         usuario: a.usuario,
         empleado: a.empleado,
       })),
+    },
+    notasCredito: {
+      cantidad: nc.cnt || 0,
+      total: Number(nc.total) || 0,
+      efectivo: Number(nc.efectivo) || 0,
+      tarjeta: Number(nc.tarjeta) || 0,
+      deuda: Number(nc.deuda) || 0,
     },
     totalEfectivoCaja,
     totalTarjeta: v.tarjeta || 0,

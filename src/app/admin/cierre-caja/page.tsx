@@ -32,6 +32,7 @@ interface CierreData {
   ingresos: number;
   pagos: number;
   anuladas: { cantidad: number; total: number; detalle?: Array<{ boleta: string; cliente: string; total: number; fechora: string; usuario: string; empleado: string }> };
+  notasCredito?: { cantidad: number; total: number; efectivo: number; tarjeta: number; deuda: number };
   totalEfectivoCaja: number;
   totalTarjeta: number;
   totalDeuda: number;
@@ -625,6 +626,12 @@ export default function CierreCajaPage() {
                         </div>
                       ))}
                     </>
+                  )}
+                  {data.notasCredito && data.notasCredito.cantidad > 0 && (
+                    <div className="px-4 py-3 flex justify-between bg-amber-50/50">
+                      <span className="text-sm text-amber-700">Notas de credito ({data.notasCredito.cantidad})</span>
+                      <span className="text-sm font-medium text-amber-600">-{fmt(data.notasCredito.total)}</span>
+                    </div>
                   )}
                   <div className="px-4 py-3 flex justify-between transition-colors duration-150 hover:bg-gray-50/60">
                     <span className="text-sm text-gray-600">Transacciones</span>
