@@ -88,7 +88,7 @@ export async function POST(req: NextRequest) {
     ];
 
     const result = await pool.request().query(`
-      SELECT LTRIM(RTRIM(p.Nombre)) AS nombre, s.Costo,
+      SELECT LTRIM(RTRIM(p.Cod)) AS sku, LTRIM(RTRIM(p.Nombre)) AS nombre, s.Costo,
         s.Precio, s.Precio2, s.Precio3, s.Precio4, s.Stk
       FROM [${dbProd}].dbo.Stock s
       JOIN [${dbProd}].dbo.Productos p ON p.Cod = s.CodProducto
@@ -113,7 +113,7 @@ export async function POST(req: NextRequest) {
     const alerts: string[] = [];
     for (const p of result.recordset) {
       const costo = Number(p.Costo);
-      let lines = `${p.nombre}\nCosto: $${costo.toLocaleString("es-AR")}`;
+      let lines = `#${p.sku} ${p.nombre}\nCosto: $${costo.toLocaleString("es-AR")}`;
       for (const lista of LISTAS) {
         const precio = Number(p[lista.col]);
         if (precio > 0 && precio < costo) {
