@@ -215,11 +215,11 @@ export async function GET(req: NextRequest) {
 
       const resend = new Resend(resendKey);
       const fromEmail = process.env.RESEND_FROM || "onboarding@resend.dev";
-      const toEmail = "gdpsistemas2012@gmail.com";
+      const toEmails = ["gdpsistemas2012@gmail.com", "gabrieldeccp@gmail.com"];
 
       const emailResult = await resend.emails.send({
         from: fromEmail,
-        to: toEmail,
+        to: toEmails,
         subject: `Resumen semanal reparto — ${weekLabel}`,
         html,
       });
@@ -228,7 +228,7 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: emailResult.error.message, summary }, { status: 500 });
       }
 
-      return NextResponse.json({ ok: true, emailSent: toEmail, summary });
+      return NextResponse.json({ ok: true, emailSent: toEmails, summary });
     }
 
     return NextResponse.json(summary);
