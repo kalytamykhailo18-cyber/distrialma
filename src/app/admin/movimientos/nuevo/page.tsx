@@ -531,11 +531,11 @@ export default function NuevoMovimiento() {
                     setUploading(true);
                     try {
                       const fd = new FormData();
-                      fd.append("file", f);
-                      fd.append("folder", "movimientos");
+                      fd.append("image", f);
+                      fd.append("sku", "movimiento");
                       const res = await fetch("/api/admin/upload", { method: "POST", body: fd });
                       const d = await res.json();
-                      if (d.url) setImageUrl(d.url);
+                      if (d.filename) setImageUrl(d.filename);
                     } catch {}
                     setUploading(false);
                   }} />
