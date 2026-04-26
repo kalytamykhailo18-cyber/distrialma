@@ -66,7 +66,7 @@ export default function RepartoPage() {
     } catch {}
   }
 
-  async function setDeliveryStatus(clientId: string, estado: string) {
+  async function setDeliveryStatus(clientId: string, estado: string, skipNotification = false) {
     const existing = deliveryStatuses[clientId];
     // If clicking the same status again, undo
     if (existing?.estado === estado) {
@@ -78,7 +78,8 @@ export default function RepartoPage() {
         body: JSON.stringify({ clientId, fecha: todayDate, estado }),
       });
 
-      // Send WhatsApp notification to client
+      // Send WhatsApp notification to client (skip for old orders)
+      if (skipNotification) { loadDeliveryStatuses(); return; }
       const client = data?.clients.find((c) => c.cod === clientId);
       if (client?.telefono) {
         const nombre = client.nombre.split(" ")[0]; // first name
@@ -501,7 +502,7 @@ export default function RepartoPage() {
 
         {/* Old undelivered orders warning */}
         {(() => {
-          const clientsWithOld = filtered.filter((c) => c.hasOldOrders);
+          const clientsWithOld = filtered.filter((c) => c.hasOldOrders && deliveryStatuses[c.cod]?.estado !== "entregado");
           if (clientsWithOld.length === 0) return null;
           return (
             <Stagger delay={130}>
@@ -520,15 +521,15 @@ export default function RepartoPage() {
                           <span className="text-amber-700 font-bold">{c.oldOrdersCount} boleta{c.oldOrdersCount > 1 ? "s" : ""} · ${c.oldOrdersTotal.toLocaleString("es-AR", { maximumFractionDigits: 0 })}</span>
                         </div>
                         <div className="flex gap-2">
-                          <button onClick={() => setDeliveryStatus(c.cod, "entregado")}
+                          <button onClick={() => setDeliveryStatus(c.cod, "entregado", true)}
                             className={`flex-1 py-1.5 rounded-lg text-xs font-semibold ${springBtn} ${isEntregado ? "bg-green-600 text-white" : "bg-white border border-green-300 text-green-700 hover:bg-green-50"}`}>
                             {isEntregado ? "✓ Entregado" : "Entregado"}
                           </button>
-                          <button onClick={() => setDeliveryStatus(c.cod, "reintentar")}
+                          <button onClick={() => setDeliveryStatus(c.cod, "reintentar", true)}
                             className={`flex-1 py-1.5 rounded-lg text-xs font-semibold ${springBtn} ${isReintentar ? "bg-amber-500 text-white" : "bg-white border border-amber-300 text-amber-700 hover:bg-amber-50"}`}>
                             Reintentar
                           </button>
-                          <button onClick={() => setDeliveryStatus(c.cod, "rechazado")}
+                          <button onClick={() => setDeliveryStatus(c.cod, "rechazado", true)}
                             className={`flex-1 py-1.5 rounded-lg text-xs font-semibold ${springBtn} ${isRechazado ? "bg-red-500 text-white" : "bg-white border border-red-300 text-red-700 hover:bg-red-50"}`}>
                             Rechazado
                           </button>
