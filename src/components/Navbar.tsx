@@ -74,6 +74,7 @@ export default function Navbar() {
         { href: "/productos", label: "Productos", match: "/productos" },
         { href: "/mis-pedidos", label: "Mis Pedidos", match: "/mis-pedidos" },
         { href: "/estado-cuenta", label: "Mi Cuenta", match: "/estado-cuenta" },
+        { href: "/mis-descuentos", label: "Mis Descuentos", match: "/mis-descuentos" },
       ]
     : [
         { href: "/productos", label: "Productos", match: "/productos" },
