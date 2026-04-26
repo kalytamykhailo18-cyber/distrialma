@@ -1,11 +1,11 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { requireStaff } from "@/lib/api-auth";
 import { prisma } from "@/lib/prisma";
 import { getPool, getDbName } from "@/lib/mssql";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const session = await requireStaff();
   if (!session) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
@@ -27,14 +27,31 @@ export async function GET() {
       WHERE (DeBaja = 0 OR DeBaja IS NULL)
     `);
 
-    const emp = empResult.recordset.find((e: { cod: string; nombre: string }) => {
-      const empName = e.nombre.trim().toUpperCase();
-      const uName = userName.toUpperCase();
-      return empName.includes(uName) || uName.includes(empName) || empName.split(" ")[0] === uName;
-    });
+    // For admin: accept ?empleado=cod query param to view any employee
+    const { searchParams } = new URL(req.url);
+    const empCodParam = searchParams.get("empleado");
+
+    let emp;
+    if (empCodParam) {
+      emp = empResult.recordset.find((e: { cod: string }) => e.cod === empCodParam);
+    } else {
+      emp = empResult.recordset.find((e: { cod: string; nombre: string }) => {
+        const empName = e.nombre.trim().toUpperCase();
+        const uName = userName.toUpperCase();
+        return empName.includes(uName) || uName.includes(empName) || empName.split(" ")[0] === uName;
+      });
+    }
 
     if (!emp) {
-      return NextResponse.json({ error: "Empleado no encontrado", empleados: [] }, { status: 404 });
+      // Return employee list so admin can pick
+      const role = (session.user as { role?: string })?.role;
+      if (role === "admin") {
+        return NextResponse.json({
+          error: "Selecciona un empleado",
+          empleados: empResult.recordset.map((e: { cod: string; nombre: string }) => ({ cod: e.cod, nombre: e.nombre })),
+        });
+      }
+      return NextResponse.json({ error: "Empleado no encontrado" }, { status: 404 });
     }
 
     // Get descuentos for this month

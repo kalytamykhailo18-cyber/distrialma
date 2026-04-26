@@ -19,15 +19,35 @@ export default function MisDescuentosPage() {
   } | null>(null);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    fetch("/api/admin/mis-descuentos")
-      .then((r) => r.json())
-      .then((d) => { if (d.error) setError(d.error); else setData(d); })
-      .catch(() => setError("Error al cargar"))
-      .finally(() => setLoading(false));
-  }, []);
+  const [empleados, setEmpleados] = useState<Array<{ cod: string; nombre: string }>>([]);
+  const [selectedEmp, setSelectedEmp] = useState("");
+
+  async function load(empCod?: string) {
+    setLoading(true); setError("");
+    try {
+      const url = empCod ? `/api/admin/mis-descuentos?empleado=${empCod}` : "/api/admin/mis-descuentos";
+      const r = await fetch(url);
+      const d = await r.json();
+      if (d.empleados && !d.empleado) { setEmpleados(d.empleados); setError(""); }
+      else if (d.error) setError(d.error);
+      else setData(d);
+    } catch { setError("Error al cargar"); }
+    setLoading(false);
+  }
+
+  useEffect(() => { load(); }, []);
 
   if (loading) return <LoadingCenter text="Cargando descuentos..." />;
+  if (empleados.length > 0 && !data) return (
+    <PageTransition className="max-w-2xl mx-auto px-4 py-6">
+      <Stagger delay={0} y={-8}><h1 className="text-2xl font-bold text-gray-900 mb-4">Mis Descuentos</h1></Stagger>
+      <select value={selectedEmp} onChange={(e) => { setSelectedEmp(e.target.value); if (e.target.value) load(e.target.value); }}
+        className="w-full px-3 py-2 border border-brand-400 rounded-lg text-sm">
+        <option value="">Seleccionar empleado...</option>
+        {empleados.map((e) => <option key={e.cod} value={e.cod}>{e.nombre}</option>)}
+      </select>
+    </PageTransition>
+  );
   if (error) return <div className="max-w-2xl mx-auto px-4 py-10 text-center text-gray-400">{error}</div>;
   if (!data) return null;
 
