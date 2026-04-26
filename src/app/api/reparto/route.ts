@@ -235,7 +235,7 @@ export async function GET(req: NextRequest) {
       const address = [c.calle, c.numero].filter(Boolean).join(" ");
 
       const hasPendiente = orders.some((o) => o.origen === "pendiente");
-      const hasFacturado = orders.some((o) => o.origen === "facturado");
+      const hasFacturado = orders.some((o) => o.origen === "facturado" && o.fechora >= sinceStr);
       // Status: facturado > pendiente > none
       let status: "facturado" | "pendiente" | "none";
       if (hasFacturado) {
