@@ -12,15 +12,15 @@ export async function GET() {
     return NextResponse.json({ error: "No autenticado" }, { status: 401 });
   }
 
-  const user = session.user as { id?: string; role?: string };
-  if (!user.id) return NextResponse.json({ error: "Sin cliente" }, { status: 400 });
+  const user = session.user as { clientId?: string; role?: string };
+  if (!user.clientId) return NextResponse.json({ error: "Sin cliente" }, { status: 400 });
 
   try {
     const pool = await getPool();
     const dbEmpleados = getDbName("empleados");
 
     // Check if this client code is linked to an employee via Filler1
-    const empResult = await pool.request().input("clienteCod", user.id).query(`
+    const empResult = await pool.request().input("clienteCod", user.clientId).query(`
       SELECT LTRIM(RTRIM(Cod)) AS cod, LTRIM(RTRIM(Nombre)) AS nombre
       FROM [${dbEmpleados}].dbo.Empleados
       WHERE LTRIM(RTRIM(ISNULL(Filler1, ''))) = @clienteCod
