@@ -185,7 +185,7 @@ export default function VendedorPage() {
       const { order } = await res.json();
 
       // Send WhatsApp message
-      const whatsapp = "5491154137677"; // Distrialma Mayorista
+      const whatsapp = process.env.NEXT_PUBLIC_WA_MAYORISTA || "5491154137677"; // Distrialma Mayorista
       let msg = `*NUEVO PEDIDO PREVENTA*\n\n`;
       msg += `Vendedor: ${userName}\n`;
       msg += `Cliente: ${cliente.nombre}\n`;

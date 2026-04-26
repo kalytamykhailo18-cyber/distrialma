@@ -116,7 +116,7 @@ export default function CheckoutPage() {
 
     const msg = buildWhatsAppMessage();
     const encoded = encodeURIComponent(msg);
-    window.open(`https://wa.me/5491154137677?text=${encoded}`, "_blank");
+    window.open(`https://wa.me/${process.env.NEXT_PUBLIC_WA_MAYORISTA || "5491154137677"}?text=${encoded}`, "_blank");
   }
 
   if (status === "loading" || loadingClient) {

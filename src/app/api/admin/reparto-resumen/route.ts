@@ -17,7 +17,7 @@ function formatPrice(n: number): string {
 // GET: preview | POST: send email
 export async function GET(req: NextRequest) {
   const secret = req.nextUrl.searchParams.get("secret");
-  if (secret !== "re_5wSDTNZc_3ZCp") {
+  if (secret !== process.env.CRON_SECRET) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
@@ -215,7 +215,7 @@ export async function GET(req: NextRequest) {
 
       const resend = new Resend(resendKey);
       const fromEmail = process.env.RESEND_FROM || "onboarding@resend.dev";
-      const toEmails = ["gdpsistemas2012@gmail.com", "gabrieldeccp@gmail.com"];
+      const toEmails = (process.env.REPARTO_EMAILS || "gdpsistemas2012@gmail.com").split(",");
 
       const emailResult = await resend.emails.send({
         from: fromEmail,

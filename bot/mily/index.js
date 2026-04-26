@@ -8,7 +8,7 @@ import { prisma, storeMessage } from "../shared/utils.js";
 import { callClaude, NEW_CLIENT_MESSAGE, findClientByPhone } from "./ai-handler.js";
 
 const PORT = 3099;
-const RECLAMOS_PHONE = "5491134207773";
+const RECLAMOS_PHONE = process.env.RECLAMOS_PHONE || "5491134207773";
 const RRHH_PHONE = process.env.RRHH_PHONE || "5491176003814";
 
 // State

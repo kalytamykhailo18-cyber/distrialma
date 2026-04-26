@@ -190,7 +190,7 @@ async function getClientsForReminder(targetDay?: string): Promise<ReminderData> 
 // GET: preview
 export async function GET(req: NextRequest) {
   const secret = req.nextUrl.searchParams.get("secret");
-  if (secret !== "re_5wSDTNZc_3ZCp") {
+  if (secret !== process.env.CRON_SECRET) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
@@ -206,7 +206,7 @@ export async function GET(req: NextRequest) {
 // POST: send the reminders
 export async function POST(req: NextRequest) {
   const { secret } = await req.json();
-  if (secret !== "re_5wSDTNZc_3ZCp") {
+  if (secret !== process.env.CRON_SECRET) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 

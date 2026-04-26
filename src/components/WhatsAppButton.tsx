@@ -5,9 +5,9 @@ import { usePathname } from "next/navigation";
 import { FaWhatsapp } from "react-icons/fa";
 
 const CONTACTS = [
-  { label: "Mayorista", phone: "5491154137677" },
-  { label: "Distribuidora", phone: "5491150202134" },
-  { label: "Proveedores", phone: "5491176003814" },
+  { label: "Mayorista", phone: process.env.NEXT_PUBLIC_WA_MAYORISTA || "5491154137677" },
+  { label: "Distribuidora", phone: process.env.NEXT_PUBLIC_WA_DISTRIBUIDORA || "5491150202134" },
+  { label: "Proveedores", phone: process.env.NEXT_PUBLIC_WA_PROVEEDORES || "5491176003814" },
 ];
 
 export default function WhatsAppButton() {
