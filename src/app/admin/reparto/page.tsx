@@ -508,12 +508,34 @@ export default function RepartoPage() {
               <div className="bg-amber-50 border-2 border-amber-300 rounded-xl p-3 mb-4">
                 <h3 className="font-bold text-amber-800 text-sm mb-2">Entregas pendientes de dias anteriores ({clientsWithOld.length})</h3>
                 <div className="space-y-1">
-                  {clientsWithOld.map((c) => (
-                    <div key={c.cod + "-old"} className="flex items-center justify-between bg-white rounded-lg px-3 py-2 text-sm">
-                      <span className="font-medium text-gray-800">{c.nombre}</span>
-                      <span className="text-amber-700 font-bold">{c.oldOrdersCount} boleta{c.oldOrdersCount > 1 ? "s" : ""} · ${c.oldOrdersTotal.toLocaleString("es-AR", { maximumFractionDigits: 0 })}</span>
-                    </div>
-                  ))}
+                  {clientsWithOld.map((c) => {
+                    const delivery = deliveryStatuses[c.cod];
+                    const isEntregado = delivery?.estado === "entregado";
+                    const isReintentar = delivery?.estado === "reintentar";
+                    const isRechazado = delivery?.estado === "rechazado";
+                    return (
+                      <div key={c.cod + "-old"} className="bg-white rounded-lg px-3 py-2">
+                        <div className="flex items-center justify-between text-sm mb-2">
+                          <span className="font-medium text-gray-800">{c.nombre}</span>
+                          <span className="text-amber-700 font-bold">{c.oldOrdersCount} boleta{c.oldOrdersCount > 1 ? "s" : ""} · ${c.oldOrdersTotal.toLocaleString("es-AR", { maximumFractionDigits: 0 })}</span>
+                        </div>
+                        <div className="flex gap-2">
+                          <button onClick={() => setDeliveryStatus(c.cod, "entregado")}
+                            className={`flex-1 py-1.5 rounded-lg text-xs font-semibold ${springBtn} ${isEntregado ? "bg-green-600 text-white" : "bg-white border border-green-300 text-green-700 hover:bg-green-50"}`}>
+                            {isEntregado ? "✓ Entregado" : "Entregado"}
+                          </button>
+                          <button onClick={() => setDeliveryStatus(c.cod, "reintentar")}
+                            className={`flex-1 py-1.5 rounded-lg text-xs font-semibold ${springBtn} ${isReintentar ? "bg-amber-500 text-white" : "bg-white border border-amber-300 text-amber-700 hover:bg-amber-50"}`}>
+                            Reintentar
+                          </button>
+                          <button onClick={() => setDeliveryStatus(c.cod, "rechazado")}
+                            className={`flex-1 py-1.5 rounded-lg text-xs font-semibold ${springBtn} ${isRechazado ? "bg-red-500 text-white" : "bg-white border border-red-300 text-red-700 hover:bg-red-50"}`}>
+                            Rechazado
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </Stagger>
