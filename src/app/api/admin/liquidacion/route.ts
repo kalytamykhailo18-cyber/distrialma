@@ -94,6 +94,7 @@ export async function GET(req: NextRequest) {
     let diasTrabajados = 0;
     let feriadoTrabajadoMin = 0;
     let totalTardeMin = 0;
+    const dayResults: Array<{ dateStr: string; worked: number; tardeDia: number; entradas: string[]; salidas: string[] }> = [];
 
     const daysInMonth = new Date(year, month, 0).getDate();
     for (let d = 1; d <= daysInMonth; d++) {
@@ -125,20 +126,28 @@ export async function GET(req: NextRequest) {
       }
 
       // Late arrival (fixed schedule only)
+      let tardeDia = 0;
       if (fichEmp.tipoTurno === "fijo" && entradas.length > 0 && worked > 0) {
         const turnoInicioMin = timeToMin(fichEmp.turnoInicio);
         const firstEntry = timeToMin(entradas[0]);
-        if (firstEntry > turnoInicioMin) totalTardeMin += firstEntry - turnoInicioMin;
+        if (firstEntry > turnoInicioMin) {
+          tardeDia = firstEntry - turnoInicioMin;
+          totalTardeMin += tardeDia;
+        }
       }
+
+      dayResults.push({ dateStr, worked, tardeDia, entradas, salidas });
     }
 
     // Working days and daily/hourly rates
     const workingDays = Array.from({ length: daysInMonth }, (_, i) => new Date(year, month - 1, i + 1).getDay()).filter((d) => d !== 0).length;
     const dailyRate = basico > 0 && workingDays > 0 ? Math.round(basico / workingDays) : 0;
     const hourlyRate = basico > 0 && workingDays > 0 ? basico / (workingDays * (fichEmp.horasTurno || 9)) : 0;
-    const extraAmount = Math.round(hourlyRate * 2 * (totalExtra / 60)); // overtime at 200%
-    const feriadoAmount = Math.round(hourlyRate * (feriadoTrabajadoMin / 60)); // extra pay for holiday worked (already paid normal, add 1x more)
+    const extraAmount = Math.round(hourlyRate * 2 * (totalExtra / 60));
+    const feriadoAmount = Math.round(hourlyRate * (feriadoTrabajadoMin / 60));
     const suspensionAmount = suspensiones.length * dailyRate;
+    const pierdePresentismo = totalTardeMin >= 30;
+    const presentismoFinal = pierdePresentismo ? 0 : presentismo;
 
     // Get descuentos from existing module
     const descuentosResult = await getDescuentos(empleadoCod, mes);
@@ -149,7 +158,7 @@ export async function GET(req: NextRequest) {
       orderBy: { createdAt: "asc" },
     });
 
-    const totalHaberes = basico + presentismo + adicionalCaja + bono + viatico + plus + extraAmount + feriadoAmount;
+    const totalHaberes = basico + presentismoFinal + adicionalCaja + bono + viatico + plus + extraAmount + feriadoAmount;
     const totalAjustes = ajustes.reduce((s, a) => s + Number(a.monto), 0);
     const totalDescuentos = descuentosResult.total + suspensionAmount;
     const totalACobrar = totalHaberes + totalAjustes - totalDescuentos;
@@ -158,7 +167,7 @@ export async function GET(req: NextRequest) {
       empleado: { cod: empleadoCod, nombre: fichEmp.nombre, area: fichEmp.area },
       mes,
       haberes: {
-        basico, presentismo, adicionalCaja, bono, viatico, plus,
+        basico, presentismo: presentismoFinal, presentismoOriginal: presentismo, pierdePresentismo, adicionalCaja, bono, viatico, plus,
         extraHoras: Math.floor(totalExtra / 60) + ":" + String(totalExtra % 60).padStart(2, "0"),
         extraAmount,
         feriadoAmount,
@@ -176,6 +185,7 @@ export async function GET(req: NextRequest) {
       descuentos: { ...descuentosResult, suspensiones: suspensionAmount, diasSuspension: suspensiones.length },
       feriados: feriados.map((f) => ({ fecha: f.fecha.toISOString().slice(0, 10), nombre: f.nombre })),
       suspensiones: diaAjustes.map((a) => ({ fecha: a.fecha.toISOString().slice(0, 10), tipo: a.tipo, motivo: a.motivo })),
+      dias: dayResults.map((d) => ({ fecha: d.dateStr, trabajado: d.worked, tarde: d.tardeDia, entradas: d.entradas, salidas: d.salidas })),
       ajustes: ajustes.map((a) => ({ id: a.id, concepto: a.concepto, monto: Number(a.monto), createdAt: a.createdAt.toISOString() })),
       resumen: { totalHaberes, totalAjustes, totalDescuentos, totalACobrar },
     });

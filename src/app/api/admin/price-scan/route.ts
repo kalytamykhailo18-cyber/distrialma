@@ -6,9 +6,15 @@ import { requireStaff } from "@/lib/api-auth";
 
 const db = () => getDbName("productos");
 
-export async function POST() {
-  if (!(await requireStaff())) {
-    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+const CRON_SECRET = process.env.CRON_SECRET || (process.env.RESEND_API_KEY || "").substring(0, 16);
+
+export async function POST(req: Request) {
+  const url = new URL(req.url);
+  const secret = url.searchParams.get("secret");
+  if (secret !== CRON_SECRET) {
+    if (!(await requireStaff())) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    }
   }
 
   try {

@@ -23,6 +23,8 @@ export const ALL_PERMISSIONS = [
   { key: "usuarios", label: "Usuarios" },
   { key: "terminales", label: "Terminales POS" },
   { key: "difusion", label: "Difusion WhatsApp" },
+  { key: "control-horario", label: "Control Horario" },
+  { key: "liquidacion", label: "Liquidacion sueldos" },
 ] as const;
 
 // Special flags (not page permissions, but user config options)

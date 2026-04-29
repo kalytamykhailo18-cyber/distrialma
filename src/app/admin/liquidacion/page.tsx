@@ -24,7 +24,8 @@ interface Ajuste { id: number; concepto: string; monto: number }
 interface LiquidacionData {
   empleado: { cod: string; nombre: string; area: string };
   mes: string;
-  haberes: { basico: number; presentismo: number; adicionalCaja: number; bono: number; viatico: number; plus: number; extraHoras: string; extraAmount: number; feriadoAmount: number; hourlyRate: number; dailyRate: number };
+  haberes: { basico: number; presentismo: number; presentismoOriginal: number; pierdePresentismo: boolean; adicionalCaja: number; bono: number; viatico: number; plus: number; extraHoras: string; extraAmount: number; feriadoAmount: number; hourlyRate: number; dailyRate: number };
+  dias: Array<{ fecha: string; trabajado: number; tarde: number; entradas: string[]; salidas: string[] }>;
   horas: { totalHoras: string; diasTrabajados: number; extraMinutos: number; tardeMinutos: number; tardeHoras: string };
   descuentos: { mercaderia: number; faltantes: number; suspensiones: number; diasSuspension: number; total: number };
   feriados: Array<{ fecha: string; nombre: string }>;
@@ -52,6 +53,12 @@ export default function LiquidacionPage() {
   const [ajusteMonto, setAjusteMonto] = useState("");
   const [addingAjuste, setAddingAjuste] = useState(false);
   const [deletingAjuste, setDeletingAjuste] = useState<number | null>(null);
+
+  // Suspension/feriado forms
+  const [suspFecha, setSuspFecha] = useState("");
+  const [suspMotivo, setSuspMotivo] = useState("");
+  const [feriadoFecha, setFeriadoFecha] = useState("");
+  const [feriadoNombre, setFeriadoNombre] = useState("");
 
   // Config
   const [saving, setSaving] = useState(false);
@@ -155,16 +162,6 @@ export default function LiquidacionPage() {
     doc.setFont("helvetica", "bold");
     doc.text("Total haberes", 18, y); doc.text(fmt(liqData.resumen.totalHaberes), w - 18, y, { align: "right" }); y += 8;
 
-    // Descuentos (in PDF)
-    if (liqData.resumen.totalDescuentos > 0) {
-      doc.setFont("helvetica", "bold"); doc.setFontSize(10);
-      doc.text("Descuentos", 14, y); y += 6;
-      doc.setFont("helvetica", "normal"); doc.setFontSize(9);
-      if (liqData.descuentos.mercaderia > 0) { doc.text("Mercaderia", 18, y); doc.text("-" + fmt(liqData.descuentos.mercaderia), w - 18, y, { align: "right" }); y += 5; }
-      if (liqData.descuentos.suspensiones > 0) { doc.text("Suspension (" + liqData.descuentos.diasSuspension + " dias)", 18, y); doc.text("-" + fmt(liqData.descuentos.suspensiones), w - 18, y, { align: "right" }); y += 5; }
-      y += 3;
-    }
-
     // Ajustes
     if (liqData.ajustes.length > 0) {
       doc.setFont("helvetica", "bold"); doc.setFontSize(10);
@@ -183,6 +180,7 @@ export default function LiquidacionPage() {
       doc.setFont("helvetica", "normal"); doc.setFontSize(9);
       if (liqData.descuentos.mercaderia > 0) { doc.text("Mercaderia", 18, y); doc.text("-" + fmt(liqData.descuentos.mercaderia), w - 18, y, { align: "right" }); y += 5; }
       if (liqData.descuentos.faltantes > 0) { doc.text("Faltantes caja", 18, y); doc.text("-" + fmt(liqData.descuentos.faltantes), w - 18, y, { align: "right" }); y += 5; }
+      if (liqData.descuentos.suspensiones > 0) { doc.text("Suspension (" + liqData.descuentos.diasSuspension + " dias)", 18, y); doc.text("-" + fmt(liqData.descuentos.suspensiones), w - 18, y, { align: "right" }); y += 5; }
       y += 3;
     }
 
@@ -199,6 +197,26 @@ export default function LiquidacionPage() {
     doc.text(`${liqData.horas.diasTrabajados} dias trabajados — ${liqData.horas.totalHoras} horas — Valor hora: ${fmt(liqData.haberes.hourlyRate)}`, 14, y);
 
     doc.save(`Liquidacion-${liqData.empleado.nombre.replace(/\s+/g, "_")}-${liqData.mes}.pdf`);
+  }
+
+  async function addSuspension() {
+    if (!suspFecha || !selectedEmp) return;
+    await fetch("/api/admin/liquidacion", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "dia_ajuste", empleadoCod: selectedEmp, fecha: suspFecha, tipo: "suspension", motivo: suspMotivo }),
+    });
+    setSuspFecha(""); setSuspMotivo("");
+    loadLiquidacion();
+  }
+
+  async function addFeriado() {
+    if (!feriadoFecha || !feriadoNombre) return;
+    await fetch("/api/admin/liquidacion", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "feriado", fecha: feriadoFecha, nombre: feriadoNombre }),
+    });
+    setFeriadoFecha(""); setFeriadoNombre("");
+    loadLiquidacion();
   }
 
   function updateEmpField(cod: string, field: string, value: string) {
@@ -287,6 +305,11 @@ export default function LiquidacionPage() {
                       <span className="font-medium text-purple-600">{formatPrice(liqData.haberes.extraAmount)}</span>
                     </div>
                   )}
+                  {liqData.haberes.pierdePresentismo && liqData.haberes.presentismoOriginal > 0 && (
+                    <div className="px-2 py-1 text-xs text-red-500 bg-red-50 rounded mt-1">
+                      Pierde presentismo ({formatPrice(liqData.haberes.presentismoOriginal)}) por tardanzas mayores a 30 min en el mes
+                    </div>
+                  )}
                   <div className="flex justify-between px-2 py-1 border-t font-bold mt-2 pt-2">
                     <span>Total haberes</span>
                     <span>{formatPrice(liqData.resumen.totalHaberes)}</span>
@@ -325,6 +348,49 @@ export default function LiquidacionPage() {
                   </div>
                 </div>
               )}
+
+              {/* Suspensiones + Feriados */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                <div className="bg-white border rounded-xl shadow-sm p-4">
+                  <h3 className="text-sm font-semibold text-gray-700 mb-2">Suspensiones</h3>
+                  {liqData.suspensiones.length > 0 && (
+                    <div className="space-y-1 mb-2 text-xs">
+                      {liqData.suspensiones.map((s) => (
+                        <div key={s.fecha} className="flex justify-between text-red-500">
+                          <span>{s.fecha.slice(8, 10)}/{s.fecha.slice(5, 7)} {s.motivo || ""}</span>
+                          <span>-{formatPrice(liqData.haberes.dailyRate)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex gap-2">
+                    <input type="date" value={suspFecha} onChange={(e) => setSuspFecha(e.target.value)}
+                      className="flex-1 px-2 py-1.5 border rounded-lg text-xs focus:outline-none focus:border-brand-500" />
+                    <input type="text" value={suspMotivo} onChange={(e) => setSuspMotivo(e.target.value)} placeholder="Motivo"
+                      className="flex-1 px-2 py-1.5 border rounded-lg text-xs focus:outline-none focus:border-brand-500" />
+                    <button onClick={addSuspension} disabled={!suspFecha}
+                      className={`px-2 py-1.5 bg-red-50 text-red-600 border border-red-200 rounded-lg text-xs disabled:opacity-50 ${springBtn}`}>+</button>
+                  </div>
+                </div>
+                <div className="bg-white border rounded-xl shadow-sm p-4">
+                  <h3 className="text-sm font-semibold text-gray-700 mb-2">Feriados del mes</h3>
+                  {liqData.feriados.length > 0 && (
+                    <div className="space-y-1 mb-2 text-xs">
+                      {liqData.feriados.map((f) => (
+                        <div key={f.fecha} className="text-green-600">{f.fecha.slice(8, 10)}/{f.fecha.slice(5, 7)} — {f.nombre}</div>
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex gap-2">
+                    <input type="date" value={feriadoFecha} onChange={(e) => setFeriadoFecha(e.target.value)}
+                      className="flex-1 px-2 py-1.5 border rounded-lg text-xs focus:outline-none focus:border-brand-500" />
+                    <input type="text" value={feriadoNombre} onChange={(e) => setFeriadoNombre(e.target.value)} placeholder="Nombre"
+                      className="flex-1 px-2 py-1.5 border rounded-lg text-xs focus:outline-none focus:border-brand-500" />
+                    <button onClick={addFeriado} disabled={!feriadoFecha || !feriadoNombre}
+                      className={`px-2 py-1.5 bg-green-50 text-green-600 border border-green-200 rounded-lg text-xs disabled:opacity-50 ${springBtn}`}>+</button>
+                  </div>
+                </div>
+              </div>
 
               {/* Ajustes */}
               <div className="bg-white border rounded-xl shadow-sm p-4 mb-4">

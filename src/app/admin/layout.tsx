@@ -78,8 +78,8 @@ const MENU_CATEGORIES: MenuCategory[] = [
       { href: "/admin/vendedores", label: "Vendedores", perm: "vendedores" },
       { href: "/admin/usuarios", label: "Usuarios", perm: "usuarios" },
       { href: "/admin/mis-descuentos", label: "Mis Descuentos", perm: "etiquetas" },
-      { href: "/admin/control-horario", label: "Control Horario", perm: "dashboard" },
-      { href: "/admin/liquidacion", label: "Liquidacion", perm: "dashboard" },
+      { href: "/admin/control-horario", label: "Control Horario", perm: "control-horario" },
+      { href: "/admin/liquidacion", label: "Liquidacion", perm: "liquidacion" },
     ],
   },
   {

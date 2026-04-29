@@ -29,6 +29,7 @@ interface DayResult {
   salidas: string[];
   totalMinutos: number;
   descansoMinutos: number;
+  descansoReal: number;
   extraMinutos: number;
   tardeMinutos: number;
   incompleto: boolean;
@@ -228,6 +229,7 @@ export default function ControlHorarioPage() {
                         <th className="px-2 py-2">Entrada 2</th>
                         <th className="px-2 py-2">Salida 2</th>
                         <th className="px-2 py-2 text-right">Total</th>
+                        <th className="px-2 py-2 text-right">Descanso</th>
                         <th className="px-2 py-2 text-right">Extra</th>
                         <th className="px-2 py-2 text-right">Tarde</th>
                       </tr>
@@ -247,6 +249,7 @@ export default function ControlHorarioPage() {
                             <td className="px-2 py-1.5 text-xs">{day.entradas[1] || ""}</td>
                             <td className="px-2 py-1.5 text-xs">{day.salidas[1] || ""}</td>
                             <td className="px-2 py-1.5 text-xs text-right font-medium">{day.totalMinutos > 0 ? minToHHMM(day.totalMinutos) : ""}</td>
+                            <td className={`px-2 py-1.5 text-xs text-right ${day.descansoReal > 15 ? "text-red-600 font-bold" : "text-gray-400"}`}>{day.descansoReal > 0 ? minToHHMM(day.descansoReal) : ""}</td>
                             <td className="px-2 py-1.5 text-xs text-right text-purple-600">{day.extraMinutos > 0 ? minToHHMM(day.extraMinutos) : ""}</td>
                             <td className="px-2 py-1.5 text-xs text-right text-red-500">{day.tardeMinutos > 0 ? minToHHMM(day.tardeMinutos) : ""}</td>
                           </tr>
@@ -257,6 +260,7 @@ export default function ControlHorarioPage() {
                       <tr className="bg-gray-100 font-bold text-xs border-t-2">
                         <td colSpan={6} className="px-2 py-2">TOTAL</td>
                         <td className="px-2 py-2 text-right">{horarioData.resumen.totalHoras}</td>
+                        <td className="px-2 py-2 text-right"></td>
                         <td className="px-2 py-2 text-right text-purple-600">{horarioData.resumen.extraHoras}</td>
                         <td className="px-2 py-2 text-right text-red-500">{horarioData.resumen.tardeHoras}</td>
                       </tr>

@@ -89,7 +89,8 @@ client.on("message", async (msg) => {
   if (recruit) {
     botReplying.add(chatId);
     try {
-      if (recruit.step === "nombre") { recruit.data.nombre = msg.body.trim(); recruit.step = "edad"; await msg.reply("Gracias " + recruit.data.nombre + ". Cual es tu edad?"); }
+      if (recruit.step === "telefono") { recruit.data.telefono = msg.body.trim().replace(/[^0-9]/g, ""); recruit.step = "nombre"; await msg.reply("Gracias. Como te llamas?"); }
+      else if (recruit.step === "nombre") { recruit.data.nombre = msg.body.trim(); recruit.step = "edad"; await msg.reply("Gracias " + recruit.data.nombre + ". Cual es tu edad?"); }
       else if (recruit.step === "edad") { recruit.data.edad = msg.body.trim(); recruit.step = "experiencia"; await msg.reply("Gracias. Contanos brevemente tu experiencia laboral."); }
       else if (recruit.step === "experiencia") { recruit.data.experiencia = msg.body.trim(); recruit.step = "referencias"; await msg.reply("Tenes referencias laborales comprobables? Pasanos nombre y telefono de contacto."); }
       else if (recruit.step === "referencias") { recruit.data.referencias = msg.body.trim(); recruit.step = "cv"; await msg.reply("Perfecto. Si tenes CV, mandalo como foto o archivo. Si no tenes, escribi 'no tengo'."); }
@@ -100,7 +101,7 @@ client.on("message", async (msg) => {
         } else if (msg.body.trim().toLowerCase().includes("no tengo")) { cvNote = "No tiene CV"; }
         else { cvNote = msg.body.trim(); }
         recruit.data.cv = cvNote;
-        const summary = `POSTULANTE BOT\nNombre: ${recruit.data.nombre || "No indicado"}\nTelefono: ${recruit.data.telefono}\nEdad: ${recruit.data.edad}\nExperiencia: ${recruit.data.experiencia}\nReferencias: ${recruit.data.referencias}\nCV: ${cvNote}`;
+        const summary = `POSTULANTE BOT\nNombre: ${recruit.data.nombre || "No indicado"}\nTelefono: ${recruit.data.telefono || "No disponible"}\nEdad: ${recruit.data.edad}\nExperiencia: ${recruit.data.experiencia}\nReferencias: ${recruit.data.referencias}\nCV: ${cvNote}`;
         await client.sendMessage(`${RRHH_PHONE}@c.us`, summary);
         await msg.reply("Listo, recibimos tus datos. Te vamos a contactar si hay una vacante disponible. Gracias por escribirnos!");
         recruitmentChats.delete(chatId);
@@ -113,10 +114,19 @@ client.on("message", async (msg) => {
   // Detect recruitment intent
   if (msg.body && RECRUITMENT_KEYWORDS.test(msg.body)) {
     let recruitPhone = chatId.replace("@c.us", "").replace("@lid", "");
-    try { const contact = await msg.getContact(); recruitPhone = contact.number || contact.id?.user || recruitPhone; } catch {}
-    recruitmentChats.set(chatId, { step: "nombre", data: { telefono: recruitPhone } });
+    try {
+      const contact = await msg.getContact();
+      recruitPhone = contact.number || contact.id?.user || recruitPhone;
+      // For @lid chats, try to get the actual phone
+      if (chatId.endsWith("@lid") && !recruitPhone.match(/^[0-9]{10,}/)) {
+        try { const chat = await msg.getChat(); recruitPhone = chat.id?.user || recruitPhone; } catch {}
+      }
+    } catch {}
+    // Add telefono step for @lid chats where we can't get the number
+    const needsPhone = chatId.endsWith("@lid") && !recruitPhone.match(/^[0-9]{10,}/);
+    recruitmentChats.set(chatId, { step: needsPhone ? "telefono" : "nombre", data: { telefono: recruitPhone } });
     botReplying.add(chatId);
-    try { await msg.reply("Hola! Gracias por tu interes en trabajar con nosotros. Te vamos a hacer unas preguntas.\n\nComo te llamas?"); }
+    try { await msg.reply(needsPhone ? "Hola! Gracias por tu interes en trabajar con nosotros. Te vamos a hacer unas preguntas.\n\nPrimero, pasanos tu numero de telefono." : "Hola! Gracias por tu interes en trabajar con nosotros. Te vamos a hacer unas preguntas.\n\nComo te llamas?"); }
     finally { setTimeout(() => botReplying.delete(chatId), 2000); }
     return;
   }

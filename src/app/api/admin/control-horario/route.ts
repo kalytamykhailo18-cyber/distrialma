@@ -11,6 +11,7 @@ interface DayResult {
   salidas: string[];
   totalMinutos: number;
   descansoMinutos: number;
+  descansoReal: number;
   extraMinutos: number;
   tardeMinutos: number;
   incompleto: boolean;
@@ -100,26 +101,33 @@ export async function GET(req: NextRequest) {
       // Calculate total worked time by pairing entries with exits
       let totalMinutos = 0;
       let incompleto = false;
+      let descansoReal = 0;
 
       if (entradas.length > 0 && salidas.length > 0) {
-        // Pair chronologically: E1-S1, E2-S2, etc.
         const allEvents = [
           ...entradas.map((h) => ({ time: h, type: "E" })),
           ...salidas.map((h) => ({ time: h, type: "S" })),
         ].sort((a, b) => a.time.localeCompare(b.time));
 
         let currentEntry: string | null = null;
+        let lastExit: string | null = null;
         for (const event of allEvents) {
           if (event.type === "E") {
+            // Gap between last exit and this entry = break
+            if (lastExit) {
+              const gap = timeToMinutes(event.time) - timeToMinutes(lastExit);
+              if (gap > 0) descansoReal += gap;
+            }
             currentEntry = event.time;
           } else if (event.type === "S" && currentEntry) {
             const entryMin = timeToMinutes(currentEntry);
             const exitMin = timeToMinutes(event.time);
             totalMinutos += Math.max(0, exitMin - entryMin);
+            lastExit = event.time;
             currentEntry = null;
           }
         }
-        if (currentEntry) incompleto = true; // Entry without matching exit
+        if (currentEntry) incompleto = true;
       } else if (entradas.length > 0 && salidas.length === 0) {
         incompleto = true;
       } else if (salidas.length > 0 && entradas.length === 0) {
@@ -153,6 +161,7 @@ export async function GET(req: NextRequest) {
         salidas,
         totalMinutos,
         descansoMinutos,
+        descansoReal,
         extraMinutos,
         tardeMinutos,
         incompleto,
