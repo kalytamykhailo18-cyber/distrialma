@@ -557,6 +557,29 @@ model LiquidacionAjuste {
   @@map("liquidacion_ajustes")
 }
 
+// Feriados
+model Feriado {
+  id    Int      @id @default(autoincrement())
+  fecha DateTime @unique @db.Date
+  nombre String  @db.VarChar(60)
+
+  @@map("feriados")
+}
+
+// Employee day adjustments (suspensions, justified absences, etc)
+model EmpleadoDiaAjuste {
+  id          Int      @id @default(autoincrement())
+  empleadoCod String   @db.VarChar(7)
+  fecha       DateTime @db.Date
+  tipo        String   @db.VarChar(20) // suspension, justificada, injustificada
+  motivo      String?  @db.VarChar(100)
+  createdAt   DateTime @default(now())
+
+  @@unique([empleadoCod, fecha])
+  @@index([empleadoCod])
+  @@map("empleado_dia_ajustes")
+}
+
 // Cuentas propias (bancos x CUITs)
 model CuentaBancaria {
   id       Int      @id @default(autoincrement())

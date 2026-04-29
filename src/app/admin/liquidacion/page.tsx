@@ -24,9 +24,11 @@ interface Ajuste { id: number; concepto: string; monto: number }
 interface LiquidacionData {
   empleado: { cod: string; nombre: string; area: string };
   mes: string;
-  haberes: { basico: number; presentismo: number; adicionalCaja: number; bono: number; viatico: number; plus: number; extraHoras: string; extraAmount: number; hourlyRate: number };
-  horas: { totalHoras: string; diasTrabajados: number; extraMinutos: number };
-  descuentos: { mercaderia: number; faltantes: number; total: number };
+  haberes: { basico: number; presentismo: number; adicionalCaja: number; bono: number; viatico: number; plus: number; extraHoras: string; extraAmount: number; feriadoAmount: number; hourlyRate: number; dailyRate: number };
+  horas: { totalHoras: string; diasTrabajados: number; extraMinutos: number; tardeMinutos: number; tardeHoras: string };
+  descuentos: { mercaderia: number; faltantes: number; suspensiones: number; diasSuspension: number; total: number };
+  feriados: Array<{ fecha: string; nombre: string }>;
+  suspensiones: Array<{ fecha: string; tipo: string; motivo: string | null }>;
   ajustes: Ajuste[];
   resumen: { totalHaberes: number; totalAjustes: number; totalDescuentos: number; totalACobrar: number };
 }
@@ -146,11 +148,22 @@ export default function LiquidacionPage() {
       ["Viatico", liqData.haberes.viatico], ["Plus", liqData.haberes.plus],
     ];
     if (liqData.haberes.extraAmount > 0) habItems.push(["Horas extra (" + liqData.haberes.extraHoras + ")", liqData.haberes.extraAmount]);
+    if (liqData.haberes.feriadoAmount > 0) habItems.push(["Feriado trabajado", liqData.haberes.feriadoAmount]);
     for (const [label, val] of habItems) {
-      if (val > 0) { doc.text(label, 18, y); doc.text(fmt(val), w - 18, y, { align: "right" }); y += 5; }
+      if (val > 0) { doc.text(label as string, 18, y); doc.text(fmt(val as number), w - 18, y, { align: "right" }); y += 5; }
     }
     doc.setFont("helvetica", "bold");
     doc.text("Total haberes", 18, y); doc.text(fmt(liqData.resumen.totalHaberes), w - 18, y, { align: "right" }); y += 8;
+
+    // Descuentos (in PDF)
+    if (liqData.resumen.totalDescuentos > 0) {
+      doc.setFont("helvetica", "bold"); doc.setFontSize(10);
+      doc.text("Descuentos", 14, y); y += 6;
+      doc.setFont("helvetica", "normal"); doc.setFontSize(9);
+      if (liqData.descuentos.mercaderia > 0) { doc.text("Mercaderia", 18, y); doc.text("-" + fmt(liqData.descuentos.mercaderia), w - 18, y, { align: "right" }); y += 5; }
+      if (liqData.descuentos.suspensiones > 0) { doc.text("Suspension (" + liqData.descuentos.diasSuspension + " dias)", 18, y); doc.text("-" + fmt(liqData.descuentos.suspensiones), w - 18, y, { align: "right" }); y += 5; }
+      y += 3;
+    }
 
     // Ajustes
     if (liqData.ajustes.length > 0) {
@@ -280,9 +293,18 @@ export default function LiquidacionPage() {
                   </div>
                 </div>
 
+                {liqData.haberes.feriadoAmount > 0 && (
+                    <div className={`flex justify-between ${hoverRow} px-2 py-1 rounded`}>
+                      <span className="text-green-600">Feriado trabajado</span>
+                      <span className="font-medium text-green-600">{formatPrice(liqData.haberes.feriadoAmount)}</span>
+                    </div>
+                  )}
+
                 {/* Hours summary */}
-                <div className="mt-3 text-xs text-gray-400">
-                  {liqData.horas.diasTrabajados} dias trabajados — {liqData.horas.totalHoras} horas — Valor hora: {formatPrice(liqData.haberes.hourlyRate)}
+                <div className="mt-3 text-xs text-gray-400 space-y-0.5">
+                  <div>{liqData.horas.diasTrabajados} dias trabajados — {liqData.horas.totalHoras} horas</div>
+                  <div>Valor dia: {formatPrice(liqData.haberes.dailyRate)} — Valor hora: {formatPrice(liqData.haberes.hourlyRate)}</div>
+                  {liqData.horas.tardeMinutos > 0 && <div className="text-red-400">Tardanzas: {liqData.horas.tardeHoras} ({Math.round(liqData.horas.tardeMinutos)} min)</div>}
                 </div>
               </div>
 
@@ -296,6 +318,9 @@ export default function LiquidacionPage() {
                     )}
                     {liqData.descuentos.faltantes > 0 && (
                       <div className="flex justify-between px-2 py-1"><span className="text-gray-600">Faltantes caja</span><span className="text-red-500">-{formatPrice(liqData.descuentos.faltantes)}</span></div>
+                    )}
+                    {liqData.descuentos.suspensiones > 0 && (
+                      <div className="flex justify-between px-2 py-1"><span className="text-gray-600">Suspension ({liqData.descuentos.diasSuspension} dias)</span><span className="text-red-500">-{formatPrice(liqData.descuentos.suspensiones)}</span></div>
                     )}
                   </div>
                 </div>

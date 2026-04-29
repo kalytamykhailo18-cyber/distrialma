@@ -62,6 +62,18 @@ export async function GET(req: NextRequest) {
     const startDate = new Date(year, month - 1, 1);
     const endDate = new Date(year, month, 0);
 
+    // Get feriados for this month
+    const feriados = await prisma.feriado.findMany({
+      where: { fecha: { gte: startDate, lte: endDate } },
+    });
+    const feriadoSet = new Set(feriados.map((f) => f.fecha.toISOString().slice(0, 10)));
+
+    // Get day adjustments (suspensions, etc)
+    const diaAjustes = await prisma.empleadoDiaAjuste.findMany({
+      where: { empleadoCod, fecha: { gte: startDate, lte: endDate } },
+    });
+    const suspensiones = diaAjustes.filter((a) => a.tipo === "suspension");
+
     const punches = await prisma.fichadorPunch.findMany({
       where: { empleadoId: fichEmp.id, fecha: { gte: startDate, lte: endDate } },
       orderBy: [{ fecha: "asc" }, { hora: "asc" }],
@@ -80,8 +92,14 @@ export async function GET(req: NextRequest) {
     let totalMinutos = 0;
     let totalExtra = 0;
     let diasTrabajados = 0;
+    let feriadoTrabajadoMin = 0;
+    let totalTardeMin = 0;
 
-    for (const dayPunches of Array.from(byDate.values())) {
+    const daysInMonth = new Date(year, month, 0).getDate();
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+      const dayPunches = byDate.get(dateStr);
+      if (!dayPunches) continue;
       const entradas: string[] = [];
       const salidas: string[] = [];
       for (const p of dayPunches) {
@@ -103,16 +121,26 @@ export async function GET(req: NextRequest) {
         diasTrabajados++;
         totalMinutos += worked;
         if (fichEmp.horasExtras && worked > shiftMin) totalExtra += worked - shiftMin;
+        if (feriadoSet.has(dateStr)) feriadoTrabajadoMin += worked;
+      }
+
+      // Late arrival (fixed schedule only)
+      if (fichEmp.tipoTurno === "fijo" && entradas.length > 0 && worked > 0) {
+        const turnoInicioMin = timeToMin(fichEmp.turnoInicio);
+        const firstEntry = timeToMin(entradas[0]);
+        if (firstEntry > turnoInicioMin) totalTardeMin += firstEntry - turnoInicioMin;
       }
     }
 
-    // Hourly rate for overtime: basico / (shift hours * working days in month)
-    const daysInMonth = new Date(year, month, 0).getDate();
-    const workingDays = Array.from({ length: daysInMonth }, (_, i) => new Date(year, month - 1, i + 1).getDay()).filter((d) => d !== 0).length; // exclude sundays
+    // Working days and daily/hourly rates
+    const workingDays = Array.from({ length: daysInMonth }, (_, i) => new Date(year, month - 1, i + 1).getDay()).filter((d) => d !== 0).length;
+    const dailyRate = basico > 0 && workingDays > 0 ? Math.round(basico / workingDays) : 0;
     const hourlyRate = basico > 0 && workingDays > 0 ? basico / (workingDays * (fichEmp.horasTurno || 9)) : 0;
-    const extraAmount = Math.round(hourlyRate * 2 * (totalExtra / 60)); // overtime at 100% = x2
+    const extraAmount = Math.round(hourlyRate * 2 * (totalExtra / 60)); // overtime at 200%
+    const feriadoAmount = Math.round(hourlyRate * (feriadoTrabajadoMin / 60)); // extra pay for holiday worked (already paid normal, add 1x more)
+    const suspensionAmount = suspensiones.length * dailyRate;
 
-    // Get descuentos from existing module (InternalMovement + CierreCaja diferencias)
+    // Get descuentos from existing module
     const descuentosResult = await getDescuentos(empleadoCod, mes);
 
     // Get manual adjustments
@@ -121,9 +149,9 @@ export async function GET(req: NextRequest) {
       orderBy: { createdAt: "asc" },
     });
 
-    const totalHaberes = basico + presentismo + adicionalCaja + bono + viatico + plus + extraAmount;
+    const totalHaberes = basico + presentismo + adicionalCaja + bono + viatico + plus + extraAmount + feriadoAmount;
     const totalAjustes = ajustes.reduce((s, a) => s + Number(a.monto), 0);
-    const totalDescuentos = descuentosResult.total;
+    const totalDescuentos = descuentosResult.total + suspensionAmount;
     const totalACobrar = totalHaberes + totalAjustes - totalDescuentos;
 
     return NextResponse.json({
@@ -133,15 +161,21 @@ export async function GET(req: NextRequest) {
         basico, presentismo, adicionalCaja, bono, viatico, plus,
         extraHoras: Math.floor(totalExtra / 60) + ":" + String(totalExtra % 60).padStart(2, "0"),
         extraAmount,
+        feriadoAmount,
         hourlyRate: Math.round(hourlyRate),
+        dailyRate,
       },
       horas: {
         totalMinutos,
         totalHoras: Math.floor(totalMinutos / 60) + ":" + String(totalMinutos % 60).padStart(2, "0"),
         diasTrabajados,
         extraMinutos: totalExtra,
+        tardeMinutos: totalTardeMin,
+        tardeHoras: Math.floor(totalTardeMin / 60) + ":" + String(totalTardeMin % 60).padStart(2, "0"),
       },
-      descuentos: descuentosResult,
+      descuentos: { ...descuentosResult, suspensiones: suspensionAmount, diasSuspension: suspensiones.length },
+      feriados: feriados.map((f) => ({ fecha: f.fecha.toISOString().slice(0, 10), nombre: f.nombre })),
+      suspensiones: diaAjustes.map((a) => ({ fecha: a.fecha.toISOString().slice(0, 10), tipo: a.tipo, motivo: a.motivo })),
       ajustes: ajustes.map((a) => ({ id: a.id, concepto: a.concepto, monto: Number(a.monto), createdAt: a.createdAt.toISOString() })),
       resumen: { totalHaberes, totalAjustes, totalDescuentos, totalACobrar },
     });
@@ -195,6 +229,30 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, id: ajuste.id });
   }
 
+  // Add feriado
+  if (body.action === "feriado") {
+    const { fecha, nombre } = body;
+    if (!fecha || !nombre) return NextResponse.json({ error: "Datos requeridos" }, { status: 400 });
+    await prisma.feriado.upsert({
+      where: { fecha: new Date(fecha) },
+      update: { nombre },
+      create: { fecha: new Date(fecha), nombre },
+    });
+    return NextResponse.json({ ok: true });
+  }
+
+  // Add day adjustment (suspension, etc)
+  if (body.action === "dia_ajuste") {
+    const { empleadoCod, fecha, tipo, motivo } = body;
+    if (!empleadoCod || !fecha || !tipo) return NextResponse.json({ error: "Datos requeridos" }, { status: 400 });
+    await prisma.empleadoDiaAjuste.upsert({
+      where: { empleadoCod_fecha: { empleadoCod, fecha: new Date(fecha) } },
+      update: { tipo, motivo: motivo || null },
+      create: { empleadoCod, fecha: new Date(fecha), tipo, motivo: motivo || null },
+    });
+    return NextResponse.json({ ok: true });
+  }
+
   return NextResponse.json({ error: "action requerida" }, { status: 400 });
 }
 
@@ -219,18 +277,21 @@ async function getDescuentos(empleadoCod: string, mes: string) {
   try {
     const movs = await prisma.internalMovement.findMany({
       where: {
-        subtipo: "descuento_empleados",
+        estado: "aprobado",
         createdAt: { gte: startDate, lte: endDate },
+        empleados: { not: null },
       },
       include: { items: true },
     });
     for (const mov of movs) {
-      const empleados = JSON.parse(mov.empleados || "[]");
-      if (empleados.includes(empleadoCod) || empleados.includes(empleadoCod.trim())) {
-        const share = empleados.length > 0 ? 1 / empleados.length : 1;
+      try {
+        const emps: Array<{ cod: string; nombre: string }> = JSON.parse(mov.empleados || "[]");
+        const isMe = emps.some((e) => e.cod === empleadoCod || e.cod === empleadoCod.trim());
+        if (!isMe) continue;
         const movTotal = mov.items.reduce((s, it) => s + Number(it.costo || 0) * Number(it.cantidad), 0);
+        const share = emps.length > 0 ? 1 / emps.length : 1;
         movDescuentos += movTotal * share;
-      }
+      } catch { /* invalid JSON */ }
     }
   } catch {}
 
