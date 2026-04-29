@@ -117,7 +117,7 @@ export async function GET(req: NextRequest) {
       // Also check archived web orders from PostgreSQL (both PedidoBackup and ArchivedOrder)
       const { PrismaClient } = await import("@prisma/client");
       const prismaLocal = new PrismaClient();
-      const [backups, archivedOrders] = await Promise.all([
+      const [backups, archivedOrders, registro] = await Promise.all([
         prismaLocal.pedidoBackup.findMany({
           where: { clienteCod: cod },
           orderBy: { createdAt: "desc" },
@@ -128,6 +128,9 @@ export async function GET(req: NextRequest) {
           orderBy: { archivedAt: "desc" },
           take: 20,
           include: { items: true },
+        }),
+        prismaLocal.clienteRegistro.findFirst({
+          where: { clienteCod: { in: [cod, cod.padStart(7, " ")] } },
         }),
       ]);
       await prismaLocal.$disconnect();
@@ -176,6 +179,15 @@ export async function GET(req: NextRequest) {
         facturas,
         pedidosWeb,
         pedidosArchivados,
+        registro: registro ? {
+          whatsapp: registro.whatsapp,
+          fotoLocal: registro.fotoLocal,
+          fotoCuit: registro.fotoCuit,
+          lat: registro.lat,
+          lng: registro.lng,
+          registradoPor: registro.registradoPor,
+          createdAt: registro.createdAt.toISOString(),
+        } : null,
       });
     }
 

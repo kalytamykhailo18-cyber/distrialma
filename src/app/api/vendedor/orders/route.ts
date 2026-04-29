@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireStaff } from "@/lib/api-auth";
 import { prisma } from "@/lib/prisma";
 import { getPool, getDbName } from "@/lib/mssql";
+import { Resend } from "resend";
 
 const SUCURSAL = (process.env.PUNTOUCH_SUCURSAL || "7").padEnd(3, " ");
 const TERMINAL = parseInt(process.env.PUNTOUCH_TERMINAL || "7");
@@ -331,6 +332,33 @@ export async function POST(req: NextRequest) {
       },
       include: { items: true },
     });
+
+    // Send commission email to vendedor (fire-and-forget)
+    const userSession = session.user as { userEmail?: string; name?: string };
+    if (userSession.userEmail) {
+      const fmt = (n: number) => "$" + n.toLocaleString("es-AR", { maximumFractionDigits: 0 });
+      try {
+        const resend = new Resend(process.env.RESEND_API_KEY || "");
+        const itemsHtml = itemsWithCommission.map((i: { productName: string; cantidad: number; precioVenta: number; comisionPorc: number; comisionMonto: number; esPromocional: boolean }) =>
+          `<tr><td>${i.productName}</td><td style="text-align:right">${i.cantidad}</td><td style="text-align:right">${fmt(i.precioVenta * i.cantidad)}</td><td style="text-align:right">${i.esPromocional ? "—" : i.comisionPorc + "%"}</td><td style="text-align:right">${fmt(i.comisionMonto)}</td></tr>`
+        ).join("");
+        await resend.emails.send({
+          from: process.env.RESEND_FROM || "Administracion <no-responder@alertrasadmin.com>",
+          to: userSession.userEmail,
+          subject: `Pedido ${clienteName} — Comision aprox. ${fmt(comisionTotal)}`,
+          html: `<h2>Pedido registrado</h2>
+            <p><strong>Cliente:</strong> ${clienteName}</p>
+            <p><strong>Total:</strong> ${fmt(total)}</p>
+            <p><strong>Comision aproximada:</strong> ${fmt(comisionTotal)}</p>
+            <table style="border-collapse:collapse;width:100%;font-size:13px">
+              <tr style="background:#f5f5f5"><th style="text-align:left;padding:4px">Producto</th><th style="text-align:right;padding:4px">Cant</th><th style="text-align:right;padding:4px">Subtotal</th><th style="text-align:right;padding:4px">%</th><th style="text-align:right;padding:4px">Comision</th></tr>
+              ${itemsHtml}
+              <tr style="font-weight:bold;border-top:2px solid #333"><td colspan="4" style="padding:4px">TOTAL COMISION</td><td style="text-align:right;padding:4px">${fmt(comisionTotal)}</td></tr>
+            </table>
+            <p style="color:#888;font-size:11px">Esta comision es aproximada. La definitiva se calcula sobre lo real facturado.</p>`,
+        });
+      } catch {}
+    }
 
     return NextResponse.json({ order, puntouchCod, nroped: nextNroped });
   } catch (error) {

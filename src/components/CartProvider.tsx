@@ -80,8 +80,9 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       setItems((prev) => {
         const existing = prev.find((i) => itemKey(i) === key);
         if (existing) {
+          const step = mode === "unit" && existing.pesoMayorista > 0 ? existing.pesoMayorista : 1;
           return prev.map((i) =>
-            itemKey(i) === key ? { ...i, quantity: i.quantity + 1 } : i
+            itemKey(i) === key ? { ...i, quantity: Math.round((i.quantity + step) * 10) / 10 } : i
           );
         }
         return [...prev, { ...item, quantity: minQty, mode }];
@@ -101,7 +102,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       prev.map((i) => {
         if (itemKey(i) !== key) return i;
         const minQty = i.mode === "unit" && i.pesoMayorista > 0 ? i.pesoMayorista : 1;
-        const newQty = Math.max(minQty, quantity);
+        const newQty = Math.round(Math.max(minQty, quantity) * 10) / 10;
         return { ...i, quantity: newQty };
       })
     );

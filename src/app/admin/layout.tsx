@@ -67,6 +67,8 @@ const MENU_CATEGORIES: MenuCategory[] = [
       { href: "/admin/inbox", label: "Inbox", perm: "informes" },
       { href: "/admin/notificaciones", label: "Deudas", perm: "notificaciones" },
       { href: "/admin/notificaciones/reactivar", label: "Reactivar clientes", perm: "notificaciones" },
+      { href: "/admin/notificaciones/deuda-auto", label: "Deuda automatica", perm: "notificaciones" },
+      { href: "/admin/alertas-stock", label: "Alertas stock", perm: "notificaciones" },
       { href: "/admin/bot-qr", label: "Bot QR", perm: "clientes" },
     ],
   },
@@ -76,6 +78,8 @@ const MENU_CATEGORIES: MenuCategory[] = [
       { href: "/admin/vendedores", label: "Vendedores", perm: "vendedores" },
       { href: "/admin/usuarios", label: "Usuarios", perm: "usuarios" },
       { href: "/admin/mis-descuentos", label: "Mis Descuentos", perm: "etiquetas" },
+      { href: "/admin/control-horario", label: "Control Horario", perm: "dashboard" },
+      { href: "/admin/liquidacion", label: "Liquidacion", perm: "dashboard" },
     ],
   },
   {

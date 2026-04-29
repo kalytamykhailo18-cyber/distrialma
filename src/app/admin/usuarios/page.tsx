@@ -10,6 +10,8 @@ interface UserRecord {
   username: string;
   role: string;
   permissions: string[];
+  empleadoCod?: string | null;
+  email?: string | null;
   createdAt: string;
 }
 
@@ -23,6 +25,8 @@ export default function UsuariosPage() {
   const [formUsername, setFormUsername] = useState("");
   const [formPassword, setFormPassword] = useState("");
   const [formPerms, setFormPerms] = useState<string[]>([]);
+  const [formEmpleadoCod, setFormEmpleadoCod] = useState("");
+  const [formEmail, setFormEmail] = useState("");
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [confirmUser, setConfirmUser] = useState<UserRecord | null>(null);
 
@@ -61,6 +65,8 @@ export default function UsuariosPage() {
     setFormUsername("");
     setFormPassword("");
     setFormPerms([]);
+    setFormEmpleadoCod("");
+    setFormEmail("");
     setError("");
     setShowForm(true);
   }
@@ -70,6 +76,8 @@ export default function UsuariosPage() {
     setFormUsername(user.username);
     setFormPassword("");
     setFormPerms(user.role === "admin" && user.permissions.length === 0 ? [...allPermKeys] : [...user.permissions]);
+    setFormEmpleadoCod(user.empleadoCod || "");
+    setFormEmail(user.email || "");
     setError("");
     setShowForm(true);
   }
@@ -100,9 +108,11 @@ export default function UsuariosPage() {
 
     try {
       if (editingUser) {
-        const body: { id: number; username?: string; password?: string; permissions: string[] } = {
+        const body: Record<string, unknown> = {
           id: editingUser.id,
           permissions: formPerms,
+          empleadoCod: formEmpleadoCod,
+          email: formEmail,
         };
         if (formUsername !== editingUser.username) body.username = formUsername;
         if (formPassword) body.password = formPassword;
@@ -125,6 +135,8 @@ export default function UsuariosPage() {
             username: formUsername.trim(),
             password: formPassword,
             permissions: formPerms,
+            empleadoCod: formEmpleadoCod,
+            email: formEmail,
           }),
         });
         const data = await res.json();
@@ -230,6 +242,32 @@ export default function UsuariosPage() {
                     placeholder={editingUser ? "sin cambios" : "contraseña"}
                     disabled={saving}
                     className="w-full px-3 py-2 border border-brand-400 rounded-xl text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 disabled:opacity-50"
+                  />
+                </div>
+              </div>
+
+              {/* Empleado & Email */}
+              <div className="grid grid-cols-2 gap-3 mb-3">
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Cod. Empleado (PunTouch)</label>
+                  <input
+                    type="text"
+                    value={formEmpleadoCod}
+                    onChange={(e) => setFormEmpleadoCod(e.target.value)}
+                    placeholder="ej: 5"
+                    disabled={saving}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:border-brand-600 disabled:opacity-50"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Email (comisiones)</label>
+                  <input
+                    type="email"
+                    value={formEmail}
+                    onChange={(e) => setFormEmail(e.target.value)}
+                    placeholder="vendedor@email.com"
+                    disabled={saving}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:border-brand-600 disabled:opacity-50"
                   />
                 </div>
               </div>

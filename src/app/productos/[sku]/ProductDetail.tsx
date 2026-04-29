@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { HiArrowLeft } from "react-icons/hi";
-import Link from "next/link";
 import { formatPrice } from "@/lib/utils";
 import ConfirmModal from "@/components/ConfirmModal";
 import { useCart } from "@/components/CartProvider";
@@ -307,20 +306,6 @@ export default function ProductDetailPage() {
                 </>
               );
             })()}
-            {product.precioEspecial === undefined && (
-              <p className="text-sm text-gray-500 italic">
-                {!session?.user ? (
-                  <>
-                    <Link href="/login" className="text-brand-600 hover:underline">
-                      Iniciá sesión
-                    </Link>{" "}
-                    para ver el precio Especial.
-                  </>
-                ) : (
-                  "Tu cuenta no tiene acceso al precio Especial."
-                )}
-              </p>
-            )}
           </div>
 
           {product.minimoCompra && (
@@ -337,7 +322,7 @@ export default function ProductDetailPage() {
           {/* Add to cart */}
           {!isAdmin && product.precioMayorista > 0 && (() => {
             const unitMin = product.pesoMayorista > 0 ? product.pesoMayorista : 1;
-            const unitStep = 1;
+            const unitStep = product.pesoMayorista > 0 ? product.pesoMayorista : 1;
             const itemData = {
               sku: product.sku,
               name: product.name,

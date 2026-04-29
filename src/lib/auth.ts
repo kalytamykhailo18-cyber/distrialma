@@ -15,7 +15,34 @@ export const authOptions: NextAuthOptions = {
       async authorize(credentials) {
         if (!credentials?.username || !credentials?.password) return null;
 
-        // 1. Check SQL Server Clientes table (CUIT = username, Observaciones = password)
+        // 1. Check PostgreSQL users table first (staff/admin accounts take priority)
+        const user = await prisma.user.findFirst({
+          where: { username: { equals: credentials.username, mode: "insensitive" } },
+        });
+
+        if (user) {
+          const valid = await bcrypt.compare(
+            credentials.password,
+            user.passwordHash
+          );
+          if (!valid) return null;
+
+          let permissions: string[] = [];
+          try {
+            permissions = JSON.parse(user.permissions || "[]");
+          } catch { /* ignore */ }
+
+          return {
+            id: String(user.id),
+            name: user.username,
+            role: user.role,
+            permissions,
+            empleadoCod: user.empleadoCod || null,
+            email: user.email || null,
+          };
+        }
+
+        // 2. Fall back to SQL Server Clientes table (client accounts)
         try {
           const pool = await getPool();
           const dbClientes = getDbName("clientes");
@@ -44,49 +71,30 @@ export const authOptions: NextAuthOptions = {
           console.error("SQL Server auth error:", err);
         }
 
-        // 2. Fall back to PostgreSQL users table (admin accounts)
-        const user = await prisma.user.findUnique({
-          where: { username: credentials.username },
-        });
-
-        if (!user) return null;
-
-        const valid = await bcrypt.compare(
-          credentials.password,
-          user.passwordHash
-        );
-        if (!valid) return null;
-
-        let permissions: string[] = [];
-        try {
-          permissions = JSON.parse(user.permissions || "[]");
-        } catch { /* ignore */ }
-
-        return {
-          id: String(user.id),
-          name: user.username,
-          role: user.role,
-          permissions,
-        };
+        return null;
       },
     }),
   ],
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
-        const u = user as unknown as { role: string; id: string; permissions?: string[] };
+        const u = user as unknown as { role: string; id: string; permissions?: string[]; empleadoCod?: string | null; email?: string | null };
         token.role = u.role;
         token.clientId = u.id;
         token.permissions = u.permissions || [];
+        token.empleadoCod = u.empleadoCod || null;
+        token.userEmail = u.email || null;
       }
       return token;
     },
     async session({ session, token }) {
       if (session.user) {
-        const u = session.user as { role?: string; clientId?: string; permissions?: string[] };
+        const u = session.user as { role?: string; clientId?: string; permissions?: string[]; empleadoCod?: string | null; userEmail?: string | null };
         u.role = token.role as string;
         u.clientId = token.clientId as string;
         u.permissions = (token.permissions as string[]) || [];
+        u.empleadoCod = (token.empleadoCod as string) || null;
+        u.userEmail = (token.userEmail as string) || null;
       }
       return session;
     },

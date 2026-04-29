@@ -244,6 +244,7 @@ export default function CierreCajaPage() {
       doc.setFontSize(9);
       doc.setTextColor(50, 50, 50);
     }
+    if (data.notasCredito && data.notasCredito.efectivo > 0) { drawRowAt(leftX, colW, leftY, "Notas de credito:", `-${fmt(data.notasCredito.efectivo)}`); leftY += 7; }
     drawRowAt(leftX, colW, leftY, "Ingresos:", fmt(data.ingresos)); leftY += 7;
     drawRowAt(leftX, colW, leftY, "Pagos proveedores:", fmt(data.pagos)); leftY += 7;
     doc.setFont("helvetica", "bold");
@@ -581,6 +582,12 @@ export default function CierreCajaPage() {
                       <span className="text-xs font-medium text-red-400">-{fmt(r.total)}</span>
                     </div>
                   ))}
+                  {data.notasCredito && data.notasCredito.efectivo > 0 && (
+                  <div className="px-4 py-3 flex justify-between transition-colors duration-150 hover:bg-gray-50/60">
+                    <span className="text-sm text-gray-600">Notas de credito ({data.notasCredito.cantidad})</span>
+                    <span className="text-sm font-medium text-red-500">-{fmt(data.notasCredito.efectivo)}</span>
+                  </div>
+                  )}
                   <div className="px-4 py-3 flex justify-between transition-colors duration-150 hover:bg-gray-50/60">
                     <span className="text-sm text-gray-600">Ingresos</span>
                     <span className="text-sm font-medium text-green-600">+{fmt(data.ingresos)}</span>

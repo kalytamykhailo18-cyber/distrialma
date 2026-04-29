@@ -4,6 +4,7 @@ import { useState, useRef } from "react";
 import { formatPrice } from "@/lib/utils";
 import { HiOutlineSearch } from "react-icons/hi";
 import { PageTransition, Stagger, staggerStyle, springBtn, hoverRow, LoadingCenter, useDataReady } from "@/components/AnimateIn";
+import ConfirmModal from "@/components/ConfirmModal";
 
 interface Product {
   sku: string;
@@ -75,6 +76,7 @@ export default function PreciosPage() {
   const timerRef = useRef<ReturnType<typeof setTimeout>>();
   const searchInputRef = useRef<HTMLInputElement>(null);
   const productReady = useDataReady(product);
+  const [confirmAction, setConfirmAction] = useState<{ message: string; action: () => Promise<void> } | null>(null);
 
   function handleSearch(value: string) {
     setQuery(value);
@@ -171,17 +173,21 @@ export default function PreciosPage() {
     if (!costo) return;
     try {
       const preview = await fetch("/api/admin/stock-entries/apply-similar?sku=" + product.sku).then(r => r.json());
-      if (!preview.products || preview.products.length === 0) { alert("No se encontraron productos similares"); return; }
-      const names = preview.products.map((p: {nombre: string}) => p.nombre).join("\n");
-      if (!window.confirm("Aplicar costo $" + costo + " a " + preview.products.length + " productos similares?\n\n" + names)) return;
-      const res = await fetch("/api/admin/stock-entries/apply-similar", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sku: product.sku, costo }),
+      if (!preview.products || preview.products.length === 0) { setError("No se encontraron productos similares"); return; }
+      const names = preview.products.map((p: {nombre: string}) => p.nombre).join(", ");
+      setConfirmAction({
+        message: `Aplicar costo $${costo} a ${preview.products.length} productos similares: ${names}`,
+        action: async () => {
+          const res = await fetch("/api/admin/stock-entries/apply-similar", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ sku: product.sku, costo }),
+          });
+          const data = await res.json();
+          if (data.updated > 0) setSuccess("Costo aplicado a " + data.updated + " productos similares");
+          else setError("No se actualizaron productos");
+        },
       });
-      const data = await res.json();
-      if (data.updated > 0) setSuccess("Costo aplicado a " + data.updated + " productos similares");
-      else setError("No se actualizaron productos");
     } catch { setError("Error al aplicar a similares"); }
   }
 
@@ -189,17 +195,21 @@ export default function PreciosPage() {
     if (!product) return;
     try {
       const preview = await fetch("/api/admin/stock-entries/apply-similar?sku=" + product.sku).then(r => r.json());
-      if (!preview.products || preview.products.length === 0) { alert("No se encontraron productos similares"); return; }
-      const names = preview.products.map((p: {nombre: string}) => p.nombre).join("\n");
-      if (!window.confirm("Clonar listas a " + preview.products.length + " productos similares?\n\n" + names)) return;
-      const res = await fetch("/api/admin/stock-entries/apply-similar", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sku: product.sku, mode: "clone", precios: form }),
+      if (!preview.products || preview.products.length === 0) { setError("No se encontraron productos similares"); return; }
+      const names = preview.products.map((p: {nombre: string}) => p.nombre).join(", ");
+      setConfirmAction({
+        message: `Clonar listas a ${preview.products.length} productos similares: ${names}`,
+        action: async () => {
+          const res = await fetch("/api/admin/stock-entries/apply-similar", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ sku: product.sku, mode: "clone", precios: form }),
+          });
+          const data = await res.json();
+          if (data.updated > 0) setSuccess("Listas clonadas a " + data.updated + " productos similares");
+          else setError("No se actualizaron productos");
+        },
       });
-      const data = await res.json();
-      if (data.updated > 0) setSuccess("Listas clonadas a " + data.updated + " productos similares");
-      else setError("No se actualizaron productos");
     } catch { setError("Error al clonar listas"); }
   }
 
@@ -225,9 +235,18 @@ export default function PreciosPage() {
       const data = await res.json();
       if (res.ok) {
         setSuccess("Precios actualizados");
-        selectProduct(product.sku);
-        window.scrollTo({ top: 0, behavior: "smooth" });
-        setTimeout(() => { searchInputRef.current?.focus(); searchInputRef.current?.select(); }, 300);
+        // Update product in place without re-focusing Minorista
+        setProduct((prev) => prev ? {
+          ...prev,
+          costo: parseFloat(form.costo) || prev.costo,
+          precio: parseFloat(form.precio) || prev.precio,
+          precio2: parseFloat(form.precio2) || prev.precio2,
+          precio3: parseFloat(form.precio3) || prev.precio3,
+          precio4: parseFloat(form.precio4) || prev.precio4,
+          precio5: parseFloat(form.precio5) || prev.precio5,
+        } : prev);
+        searchInputRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+        setTimeout(() => { searchInputRef.current?.focus(); }, 400);
       } else {
         setError(data.error || "Error al guardar");
       }
@@ -375,6 +394,17 @@ export default function PreciosPage() {
           </div>
         </Stagger>
       )}
+      <ConfirmModal
+        open={!!confirmAction}
+        message={confirmAction?.message || ""}
+        onConfirm={async () => {
+          if (confirmAction) {
+            try { await confirmAction.action(); } catch { setError("Error"); }
+          }
+          setConfirmAction(null);
+        }}
+        onCancel={() => setConfirmAction(null)}
+      />
     </PageTransition>
   );
 }

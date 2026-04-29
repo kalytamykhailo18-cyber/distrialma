@@ -1,10 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPool, getDbName } from "@/lib/mssql";
 import { prisma } from "@/lib/prisma";
+import { requireStaff } from "@/lib/api-auth";
 
 export const dynamic = "force-dynamic";
 
 const CRON_SECRET = process.env.CRON_SECRET || (process.env.RESEND_API_KEY || "").substring(0, 16);
+
+async function checkAuth(req: NextRequest): Promise<boolean> {
+  const secret = new URL(req.url).searchParams.get("secret");
+  if (secret === CRON_SECRET) return true;
+  const session = await requireStaff();
+  return !!session;
+}
 
 function toWaChatId(phone: string): string | null {
   let num = phone.replace(/\D/g, "");
@@ -52,10 +60,28 @@ async function getDeudores(minSaldo: number) {
 
 // GET: preview who would be reminded
 export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url);
-  const secret = searchParams.get("secret");
-  if (secret !== CRON_SECRET) {
+  if (!(await checkAuth(req))) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  }
+
+  const { searchParams } = new URL(req.url);
+
+  // If ?history=1, return send history
+  if (searchParams.get("history") === "1") {
+    const logs = await prisma.notificationLog.findMany({
+      where: { tipo: "deuda_auto" },
+      orderBy: { createdAt: "desc" },
+      take: 200,
+    });
+    // Group by date (day)
+    const byDay = new Map<string, { ok: number; failed: number; date: string }>();
+    for (const log of logs) {
+      const day = log.createdAt.toISOString().slice(0, 10);
+      const entry = byDay.get(day) || { ok: 0, failed: 0, date: day };
+      if (log.ok) entry.ok++; else entry.failed++;
+      byDay.set(day, entry);
+    }
+    return NextResponse.json({ history: Array.from(byDay.values()) });
   }
 
   const minSaldo = parseFloat(await getSetting("deuda_reminder_min_saldo", "50000"));
@@ -113,12 +139,7 @@ export async function GET(req: NextRequest) {
 
 // POST: send reminders
 export async function POST(req: NextRequest) {
-  const { searchParams } = new URL(req.url);
-  let secret = searchParams.get("secret");
-  if (!secret) {
-    try { const body = await req.json(); secret = body.secret; } catch { /* */ }
-  }
-  if (secret !== CRON_SECRET) {
+  if (!(await checkAuth(req))) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
@@ -210,8 +231,8 @@ export async function POST(req: NextRequest) {
       failed++;
     }
 
-    // Rate limit: 1 second between messages
-    await new Promise((r) => setTimeout(r, 1000));
+    // Rate limit: 3 seconds between messages
+    await new Promise((r) => setTimeout(r, 3000));
   }
 
   console.log(`[DEUDA-REMINDER] Sent: ${sent}, Failed: ${failed}, Skipped: ${skipped}, Eligible: ${eligible.length}`);

@@ -155,8 +155,8 @@ export default function PedidosPage() {
                               <span className="ml-2 px-1.5 py-0.5 bg-yellow-100 text-yellow-700 rounded text-xs font-medium">Pendiente</span>
                             )}
                             {order.notas && (
-                              <span className="ml-2 text-amber-600">
-                                Nota: {order.notas}
+                              <span className="ml-2 text-amber-600" title={order.notas}>
+                                📝
                               </span>
                             )}
                           </div>
@@ -175,6 +175,12 @@ export default function PedidosPage() {
 
                       <CollapsiblePanel open={expanded.has(order.boleta)}>
                         <div className="border-t border-brand-200 bg-brand-50/50 px-2 sm:px-4 py-3">
+                          {order.notas && (
+                            <div className="bg-amber-50 border border-amber-300 rounded-lg px-3 py-2 mb-3">
+                              <span className="text-xs font-medium text-amber-700">Nota:</span>
+                              <p className="text-sm text-amber-900 mt-0.5 whitespace-pre-wrap">{order.notas}</p>
+                            </div>
+                          )}
                           {order.facturado && (
                             <div className="flex flex-wrap gap-1 mb-3">
                               <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full font-medium">Precarga: {formatPrice(order.total)}</span>

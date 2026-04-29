@@ -19,7 +19,13 @@ interface Product {
   name: string;
   barcode: string;
   rubro: string;
+  unidad: string;
+  pesoMayorista: number;
+  minimoCompra: number;
+  minimoCompraText: string;
+  cantPorCaja: number;
   mayorista: number;
+  precioCajaCerrada: number;
   precioVenta: number;
   stock: number;
   promocional: boolean;
@@ -31,6 +37,14 @@ interface Cliente {
   cuit: string;
   direccion: string;
   telefono: string;
+  whatsapp?: string;
+  registro?: {
+    fotoLocal?: string;
+    fotoCuit?: string;
+    whatsapp?: string;
+    lat?: number;
+    lng?: number;
+  } | null;
 }
 
 interface CartItem extends Product {
@@ -55,6 +69,22 @@ export default function VendedorPage() {
   const [notas, setNotas] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const searchTimeout = useRef<ReturnType<typeof setTimeout>>();
+  const [clientHistory, setClientHistory] = useState<Array<{ sku: string; nombre: string; totalCant: number; veces: number; ultimaCompra: string }>>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+
+  // New client registration
+  const [showNewClient, setShowNewClient] = useState(false);
+  const [ncNombre, setNcNombre] = useState("");
+  const [ncDireccion, setNcDireccion] = useState("");
+  const [ncLocalidad, setNcLocalidad] = useState("");
+  const [ncTelefono, setNcTelefono] = useState("");
+  const [ncWhatsapp, setNcWhatsapp] = useState("");
+  const [ncCuit, setNcCuit] = useState("");
+  const [ncIva, setNcIva] = useState("CF");
+  const [ncFotoLocal, setNcFotoLocal] = useState<string | null>(null);
+  const [ncFotoCuit, setNcFotoCuit] = useState<string | null>(null);
+  const [ncSaving, setNcSaving] = useState(false);
+  const [ncGps, setNcGps] = useState<{ lat: number; lng: number } | null>(null);
 
   // Auth redirect
   useEffect(() => {
@@ -102,20 +132,33 @@ export default function VendedorPage() {
     searchTimeout.current = setTimeout(() => searchProducts(val), 300);
   }
 
-  function addToCart(p: Product) {
+  function getStep(p: Product): number {
+    if (p.unidad?.toUpperCase() === "KG" && p.pesoMayorista > 0) return p.pesoMayorista;
+    if (p.minimoCompra > 0) return p.minimoCompra;
+    return 1;
+  }
+
+  function addToCart(p: Product, mode: "unit" | "caja" = "unit") {
+    const qty = mode === "caja" && p.cantPorCaja > 0 ? p.cantPorCaja : getStep(p);
+    const precio = mode === "caja" && p.precioCajaCerrada > 0 ? p.precioCajaCerrada : p.precioVenta;
     setCart((prev) => {
       const existing = prev.find((i) => i.sku === p.sku);
       if (existing) {
-        return prev.map((i) => i.sku === p.sku ? { ...i, cantidad: i.cantidad + 1 } : i);
+        return prev.map((i) => i.sku === p.sku ? { ...i, cantidad: Math.round((i.cantidad + qty) * 100) / 100, precioVenta: precio } : i);
       }
-      return [...prev, { ...p, cantidad: 1 }];
+      return [...prev, { ...p, precioVenta: precio, cantidad: qty }];
     });
     setSearch("");
     setResults([]);
   }
 
   function updateQty(sku: string, delta: number) {
-    setCart((prev) => prev.map((i) => i.sku === sku ? { ...i, cantidad: Math.max(0, i.cantidad + delta) } : i).filter((i) => i.cantidad > 0));
+    setCart((prev) => prev.map((i) => {
+      if (i.sku !== sku) return i;
+      const step = getStep(i);
+      const newQty = Math.round((i.cantidad + delta * step) * 100) / 100;
+      return { ...i, cantidad: Math.max(0, newQty) };
+    }).filter((i) => i.cantidad > 0));
   }
 
   function removeFromCart(sku: string) {
@@ -123,7 +166,62 @@ export default function VendedorPage() {
   }
 
   const cartTotal = cart.reduce((sum, i) => sum + i.precioVenta * i.cantidad, 0);
-  const cartCount = cart.reduce((sum, i) => sum + i.cantidad, 0);
+  const cartCount = cart.length;
+
+  function handlePhoto(file: File, setter: (v: string | null) => void) {
+    const reader = new FileReader();
+    reader.onload = () => setter(reader.result as string);
+    reader.readAsDataURL(file);
+  }
+
+  function captureGps() {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => setNcGps({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      () => {},
+      { timeout: 10000 }
+    );
+  }
+
+  async function handleRegisterClient() {
+    if (!ncNombre.trim() || !ncTelefono.trim()) return;
+    setNcSaving(true);
+    try {
+      const res = await fetch("/api/vendedor/register-client", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nombre: ncNombre, direccion: ncDireccion, localidad: ncLocalidad,
+          telefono: ncTelefono, whatsapp: ncWhatsapp, cuit: ncCuit, iva: ncIva,
+          fotoLocal: ncFotoLocal, fotoCuit: ncFotoCuit,
+          lat: ncGps?.lat, lng: ncGps?.lng,
+        }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        selectCliente({ cod: data.cod, nombre: data.nombre, cuit: ncCuit, direccion: ncDireccion, telefono: ncTelefono });
+        setShowNewClient(false);
+        setNcNombre(""); setNcDireccion(""); setNcLocalidad(""); setNcTelefono("");
+        setNcWhatsapp(""); setNcCuit(""); setNcIva("CF");
+        setNcFotoLocal(null); setNcFotoCuit(null); setNcGps(null);
+      } else {
+        alert(data.error || "Error");
+      }
+    } catch { alert("Error de conexion"); }
+    setNcSaving(false);
+  }
+
+  async function selectCliente(c: Cliente) {
+    setCliente(c);
+    setClientHistory([]);
+    setLoadingHistory(true);
+    try {
+      const res = await fetch(`/api/vendedor/client-history?cod=${c.cod}`);
+      const data = await res.json();
+      setClientHistory(data.products || []);
+    } catch {}
+    setLoadingHistory(false);
+  }
 
   async function searchClientes(q: string) {
     setClienteSearch(q);
@@ -275,6 +373,13 @@ export default function VendedorPage() {
                   <button className={`px-3 py-2 border rounded-lg text-gray-600 ${springBtn}`}>
                     <HiOutlineCamera className="w-5 h-5" />
                   </button>
+                  <button
+                    onClick={() => window.open("/api/price-list?download=1", "_blank")}
+                    className={`px-3 py-2 border rounded-lg text-red-500 ${springBtn}`}
+                    title="Lista de precios PDF"
+                  >
+                    PDF
+                  </button>
                 </div>
               </Stagger>
 
@@ -284,26 +389,37 @@ export default function VendedorPage() {
                 {results.length > 0 && (
                   <div className="space-y-2 mb-4">
                     {results.map((p, i) => (
-                      <button
-                        key={p.sku}
-                        onClick={() => addToCart(p)}
-                        style={staggerStyle(true, i)}
-                        className={`w-full text-left bg-white border rounded-lg p-3 shadow-sm ${hoverRow} ${springBtn}`}
-                      >
-                        <div className="flex justify-between items-start">
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-gray-800 truncate">{p.name}</p>
-                            <p className="text-xs text-gray-400">SKU: {p.sku} — Stock: {p.stock}</p>
-                            {p.promocional && (
-                              <span className="inline-block mt-1 text-xs px-2 py-0.5 bg-purple-100 text-purple-700 rounded">Promocional</span>
-                            )}
+                      <div key={p.sku} style={staggerStyle(true, i)} className={`bg-white border rounded-lg p-3 shadow-sm ${hoverRow}`}>
+                        <button onClick={() => addToCart(p)} className="w-full text-left">
+                          <div className="flex justify-between items-start">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-1.5">
+                                <div className={`w-2 h-2 rounded-full shrink-0 ${p.stock > 10 ? "bg-green-500" : p.stock > 0 ? "bg-yellow-400" : "bg-red-500"}`} />
+                                <p className="text-sm font-medium text-gray-800 truncate">{p.name}</p>
+                              </div>
+                              <p className="text-xs text-gray-400 ml-3.5">
+                                SKU: {p.sku}
+                                {p.minimoCompraText && <span className="ml-1 text-amber-600">Min: {p.minimoCompraText}</span>}
+                              </p>
+                              {p.promocional && (
+                                <span className="inline-block mt-1 text-xs px-2 py-0.5 bg-purple-100 text-purple-700 rounded">Promocional</span>
+                              )}
+                            </div>
+                            <div className="text-right ml-2">
+                              <p className="text-sm font-bold text-brand-500">{formatPrice(p.precioVenta)}</p>
+                              <p className="text-xs text-gray-400">May: {formatPrice(p.mayorista)}</p>
+                            </div>
                           </div>
-                          <div className="text-right ml-2">
-                            <p className="text-sm font-bold text-brand-500">{formatPrice(p.precioVenta)}</p>
-                            <p className="text-xs text-gray-400">May: {formatPrice(p.mayorista)}</p>
-                          </div>
-                        </div>
-                      </button>
+                        </button>
+                        {p.cantPorCaja > 0 && p.precioCajaCerrada > 0 && (
+                          <button
+                            onClick={() => addToCart(p, "caja")}
+                            className={`mt-2 w-full py-1.5 text-xs font-medium text-brand-600 bg-brand-50 border border-brand-200 rounded-lg ${springBtn}`}
+                          >
+                            Caja x{p.cantPorCaja} — {formatPrice(p.precioCajaCerrada)}/u
+                          </button>
+                        )}
+                      </div>
                     ))}
                   </div>
                 )}
@@ -321,12 +437,12 @@ export default function VendedorPage() {
                         <div key={item.sku} style={staggerStyle(true, i)} className={`flex items-center gap-2 text-sm ${hoverRow}`}>
                           <div className="flex-1 min-w-0">
                             <p className="text-xs font-medium truncate">{item.name}</p>
-                            <p className="text-xs text-gray-400">{formatPrice(item.precioVenta)} c/u</p>
+                            <p className="text-xs text-gray-400">{formatPrice(item.precioVenta)}{item.unidad?.toUpperCase() === "KG" ? " /kg" : " c/u"}</p>
                           </div>
                           <button onClick={() => updateQty(item.sku, -1)} className={`w-7 h-7 border rounded flex items-center justify-center ${springBtn}`}>
                             <HiOutlineMinus className="w-3 h-3" />
                           </button>
-                          <span className="w-8 text-center text-sm font-medium">{item.cantidad}</span>
+                          <span className="w-12 text-center text-sm font-medium">{item.unidad?.toUpperCase() === "KG" ? `${item.cantidad}kg` : item.cantidad}</span>
                           <button onClick={() => updateQty(item.sku, 1)} className={`w-7 h-7 border rounded flex items-center justify-center ${springBtn}`}>
                             <HiOutlinePlus className="w-3 h-3" />
                           </button>
@@ -362,14 +478,101 @@ export default function VendedorPage() {
                 </div>
               </Stagger>
 
+              <Stagger delay={70}>
+                <button
+                  onClick={() => { setShowNewClient(!showNewClient); captureGps(); }}
+                  className={`w-full mb-3 py-2.5 text-sm font-medium rounded-lg border-2 border-dashed ${springBtn} ${showNewClient ? "border-brand-400 bg-brand-50 text-brand-600" : "border-gray-300 text-gray-500 hover:border-brand-400"}`}
+                >
+                  {showNewClient ? "Cancelar alta" : "+ Nuevo cliente"}
+                </button>
+              </Stagger>
+
+              {showNewClient && (
+                <Stagger delay={80}>
+                  <div className="bg-white border rounded-lg p-4 mb-3 shadow-sm space-y-3">
+                    <h3 className="text-sm font-semibold text-gray-700">Alta de cliente</h3>
+                    <input type="text" value={ncNombre} onChange={(e) => setNcNombre(e.target.value)} placeholder="Nombre *" className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:border-brand-500" />
+                    <input type="text" value={ncDireccion} onChange={(e) => setNcDireccion(e.target.value)} placeholder="Direccion" className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:border-brand-500" />
+                    <input type="text" value={ncLocalidad} onChange={(e) => setNcLocalidad(e.target.value)} placeholder="Localidad" className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:border-brand-500" />
+                    <div className="grid grid-cols-2 gap-2">
+                      <input type="tel" value={ncTelefono} onChange={(e) => setNcTelefono(e.target.value)} placeholder="Telefono *" className="px-3 py-2 border rounded-lg text-sm focus:outline-none focus:border-brand-500" />
+                      <input type="tel" value={ncWhatsapp} onChange={(e) => setNcWhatsapp(e.target.value)} placeholder="WhatsApp" className="px-3 py-2 border rounded-lg text-sm focus:outline-none focus:border-brand-500" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <input type="text" value={ncCuit} onChange={(e) => setNcCuit(e.target.value)} placeholder="CUIT" className="px-3 py-2 border rounded-lg text-sm focus:outline-none focus:border-brand-500" />
+                      <select value={ncIva} onChange={(e) => setNcIva(e.target.value)} className="px-3 py-2 border rounded-lg text-sm focus:outline-none focus:border-brand-500 bg-white">
+                        <option value="CF">Consumidor Final</option>
+                        <option value="MT">Monotributista</option>
+                        <option value="RI">Resp. Inscripto</option>
+                        <option value="EX">Exento</option>
+                      </select>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Foto del local</label>
+                        <input type="file" accept="image/*" capture="environment" onChange={(e) => e.target.files?.[0] && handlePhoto(e.target.files[0], setNcFotoLocal)} className="w-full text-xs" />
+                        {ncFotoLocal && <img src={ncFotoLocal} alt="" className="mt-1 h-16 rounded border object-cover" />}
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Foto CUIT/Constancia</label>
+                        <input type="file" accept="image/*" capture="environment" onChange={(e) => e.target.files?.[0] && handlePhoto(e.target.files[0], setNcFotoCuit)} className="w-full text-xs" />
+                        {ncFotoCuit && <img src={ncFotoCuit} alt="" className="mt-1 h-16 rounded border object-cover" />}
+                      </div>
+                    </div>
+                    {ncGps && <p className="text-xs text-green-600">GPS: {ncGps.lat.toFixed(5)}, {ncGps.lng.toFixed(5)}</p>}
+                    <button
+                      onClick={handleRegisterClient}
+                      disabled={ncSaving || !ncNombre.trim() || !ncTelefono.trim()}
+                      className={`w-full py-2.5 bg-green-500 text-white rounded-lg text-sm font-medium disabled:opacity-50 ${springBtn}`}
+                    >
+                      {ncSaving ? "Registrando..." : "Registrar cliente"}
+                    </button>
+                  </div>
+                </Stagger>
+              )}
+
               {cliente && (
                 <Stagger delay={80}>
                   <div className="bg-brand-50 border-2 border-brand-400 rounded-lg p-3 mb-3 shadow-sm">
                     <p className="text-xs text-brand-600 font-medium">SELECCIONADO</p>
                     <p className="font-medium text-gray-800">{cliente.nombre}</p>
-                    <p className="text-xs text-gray-500">{cliente.cuit}</p>
-                    {cliente.direccion && <p className="text-xs text-gray-500">{cliente.direccion}</p>}
+                    <div className="flex flex-wrap gap-x-3 text-xs text-gray-500 mt-1">
+                      {cliente.cuit && <span>CUIT: {cliente.cuit}</span>}
+                      {cliente.direccion && <span>{cliente.direccion}</span>}
+                      {cliente.telefono && <span>Tel: {cliente.telefono}</span>}
+                      {(cliente.registro?.whatsapp || cliente.whatsapp) && <span>WA: {cliente.registro?.whatsapp || cliente.whatsapp}</span>}
+                    </div>
+                    {cliente.registro?.fotoLocal && (
+                      <div className="mt-2">
+                        <a href={cliente.registro.fotoLocal} target="_blank" rel="noopener noreferrer">
+                          <img src={cliente.registro.fotoLocal} alt="Local" className="h-20 rounded-lg border object-cover hover:opacity-80" />
+                        </a>
+                      </div>
+                    )}
+                    {cliente.registro?.lat && (
+                      <a href={`https://maps.google.com/?q=${cliente.registro.lat},${cliente.registro.lng}`} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline mt-1 inline-block">
+                        Ver ubicacion
+                      </a>
+                    )}
                   </div>
+                  {/* Purchase history */}
+                  {loadingHistory && <p className="text-xs text-gray-400 mt-2">Cargando historial...</p>}
+                  {clientHistory.length > 0 && (
+                    <div className="mt-3 border-t pt-2">
+                      <p className="text-xs font-semibold text-gray-500 mb-2">Compras habituales (90 dias)</p>
+                      <div className="space-y-1 max-h-48 overflow-y-auto">
+                        {clientHistory.map((h) => (
+                          <div key={h.sku} className={`flex items-center justify-between text-xs py-1.5 px-2 rounded ${hoverRow}`}>
+                            <div className="flex-1 min-w-0">
+                              <span className="text-gray-800 truncate block">{h.nombre}</span>
+                              <span className="text-gray-400">{h.veces}x — ult: {h.ultimaCompra}</span>
+                            </div>
+                            <span className="text-gray-600 shrink-0 ml-2">{h.totalCant} un</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </Stagger>
               )}
 
@@ -378,14 +581,22 @@ export default function VendedorPage() {
                   {clienteResults.map((c, i) => (
                     <button
                       key={c.cod}
-                      onClick={() => setCliente(c)}
+                      onClick={() => selectCliente(c)}
                       style={staggerStyle(true, i)}
                       className={`w-full text-left bg-white border rounded-lg p-3 shadow-sm ${hoverRow} ${springBtn} ${
                         cliente?.cod === c.cod ? "border-brand-400 bg-brand-50" : ""
                       }`}
                     >
-                      <p className="text-sm font-medium text-gray-800">{c.nombre}</p>
-                      <p className="text-xs text-gray-400">{c.cuit} {c.direccion && `— ${c.direccion}`}</p>
+                      <div className="flex gap-3">
+                        {c.registro?.fotoLocal && (
+                          <img src={c.registro.fotoLocal} alt="" className="w-12 h-12 rounded-lg border object-cover shrink-0" />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-800">{c.nombre}</p>
+                          <p className="text-xs text-gray-400">{c.cuit} {c.direccion && `— ${c.direccion}`}</p>
+                          {c.telefono && <p className="text-xs text-gray-400">Tel: {c.telefono}</p>}
+                        </div>
+                      </div>
                     </button>
                   ))}
                 </div>

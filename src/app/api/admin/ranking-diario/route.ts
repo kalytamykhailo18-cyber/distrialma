@@ -159,7 +159,7 @@ export async function POST(req: NextRequest) {
         });
         sent++;
       } catch { /* */ }
-      await new Promise((r) => setTimeout(r, 1000));
+      await new Promise((r) => setTimeout(r, 3000));
     }
 
     console.log(`[RANKING] Sent ${sent} messages. First: ${first.nombre}, Last top6: ${lastTop6.nombre}`);

@@ -21,7 +21,7 @@ export async function GET() {
   }
 
   const users = await prisma.user.findMany({
-    select: { id: true, username: true, role: true, permissions: true, createdAt: true },
+    select: { id: true, username: true, role: true, permissions: true, empleadoCod: true, email: true, createdAt: true },
     orderBy: { createdAt: "desc" },
   });
 
@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
-  const { username, password, permissions } = await req.json();
+  const { username, password, permissions, empleadoCod, email } = await req.json();
 
   if (!username || !password) {
     return NextResponse.json({ error: "Usuario y contraseña son obligatorios" }, { status: 400 });
@@ -64,13 +64,12 @@ export async function POST(req: NextRequest) {
   }
 
   const passwordHash = await bcrypt.hash(password, 10);
-  // If all permissions selected, role = admin; otherwise staff
   const isFullAccess = VALID_PERM_KEYS.every((k) => validPerms.includes(k));
   const role = isFullAccess ? "admin" : "staff";
 
   const user = await prisma.user.create({
-    data: { username, passwordHash, role, permissions: JSON.stringify(validPerms) },
-    select: { id: true, username: true, role: true, permissions: true, createdAt: true },
+    data: { username, passwordHash, role, permissions: JSON.stringify(validPerms), empleadoCod: empleadoCod || null, email: email || null },
+    select: { id: true, username: true, role: true, permissions: true, empleadoCod: true, email: true, createdAt: true },
   });
 
   let perms: string[] = [];
@@ -84,7 +83,7 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
-  const { id, username, password, permissions } = await req.json();
+  const { id, username, password, permissions, empleadoCod, email } = await req.json();
 
   if (!id) {
     return NextResponse.json({ error: "ID requerido" }, { status: 400 });
@@ -102,8 +101,10 @@ export async function PUT(req: NextRequest) {
     }
   }
 
-  const data: { username?: string; passwordHash?: string; role?: string; permissions?: string } = {};
+  const data: { username?: string; passwordHash?: string; role?: string; permissions?: string; empleadoCod?: string | null; email?: string | null } = {};
   if (username) data.username = username;
+  if (empleadoCod !== undefined) data.empleadoCod = empleadoCod || null;
+  if (email !== undefined) data.email = email || null;
   if (password) {
     if (password.length < 4) {
       return NextResponse.json({ error: "La contraseña debe tener al menos 4 caracteres" }, { status: 400 });
@@ -120,7 +121,7 @@ export async function PUT(req: NextRequest) {
   const user = await prisma.user.update({
     where: { id },
     data,
-    select: { id: true, username: true, role: true, permissions: true, createdAt: true },
+    select: { id: true, username: true, role: true, permissions: true, empleadoCod: true, email: true, createdAt: true },
   });
 
   let perms: string[] = [];

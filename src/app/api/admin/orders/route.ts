@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getPool, getDbName } from "@/lib/mssql";
 import { requireStaff } from "@/lib/api-auth";
+import { prisma } from "@/lib/prisma";
 
 export async function GET() {
   if (!(await requireStaff())) {
@@ -156,6 +157,21 @@ export async function GET() {
         } : null,
       };
     });
+
+    // Recover notes from PostgreSQL backup for orders where PunTouch cleared them
+    const ordersWithoutNotes = rawOrders.filter((o) => !o.notas);
+    if (ordersWithoutNotes.length > 0) {
+      const boletas = ordersWithoutNotes.map((o) => o.boleta);
+      const archived = await prisma.archivedOrder.findMany({
+        where: { boleta: { in: boletas } },
+        select: { boleta: true, notas: true },
+      });
+      const notasMap = new Map(archived.filter((a) => a.notas).map((a) => [a.boleta, a.notas!]));
+      for (const o of ordersWithoutNotes) {
+        const backup = notasMap.get(o.boleta);
+        if (backup) o.notas = backup;
+      }
+    }
 
     // Merge orders from the same client (same clienteCod + deliveryDay)
     const mergeKey = (o: typeof rawOrders[0]) => `${o.clienteCod}|${o.deliveryDay}`;

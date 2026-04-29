@@ -108,7 +108,7 @@ export async function POST(req: NextRequest) {
           });
         }
       } catch { /* */ }
-      await new Promise((r) => setTimeout(r, 1000));
+      await new Promise((r) => setTimeout(r, 3000));
     }
 
     console.log(`[REPARTO-FACTURADO] Sent ${sent}/${clientes.length} invoice notifications`);

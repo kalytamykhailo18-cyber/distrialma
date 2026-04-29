@@ -38,16 +38,24 @@ export default function MisDescuentosPage() {
   useEffect(() => { load(); }, []);
 
   if (loading) return <LoadingCenter text="Cargando descuentos..." />;
-  if (empleados.length > 0 && !data) return (
-    <PageTransition className="max-w-2xl mx-auto px-4 py-6">
-      <Stagger delay={0} y={-8}><h1 className="text-2xl font-bold text-gray-900 mb-4">Mis Descuentos</h1></Stagger>
-      <select value={selectedEmp} onChange={(e) => { setSelectedEmp(e.target.value); if (e.target.value) load(e.target.value); }}
-        className="w-full px-3 py-2 border border-brand-400 rounded-lg text-sm">
-        <option value="">Seleccionar empleado...</option>
-        {empleados.map((e) => <option key={e.cod} value={e.cod}>{e.nombre}</option>)}
-      </select>
-    </PageTransition>
-  );
+  if (empleados.length > 0 && !data) {
+    // Auto-load first employee
+    if (!selectedEmp && empleados.length > 0) {
+      setSelectedEmp(empleados[0].cod);
+      load(empleados[0].cod);
+    }
+    return (
+      <PageTransition className="max-w-2xl mx-auto px-4 py-6">
+        <Stagger delay={0} y={-8}><h1 className="text-2xl font-bold text-gray-900 mb-4">Mis Descuentos</h1></Stagger>
+        <select value={selectedEmp} onChange={(e) => { setSelectedEmp(e.target.value); if (e.target.value) load(e.target.value); }}
+          className="w-full px-3 py-2 border border-brand-400 rounded-lg text-sm">
+          <option value="">Seleccionar empleado...</option>
+          {empleados.map((e) => <option key={e.cod} value={e.cod}>{e.nombre}</option>)}
+        </select>
+        <LoadingCenter text="Cargando..." />
+      </PageTransition>
+    );
+  }
   if (error) return <div className="max-w-2xl mx-auto px-4 py-10 text-center text-gray-400">{error}</div>;
   if (!data) return null;
 
@@ -55,7 +63,18 @@ export default function MisDescuentosPage() {
     <PageTransition className="max-w-2xl mx-auto px-4 py-6">
       <Stagger delay={0} y={-8}>
         <h1 className="text-2xl font-bold text-gray-900 mb-1">Mis Descuentos</h1>
-        <p className="text-sm text-gray-500 mb-6">{data.empleado} — {data.mes}</p>
+        {empleados.length > 0 ? (
+          <div className="flex items-center gap-2 mb-4">
+            <select value={selectedEmp} onChange={(e) => { setSelectedEmp(e.target.value); if (e.target.value) load(e.target.value); }}
+              className="flex-1 px-3 py-2 border border-brand-400 rounded-lg text-sm">
+              <option value="">Todos los empleados...</option>
+              {empleados.map((e) => <option key={e.cod} value={e.cod}>{e.nombre}</option>)}
+            </select>
+            <span className="text-sm text-gray-400">{data.mes}</span>
+          </div>
+        ) : (
+          <p className="text-sm text-gray-500 mb-6">{data.empleado} — {data.mes}</p>
+        )}
       </Stagger>
 
       {/* Summary */}

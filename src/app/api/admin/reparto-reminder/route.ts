@@ -280,7 +280,7 @@ export async function POST(req: NextRequest) {
         results.push({ cod: client.cod, nombre: client.nombre, ok: false, error: e instanceof Error ? e.message : "Error" });
       }
 
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      await new Promise((resolve) => setTimeout(resolve, 3000));
     }
 
     const sent = results.filter((r) => r.ok).length;

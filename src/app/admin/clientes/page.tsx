@@ -68,6 +68,7 @@ export default function ClientesPage() {
   const [cliente, setCliente] = useState<ClienteDetalle | null>(null);
   const [facturas, setFacturas] = useState<Factura[]>([]);
   const [loadingDetail, setLoadingDetail] = useState(false);
+  const [registro, setRegistro] = useState<{ whatsapp?: string; fotoLocal?: string; fotoCuit?: string; lat?: number; lng?: number; registradoPor?: string } | null>(null);
 
   // Factura items
   const [expandedBoleta, setExpandedBoleta] = useState<string | null>(null);
@@ -107,6 +108,7 @@ export default function ClientesPage() {
       const d = await res.json();
       setCliente(d.cliente || null);
       setFacturas(d.facturas || []);
+      setRegistro(d.registro || null);
       const live = (d.pedidosWeb || []).map((p: Record<string, unknown>) => ({ ...p, archived: false }));
       const archived = (d.pedidosArchivados || []).map((p: Record<string, unknown>) => ({ ...p, notas: "", archived: true, archivedItems: p.items }));
       // Merge, deduplicate by boleta (live takes priority), sort by fecha desc
@@ -313,7 +315,37 @@ export default function ClientesPage() {
                 <div className="flex gap-4 mt-3 text-xs text-gray-400">
                   <span>{cliente.totalVeces} compras</span>
                   {cliente.fechaAlta && <span>Alta: {cliente.fechaAlta.slice(6, 8)}/{cliente.fechaAlta.slice(4, 6)}/{cliente.fechaAlta.slice(0, 4)}</span>}
+                  {registro?.whatsapp && <span>WA: {registro.whatsapp}</span>}
+                  {registro?.registradoPor && <span>Registrado por: {registro.registradoPor}</span>}
                 </div>
+                {(registro?.fotoLocal || registro?.fotoCuit || registro?.lat) && (
+                  <div className="flex flex-wrap gap-3 mt-3">
+                    {registro.fotoLocal && (
+                      <div>
+                        <p className="text-xs text-gray-400 mb-1">Foto del local</p>
+                        <a href={registro.fotoLocal} target="_blank" rel="noopener noreferrer">
+                          <img src={registro.fotoLocal} alt="Local" className="h-24 rounded-lg border object-cover hover:opacity-80" />
+                        </a>
+                      </div>
+                    )}
+                    {registro.fotoCuit && (
+                      <div>
+                        <p className="text-xs text-gray-400 mb-1">Constancia CUIT</p>
+                        <a href={registro.fotoCuit} target="_blank" rel="noopener noreferrer">
+                          <img src={registro.fotoCuit} alt="CUIT" className="h-24 rounded-lg border object-cover hover:opacity-80" />
+                        </a>
+                      </div>
+                    )}
+                    {registro.lat && registro.lng && (
+                      <div>
+                        <p className="text-xs text-gray-400 mb-1">Ubicacion</p>
+                        <a href={`https://maps.google.com/?q=${registro.lat},${registro.lng}`} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline">
+                          Ver en Google Maps
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </Stagger>
 

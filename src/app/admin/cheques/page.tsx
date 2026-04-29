@@ -83,7 +83,7 @@ export default function ChequesPage() {
   const [loadingInformes, setLoadingInformes] = useState(false);
   const [chequePage, setChequePage] = useState(1);
   const CHEQUES_PER_PAGE = 12;
-  const [estadoFiltro, setEstadoFiltro] = useState("");
+  const [estadoFiltro, setEstadoFiltro] = useState("pendientes");
   const [search, setSearch] = useState("");
   const [cuentaFiltro, setCuentaFiltro] = useState("");
   const [showForm, setShowForm] = useState(false);
@@ -124,13 +124,15 @@ export default function ChequesPage() {
     if (tab === "informes") { loadInformes(); return; }
     setLoading(true);
     const params = new URLSearchParams({ tipo: tab });
-    if (estadoFiltro) params.set("estado", estadoFiltro);
+    if (estadoFiltro && estadoFiltro !== "pendientes") params.set("estado", estadoFiltro);
     if (search) params.set("search", search);
     if (cuentaFiltro) params.set("cuentaId", cuentaFiltro);
     try {
       const res = await fetch(`/api/admin/cheques?${params}`);
       const d = await res.json();
-      setCheques(d.cheques || []);
+      const COMPLETED = ["pagado", "depositado", "anulado"];
+      const raw = d.cheques || [];
+      setCheques(estadoFiltro === "pendientes" ? raw.filter((c: { estado: string }) => !COMPLETED.includes(c.estado)) : raw);
       setResumen(d.resumen || null);
     } catch {}
     setLoading(false);
@@ -377,12 +379,12 @@ export default function ChequesPage() {
       {/* Tabs */}
       <Stagger delay={100}>
         <div className="flex flex-wrap gap-2 mb-4">
-          <button onClick={() => { setTab("propio"); setEstadoFiltro(""); setChequePage(1); }}
+          <button onClick={() => { setTab("propio"); setEstadoFiltro("pendientes"); setChequePage(1); }}
             className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${springBtn} ${tab === "propio" ? "bg-orange-500 text-white" : "bg-white border text-gray-700 hover:bg-gray-50"}`}>
             <HiOutlineOfficeBuilding className="w-4 h-4 inline mr-1" />
             Propios (emitidos)
           </button>
-          <button onClick={() => { setTab("tercero"); setEstadoFiltro(""); setChequePage(1); }}
+          <button onClick={() => { setTab("tercero"); setEstadoFiltro("pendientes"); setChequePage(1); }}
             className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${springBtn} ${tab === "tercero" ? "bg-blue-500 text-white" : "bg-white border text-gray-700 hover:bg-gray-50"}`}>
             <HiOutlineUser className="w-4 h-4 inline mr-1" />
             Terceros (recibidos)
@@ -423,10 +425,13 @@ export default function ChequesPage() {
               ))}
             </select>
           )}
-          {(tab === "tercero" ? ["", "en-cartera", "depositado", "endosado", "rechazado"] : ["", "en-circulacion", "pagado", "rechazado"]).map((e) => (
-            <button key={e || "all"} onClick={() => setEstadoFiltro(e)}
+          {(tab === "tercero"
+            ? [["pendientes", "Pendientes"], ["", "Todos"], ["en-cartera", "En cartera"], ["depositado", "Depositado"], ["endosado", "Endosado"], ["rechazado", "Rechazado"]]
+            : [["pendientes", "Pendientes"], ["", "Todos"], ["en-circulacion", "En circulacion"], ["pagado", "Pagado"], ["rechazado", "Rechazado"]]
+          ).map(([e, label]) => (
+            <button key={e || "all"} onClick={() => { setEstadoFiltro(e); setChequePage(1); }}
               className={`px-3 py-2 rounded-xl text-xs font-medium ${springBtn} ${estadoFiltro === e ? "bg-brand-500 text-white" : "bg-white border text-gray-600 hover:bg-gray-50"}`}>
-              {e ? ESTADO_LABELS[e]?.label || e : "Todos"}
+              {label}
             </button>
           ))}
         </div>
@@ -510,7 +515,7 @@ export default function ChequesPage() {
                     vencido ? "text-red-600" : enVentana ? "text-orange-600" : hoy ? "text-amber-600" : proximo ? "text-yellow-600" : "text-gray-600"
                   }`}>
                     <HiOutlineClock className="w-3 h-3" />
-                    Cobro: {formatDate(c.fechaCobro)}
+                    Emision: {formatDate(c.fechaEmision)} — Cobro: {formatDate(c.fechaCobro)}
                     {vencido && ` (VENCIDO hace ${-dias - 30} dias)`}
                     {enVentana && ` (a cobrar — quedan ${30 + dias} dias)`}
                     {hoy && " (HOY)"}

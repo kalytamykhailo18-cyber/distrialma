@@ -216,7 +216,7 @@ createHttpServer({
       existing.push({ role: "assistant", content: data.message });
       conversations.set(target, existing);
     }
-    setTimeout(() => inboxReplying.delete(target), 10000);
+    setTimeout(() => inboxReplying.delete(target), 30000);
   },
 });
 

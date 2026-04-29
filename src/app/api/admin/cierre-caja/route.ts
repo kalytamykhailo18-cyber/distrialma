@@ -276,7 +276,9 @@ export async function POST(req: NextRequest) {
         doc.setFontSize(9);
         doc.setTextColor(60, 60, 60);
       }
+      const ncEfectivo = data.notasCredito?.efectivo || 0;
       const lines2 = [
+        ...(ncEfectivo > 0 ? [["Notas de credito:", `-${fmt(ncEfectivo)}`, "", ""]] : []),
         ["Ingresos:", fmt(data.ingresos), "", ""],
         ["Pagos proveedores:", fmt(data.pagos), "", ""],
         ["TOTAL EFECTIVO EN CAJA:", fmt(data.totalEfectivoCaja), "", ""],
@@ -436,6 +438,34 @@ export async function POST(req: NextRequest) {
       } catch (emailErr) {
         console.error("Error sending cierre email:", emailErr);
       }
+    }
+
+    // Send cierre PDF to employee email from PunTouch
+    if (finalPdf && resendKey) {
+      try {
+        const pool2 = await getPool();
+        const dbEmp = getDbName("empleados");
+        const empResult = await pool2.request().input("nombre", userName.toUpperCase()).query(`
+          SELECT LTRIM(RTRIM(ISNULL(Email,''))) AS email
+          FROM [${dbEmp}].dbo.Empleados
+          WHERE UPPER(LTRIM(RTRIM(Nombre))) = @nombre
+            AND (DeBaja = 0 OR DeBaja IS NULL)
+            AND LTRIM(RTRIM(ISNULL(Email,''))) <> ''
+        `);
+        const empEmail = empResult.recordset[0]?.email;
+        if (empEmail && empEmail !== emailTo) {
+          const resend2 = new Resend(resendKey);
+          const fecha2 = new Date().toLocaleDateString("es-AR");
+          await resend2.emails.send({
+            from: process.env.RESEND_FROM || "Administracion <no-responder@alertrasadmin.com>",
+            to: empEmail,
+            subject: `Cierre ${fecha2}`,
+            html: `<p>Adjunto cierre del ${fecha2}.</p>`,
+            attachments: [{ filename: `Cierre-${new Date().toISOString().slice(0, 10)}.pdf`, content: finalPdf }],
+          });
+          console.log("Cierre email sent to employee:", empEmail);
+        }
+      } catch {}
     }
 
     // Enqueue print job for silent printing (use server PDF)
