@@ -305,20 +305,25 @@ async function getDescuentos(empleadoCod: string, mes: string) {
     }
   } catch {}
 
-  // Faltantes from CierreCaja diferencias
-  const faltantes = 0;
+  // Faltantes from CierreCaja diferencias — match by employee name
+  let faltantes = 0;
   try {
-    const cierres = await prisma.cierreCaja.findMany({
-      where: {
-        createdAt: { gte: startDate, lte: endDate },
-      },
-    });
-    // Check diferencias charged to this employee
-    for (const cierre of cierres) {
-      if (Number(cierre.diferencia) < 0) {
-        // Faltante — check if this employee was responsible
-        // Match by usuario name to empleado
-        // This is approximate — would need proper linking
+    // Get employee name from PunTouch
+    const { getPool, getDbName } = await import("@/lib/mssql");
+    const pool = await getPool();
+    const dbEmp = getDbName("empleados");
+    const empResult = await pool.request().input("cod", empleadoCod).query(
+      `SELECT LTRIM(RTRIM(Nombre)) AS nombre FROM [${dbEmp}].dbo.Empleados WHERE LTRIM(RTRIM(Cod)) = @cod`
+    );
+    const empNombre = empResult.recordset[0]?.nombre?.toUpperCase();
+    if (empNombre) {
+      const cierres = await prisma.cierreCaja.findMany({
+        where: { createdAt: { gte: startDate, lte: endDate } },
+      });
+      for (const cierre of cierres) {
+        if (Number(cierre.diferencia) < 0 && cierre.usuario?.toUpperCase() === empNombre) {
+          faltantes += Math.abs(Number(cierre.diferencia));
+        }
       }
     }
   } catch {}

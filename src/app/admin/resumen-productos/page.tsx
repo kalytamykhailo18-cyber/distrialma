@@ -21,6 +21,8 @@ export default function ResumenProductosPage() {
   const [data, setData] = useState<ResumenData | null>(null);
   const [loading, setLoading] = useState(false);
   const [mes, setMes] = useState(() => new Date().toISOString().slice(0, 7));
+  const [rangoDesde, setRangoDesde] = useState("");
+  const [rangoHasta, setRangoHasta] = useState("");
   const [sucursales, setSucursales] = useState(["1", "2", "6", "7", "10"]);
   const [search, setSearch] = useState("");
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -49,7 +51,9 @@ export default function ResumenProductosPage() {
   async function load() {
     setLoading(true);
     try {
-      const res = await fetch(`/api/admin/resumen-productos?mes=${mes}&sucursales=${sucursales.join(",")}`);
+      const params = new URLSearchParams({ mes, sucursales: sucursales.join(",") });
+      if (rangoDesde && rangoHasta) { params.set("desde", rangoDesde); params.set("hasta", rangoHasta); }
+      const res = await fetch(`/api/admin/resumen-productos?${params}`);
       const d = await res.json();
       if (d.error) throw new Error(d.error);
       setData(d);
@@ -69,7 +73,7 @@ export default function ResumenProductosPage() {
     setLoadingComp(false);
   }
 
-  useEffect(() => { load(); }, [mes, sucursales]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); }, [mes, sucursales, rangoDesde, rangoHasta]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { loadComp(); }, [mesComp, sucursales, comparar]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function toggleSuc(s: string) {
@@ -117,9 +121,38 @@ export default function ResumenProductosPage() {
         <Stagger delay={60}>
           <div className="flex flex-wrap items-center gap-3 mb-4">
             <div className="flex items-center gap-1.5">
-              <span className="text-xs font-medium text-gray-500">Mes actual:</span>
-              <input type="month" value={mes} onChange={(e) => setMes(e.target.value)} className="px-3 py-2 border border-brand-400 rounded-xl text-sm" />
+              <span className="text-xs font-medium text-gray-500">Mes:</span>
+              <input type="month" value={mes} onChange={(e) => { setMes(e.target.value); setRangoDesde(""); setRangoHasta(""); }} className="px-3 py-2 border border-brand-400 rounded-xl text-sm" />
             </div>
+            {(() => {
+              const today = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Argentina/Buenos_Aires" }));
+              const dayOfWeek = today.getDay() === 0 ? 7 : today.getDay(); // Mon=1, Sun=7
+              const thisMonday = new Date(today); thisMonday.setDate(today.getDate() - dayOfWeek + 1);
+              const thisSunday = new Date(thisMonday); thisSunday.setDate(thisMonday.getDate() + 6);
+              const lastMonday = new Date(thisMonday); lastMonday.setDate(thisMonday.getDate() - 7);
+              const lastSunday = new Date(lastMonday); lastSunday.setDate(lastMonday.getDate() + 6);
+              const fmt = (d: Date) => d.toISOString().slice(0, 10);
+              const isThisWeek = rangoDesde === fmt(thisMonday) && rangoHasta === fmt(thisSunday);
+              const isLastWeek = rangoDesde === fmt(lastMonday) && rangoHasta === fmt(lastSunday);
+              return (
+                <>
+                  <button onClick={() => { setRangoDesde(fmt(thisMonday)); setRangoHasta(fmt(thisSunday)); }}
+                    className={`px-3 py-2 rounded-xl text-xs font-medium ${springBtn} ${isThisWeek ? "bg-brand-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
+                    Esta semana
+                  </button>
+                  <button onClick={() => { setRangoDesde(fmt(lastMonday)); setRangoHasta(fmt(lastSunday)); }}
+                    className={`px-3 py-2 rounded-xl text-xs font-medium ${springBtn} ${isLastWeek ? "bg-brand-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
+                    Semana anterior
+                  </button>
+                  {rangoDesde && (
+                    <button onClick={() => { setRangoDesde(""); setRangoHasta(""); }}
+                      className={`px-3 py-2 rounded-xl text-xs font-medium bg-gray-100 text-gray-600 ${springBtn}`}>
+                      Mes completo
+                    </button>
+                  )}
+                </>
+              );
+            })()}
             <button onClick={() => setComparar(!comparar)}
               className={`px-3 py-2 rounded-xl text-sm font-medium ${springBtn} ${comparar ? "bg-blue-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
               {comparar ? "✕ Comparar" : "Comparar meses"}
@@ -283,6 +316,36 @@ export default function ResumenProductosPage() {
                   <option value="cantidad">Ordenar: Cantidad</option>
                   <option value="margen">Ordenar: Margen %</option>
                 </select>
+                <button onClick={async () => {
+                  const { jsPDF } = await import("jspdf");
+                  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+                  const w = doc.internal.pageSize.getWidth();
+                  const pageH = doc.internal.pageSize.getHeight();
+                  let y = 15;
+                  doc.setFontSize(12); doc.setFont("helvetica", "bold");
+                  doc.text("Lista de Productos", 14, y);
+                  doc.setFontSize(8); doc.setFont("helvetica", "normal");
+                  doc.text(rangoDesde ? `${rangoDesde} a ${rangoHasta}` : mes, w - 14, y, { align: "right" });
+                  y += 8;
+                  doc.setFillColor(240, 240, 240);
+                  doc.rect(14, y - 3, w - 28, 5, "F");
+                  doc.setFontSize(7); doc.setFont("helvetica", "bold");
+                  doc.text("SKU", 16, y); doc.text("Producto", 30, y); doc.text("Cantidad", w - 45, y, { align: "right" }); doc.text("Unidad", w - 18, y, { align: "right" });
+                  y += 5;
+                  doc.setFont("helvetica", "normal");
+                  const allProds = data?.productos?.sort((a, b) => b.cantidad - a.cantidad) || [];
+                  for (const p of allProds) {
+                    if (y > pageH - 15) { doc.addPage(); y = 15; }
+                    doc.text(p.sku, 16, y);
+                    doc.text(p.nombre.substring(0, 40), 30, y);
+                    doc.text(String(Math.round(p.cantidad * 100) / 100), w - 45, y, { align: "right" });
+                    doc.text(p.unidad || "UN", w - 18, y, { align: "right" });
+                    y += 4;
+                  }
+                  doc.save(`Productos-${rangoDesde || mes}.pdf`);
+                }} className={`px-3 py-2 bg-red-50 text-red-600 border border-red-200 rounded-xl text-xs font-medium ${springBtn}`}>
+                  PDF sin precios
+                </button>
               </div>
               <div className="divide-y">
                 {filtered.map((p, i) => {

@@ -10,12 +10,19 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const mes = searchParams.get("mes") || new Date().toISOString().slice(0, 7); // YYYY-MM
   const sucursales = searchParams.get("sucursales") || "1,2,6,7";
+  const desdeParam = searchParams.get("desde"); // YYYY-MM-DD (optional, overrides mes)
+  const hastaParam = searchParams.get("hasta"); // YYYY-MM-DD (optional)
 
-  const [year, month] = mes.split("-").map(Number);
-  const desde = `${year}${String(month).padStart(2, "0")}01000000`;
-  const hasta = month === 12
-    ? `${year + 1}0101000000`
-    : `${year}${String(month + 1).padStart(2, "0")}01000000`;
+  let desde: string;
+  let hasta: string;
+  if (desdeParam && hastaParam) {
+    desde = desdeParam.replace(/-/g, "") + "000000";
+    hasta = hastaParam.replace(/-/g, "") + "235959";
+  } else {
+    const [year, month] = mes.split("-").map(Number);
+    desde = `${year}${String(month).padStart(2, "0")}01000000`;
+    hasta = month === 12 ? `${year + 1}0101000000` : `${year}${String(month + 1).padStart(2, "0")}01000000`;
+  }
 
   try {
     const pool = await getPool();
