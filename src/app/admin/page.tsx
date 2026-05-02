@@ -2,150 +2,142 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import Pagination from "@/components/Pagination";
-import type { Product } from "@/types";
-import { PageTransition, Stagger, staggerStyle, springBtn, hoverRow, LoadingCenter, useDataReady } from "@/components/AnimateIn";
+import { formatPrice } from "@/lib/utils";
+import { HiOutlineShoppingCart, HiOutlineCash, HiOutlineExclamation, HiOutlineChat, HiOutlineTruck, HiOutlineStatusOnline } from "react-icons/hi";
+import { PageTransition, Stagger, springBtn, LoadingCenter } from "@/components/AnimateIn";
 
-export default function AdminPage() {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [total, setTotal] = useState(0);
-  const [inputValue, setInputValue] = useState("");
-  const [search, setSearch] = useState("");
+interface Resumen {
+  ventas: { tickets: number; total: number; efectivo: number; tarjeta: number };
+  pedidosWeb: number;
+  stockCritico: number;
+  whatsappSinLeer: number;
+  reparto: { entregados: number; pendientes: number };
+  botConectado: boolean;
+  fecha: string;
+  hora: string;
+}
+
+export default function AdminLandingPage() {
+  const [data, setData] = useState<Resumen | null>(null);
   const [loading, setLoading] = useState(true);
-  const ready = useDataReady(products.length > 0 ? products : null);
 
   useEffect(() => {
-    fetchProducts();
-  }, [page, search]);
+    fetch("/api/admin/resumen-diario")
+      .then((r) => r.json())
+      .then((d) => setData(d.error ? null : d))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
 
-  function handleSearch() {
-    setPage(1);
-    setSearch(inputValue.trim());
-  }
+  if (loading) return <LoadingCenter text="Cargando..." />;
+  if (!data) return <div className="p-8 text-center text-gray-400">Error al cargar resumen</div>;
 
-  async function fetchProducts() {
-    setLoading(true);
-    const params = new URLSearchParams({
-      page: String(page),
-      limit: "20",
-    });
-    if (search) params.set("search", search);
-
-    try {
-      const res = await fetch(`/api/products?${params}`);
-      const data = await res.json();
-      setProducts(data.products);
-      setTotalPages(data.totalPages);
-      setTotal(data.total);
-    } catch {
-      console.error("Error loading products");
-    } finally {
-      setLoading(false);
-    }
-  }
+  const cards = [
+    {
+      label: "Ventas hoy",
+      value: formatPrice(data.ventas.total),
+      sub: `${data.ventas.tickets} tickets`,
+      icon: HiOutlineCash,
+      color: "bg-green-50 border-green-200 text-green-700",
+      iconColor: "text-green-500",
+      href: "/admin/dashboard",
+    },
+    {
+      label: "Pedidos web",
+      value: String(data.pedidosWeb),
+      sub: "pendientes",
+      icon: HiOutlineShoppingCart,
+      color: data.pedidosWeb > 0 ? "bg-brand-50 border-brand-200 text-brand-700" : "bg-gray-50 border-gray-200 text-gray-700",
+      iconColor: "text-brand-500",
+      href: "/admin/pedidos",
+    },
+    {
+      label: "Stock critico",
+      value: String(data.stockCritico),
+      sub: "productos < 3 dias",
+      icon: HiOutlineExclamation,
+      color: data.stockCritico > 0 ? "bg-red-50 border-red-200 text-red-700" : "bg-gray-50 border-gray-200 text-gray-700",
+      iconColor: data.stockCritico > 0 ? "text-red-500" : "text-gray-400",
+      href: "/admin/alertas-stock",
+    },
+    {
+      label: "WhatsApp",
+      value: String(data.whatsappSinLeer),
+      sub: "sin leer",
+      icon: HiOutlineChat,
+      color: data.whatsappSinLeer > 0 ? "bg-blue-50 border-blue-200 text-blue-700" : "bg-gray-50 border-gray-200 text-gray-700",
+      iconColor: data.whatsappSinLeer > 0 ? "text-blue-500" : "text-gray-400",
+      href: "/admin/inbox",
+    },
+    {
+      label: "Reparto",
+      value: String(data.reparto.entregados),
+      sub: `entregados${data.reparto.pendientes > 0 ? ` / ${data.reparto.pendientes} pendientes` : ""}`,
+      icon: HiOutlineTruck,
+      color: "bg-purple-50 border-purple-200 text-purple-700",
+      iconColor: "text-purple-500",
+      href: "/admin/reparto",
+    },
+    {
+      label: "Bot Mily",
+      value: data.botConectado ? "Online" : "Offline",
+      sub: data.botConectado ? "funcionando" : "desconectado",
+      icon: HiOutlineStatusOnline,
+      color: data.botConectado ? "bg-green-50 border-green-200 text-green-700" : "bg-red-50 border-red-200 text-red-700",
+      iconColor: data.botConectado ? "text-green-500" : "text-red-500",
+      href: "/admin/bot-qr",
+    },
+  ];
 
   return (
-    <PageTransition>
-      <div className="max-w-7xl mx-auto px-4 py-6">
-        <Stagger delay={0} y={-8}>
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">Productos</h1>
-        </Stagger>
+    <PageTransition className="max-w-5xl mx-auto px-4 py-6">
+      <Stagger delay={0} y={-8}>
+        <h1 className="text-2xl font-bold text-gray-900 mb-1">Panel de Control</h1>
+        <p className="text-sm text-gray-400 mb-6">{data.fecha} — {data.hora}</p>
+      </Stagger>
 
-        <Stagger delay={60}>
-          <div className="mb-4 flex gap-2 max-w-md">
-            <input
-              type="text"
-              placeholder="Buscar producto..."
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") handleSearch(); }}
-              disabled={loading}
-              className="flex-1 px-4 py-2 border border-brand-400 rounded-xl text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 disabled:opacity-50"
-            />
-            <button
-              onClick={handleSearch}
-              disabled={loading}
-              className={`px-4 py-2 bg-brand-400 text-white rounded-xl text-sm font-medium hover:bg-brand-500 disabled:opacity-50 ${springBtn}`}
-            >
-              Buscar
-            </button>
-          </div>
-        </Stagger>
-
-        <Stagger delay={150}>
-          <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="text-left px-4 py-3 font-medium text-gray-600">
-                    SKU
-                  </th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-600">
-                    Nombre
-                  </th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-600">
-                    Imágenes
-                  </th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-600">
-                    Descripción
-                  </th>
-                  <th className="px-4 py-3"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr><td colSpan={5}><LoadingCenter /></td></tr>
-                ) : (
-                  products.map((p, i) => (
-                    <tr key={p.sku} className={`border-t ${hoverRow}`} style={staggerStyle(ready, i)}>
-                      <td className="px-4 py-3 font-mono text-gray-500">
-                        {p.sku}
-                      </td>
-                      <td className="px-4 py-3">{p.name}</td>
-                      <td className="px-4 py-3">
-                        {p.images.length > 0 ? (
-                          <span className="text-green-600">
-                            {p.images.length} img
-                          </span>
-                        ) : (
-                          <span className="text-gray-400">Sin imagen</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        {p.description ? (
-                          <span className="text-green-600">Tiene</span>
-                        ) : (
-                          <span className="text-gray-400">Sin desc.</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <Link
-                          href={`/productos/${p.sku}`}
-                          className="text-brand-600 hover:underline text-sm"
-                        >
-                          Editar
-                        </Link>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </Stagger>
-
-        <div className="mt-6">
-          <Pagination
-            page={page}
-            totalPages={totalPages}
-            total={total}
-            loading={loading}
-            onPageChange={setPage}
-          />
+      <Stagger delay={50}>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-8">
+          {cards.map((card) => {
+            const Icon = card.icon;
+            return (
+              <Link key={card.label} href={card.href}
+                className={`border rounded-xl p-4 ${card.color} ${springBtn} hover:shadow-md transition-shadow`}>
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-xs font-medium opacity-70">{card.label}</p>
+                    <p className="text-2xl font-bold mt-1">{card.value}</p>
+                    <p className="text-xs opacity-60 mt-0.5">{card.sub}</p>
+                  </div>
+                  <Icon className={`w-6 h-6 ${card.iconColor} opacity-50`} />
+                </div>
+              </Link>
+            );
+          })}
         </div>
-      </div>
+      </Stagger>
+
+      {/* Quick links */}
+      <Stagger delay={100}>
+        <h2 className="text-sm font-semibold text-gray-500 mb-3">Acceso rapido</h2>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {[
+            { href: "/admin/productos", label: "Productos" },
+            { href: "/admin/precios", label: "Precios" },
+            { href: "/admin/compras", label: "Ingresos" },
+            { href: "/admin/cierre-caja", label: "Cierre de Caja" },
+            { href: "/admin/resumen-productos", label: "Resumen Ventas" },
+            { href: "/admin/clientes", label: "Clientes" },
+            { href: "/admin/etiquetas", label: "Etiquetas" },
+            { href: "/admin/difusion", label: "Difusion" },
+          ].map((link) => (
+            <Link key={link.href} href={link.href}
+              className={`px-3 py-2.5 bg-white border rounded-xl text-sm text-center text-gray-700 font-medium hover:bg-gray-50 ${springBtn}`}>
+              {link.label}
+            </Link>
+          ))}
+        </div>
+      </Stagger>
     </PageTransition>
   );
 }

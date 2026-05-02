@@ -17,7 +17,7 @@ interface MenuCategory { label: string; icon: React.ElementType; items: MenuItem
 const MENU_CATEGORIES: MenuCategory[] = [
   {
     label: "Catalogo", icon: HiOutlineCube, items: [
-      { href: "/admin", label: "Productos", perm: "productos" },
+      { href: "/admin/productos", label: "Productos", perm: "productos" },
       { href: "/admin/categorias", label: "Categorias", perm: "categorias" },
       { href: "/admin/marcas", label: "Marcas", perm: "marcas" },
       { href: "/admin/combos", label: "Combos", perm: "combos" },
