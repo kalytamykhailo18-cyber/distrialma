@@ -440,8 +440,9 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Send cierre PDF to employee email from PunTouch
-    if (finalPdf && resendKey) {
+    // Send cierre PDF to employee email only when faltante (negative difference)
+    const diferencia = nuevoInicioVal - data.totalEfectivoCaja;
+    if (finalPdf && resendKey && diferencia < 0) {
       try {
         const pool2 = await getPool();
         const dbEmp = getDbName("empleados");

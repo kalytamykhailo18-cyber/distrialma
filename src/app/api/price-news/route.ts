@@ -42,6 +42,7 @@ export async function GET() {
       WHERE p.Cod IN (${placeholders})
         AND LTRIM(RTRIM(s.Deposito)) = '0'
         AND s.Precio2 > 0
+        AND s.Stk > 0
     `);
 
     const productMap = new Map(

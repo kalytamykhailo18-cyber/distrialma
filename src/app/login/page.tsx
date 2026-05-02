@@ -30,12 +30,17 @@ export default function LoginPage() {
     if (result?.error) {
       setError("Usuario o contraseña incorrectos");
     } else {
-      // Check if vendedor-only staff → redirect to tomar pedido
+      // Redirect based on role/permissions
       try {
         const sess = await fetch("/api/auth/session").then((r) => r.json());
-        const perms = sess?.user?.permissions || [];
-        if (sess?.user?.role === "staff" && perms.length === 1 && perms[0] === "vendedor") {
-          router.push("/admin/vendedor");
+        const perms: string[] = sess?.user?.permissions || [];
+        const role = sess?.user?.role;
+        if (role === "staff" || role === "admin") {
+          if (perms.length === 1 && perms[0] === "vendedor") {
+            router.push("/admin/vendedor");
+          } else {
+            router.push("/admin");
+          }
           router.refresh();
           return;
         }

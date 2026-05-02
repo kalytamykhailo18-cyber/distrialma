@@ -11,9 +11,10 @@ export default function PedidoEnviadoPage() {
         <div className="w-16 h-16 mx-auto mb-4 bg-green-100 rounded-full flex items-center justify-center">
           <HiCheck className="w-8 h-8 text-green-600" />
         </div>
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">Pedido enviado</h1>
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">Pedido enviado!</h1>
       </Stagger>
       <Stagger delay={100}>
+        <p className="text-lg text-green-600 font-medium mb-2">Gracias por tu compra!</p>
         <p className="text-gray-500 mb-6">
           Tu pedido fue recibido correctamente. Te contactaremos para confirmar la entrega.
         </p>

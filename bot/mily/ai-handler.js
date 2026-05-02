@@ -21,8 +21,9 @@ PAGOS/ALIAS/TRANSFERENCIA: NO dar el alias bancario. Decir "el alias para transf
 NO SABE: "Un asesor te contacta." No inventar.
 RECLAMOS: "Tomamos nota, nuestra encargada te contacta." Se deriva automatico.
 PERSONA: "Te paso con un asesor."
-NO REGISTRADO: Pedir datos, usar register_client (minimo nombre+telefono).
+NO REGISTRADO: Pedir nombre completo, telefono y direccion ANTES de registrar. No registrar si falta algun dato. Despues de registrar, las credenciales se envian automaticamente.
 STICKER: send_sticker al cerrar bien una conversacion.
+COMUNIDAD: Al cerrar una buena conversacion (despues del sticker o la despedida), invitar al cliente a unirse a la comunidad de WhatsApp: "Unite a nuestra comunidad para enterarte de cambios de precios y novedades: https://chat.whatsapp.com/LpfhYKk33eIFAdeshNWAYI". Solo invitar 1 vez por conversacion, no repetir si ya lo invitaste.
 PRIVACIDAD: No dar datos de otros clientes.
 
 Horarios: Minorista Dom-Jue 7-22:30, Vie-Sab 8-23:30. Mayorista Merlo Lun-Sab 8-18 (NO cierra a las 14, cierra a las 18). Pontevedra Lun-Sab 9-17. Web 24hs. PedidosYa disponible.
@@ -50,7 +51,7 @@ const TOOLS = [
   { name: "search_combos", description: "Busca combos/promociones disponibles en Distrialma.", input_schema: { type: "object", properties: { query: { type: "string", description: "Palabras clave del combo" } }, required: ["query"] } },
   { name: "send_price_list", description: "Genera y envia una lista de precios en PDF al cliente por WhatsApp, filtrada por rubro o marca. SIEMPRE usar con filtro.", input_schema: { type: "object", properties: { filter: { type: "string", description: "Filtro OBLIGATORIO por rubro o marca" } }, required: ["filter"] } },
   { name: "send_sticker", description: "Envia el sticker de Alma al cliente. Solo al final de una buena conversacion.", input_schema: { type: "object", properties: {}, required: [] } },
-  { name: "register_client", description: "Registra un cliente nuevo. Necesitás al menos nombre completo y teléfono.", input_schema: { type: "object", properties: { nombre: { type: "string" }, direccion: { type: "string" }, telefono: { type: "string" }, cuit: { type: "string" } }, required: ["nombre", "telefono"] } },
+  { name: "register_client", description: "Registra un cliente nuevo. Necesitas nombre completo, telefono y direccion. CUIT es opcional. NO registrar si falta nombre o telefono.", input_schema: { type: "object", properties: { nombre: { type: "string", description: "Nombre completo" }, direccion: { type: "string", description: "Direccion del local o domicilio" }, telefono: { type: "string", description: "Numero de telefono" }, cuit: { type: "string", description: "CUIT (opcional)" } }, required: ["nombre", "telefono", "direccion"] } },
 ];
 
 export async function callClaude(chatId, userMessage, clientInfo, phoneNumber, { conversations, client, storeMessage }) {
@@ -162,7 +163,12 @@ export async function callClaude(chatId, userMessage, clientInfo, phoneNumber, {
           } else if (tu.name === "register_client") {
             const reg = await registerClient({ nombre: tu.input.nombre, direccion: tu.input.direccion || "", telefono: tu.input.telefono, cuit: tu.input.cuit || "" });
             console.log(`[REGISTER] ${chatId}: registered ${reg.nombre} as client ${reg.cod}`);
-            result = { success: true, clienteCod: reg.cod, nombre: reg.nombre, message: "Cliente registrado exitosamente." };
+            // Send credentials to client
+            const cuitUser = (tu.input.cuit || "").replace(/[^0-9]/g, "");
+            const usuario = cuitUser || reg.cod;
+            await client.sendMessage(chatId, `Ya estas registrado! Podes entrar a nuestra web:\n\nwww.distrialma.com.ar\nUsuario: ${usuario}\nClave: ALMA2026\n\nAhi ves todos los productos con precios y podes hacer pedidos.`);
+            storeMessage(chatId, "out", `[Credenciales enviadas] Usuario: ${usuario}`, "bot");
+            result = { success: true, clienteCod: reg.cod, nombre: reg.nombre, message: "Cliente registrado y credenciales enviadas." };
           } else {
             result = { error: "Herramienta desconocida" };
           }
