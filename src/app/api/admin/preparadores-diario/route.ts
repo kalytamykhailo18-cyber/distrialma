@@ -79,6 +79,42 @@ async function getDailyStats() {
   };
 }
 
+async function getMonthlyStats(mes: string) {
+  const pool = await getPool();
+  const dbTransas = getDbName("transas");
+
+  const [year, month] = mes.split("-").map(Number);
+  const desde = `${year}${String(month).padStart(2, "0")}01000000`;
+  const hasta = month === 12 ? `${year + 1}0101000000` : `${year}${String(month + 1).padStart(2, "0")}01000000`;
+
+  const result = await pool.request().input("desde", desde).input("hasta", hasta).query(`
+    SELECT
+      COUNT(DISTINCT t.Boleta) AS totalPedidos,
+      COUNT(DISTINCT t.Cliente) AS totalClientes,
+      SUM(t.Total) AS totalMonto,
+      COUNT(DISTINCT SUBSTRING(LTRIM(RTRIM(t.Fechora)), 1, 8)) AS diasTrabajados
+    FROM [${dbTransas}].dbo.Transas t
+    WHERE t.Tipo = 'V'
+      AND (LTRIM(RTRIM(t.Itm)) = '0' OR LTRIM(RTRIM(t.Itm)) = '')
+      AND LTRIM(RTRIM(t.Sucursal)) = '7'
+      AND t.Fechora >= @desde AND t.Fechora < @hasta
+      AND (t.Anulado IS NULL OR LTRIM(RTRIM(t.Anulado)) = '' OR t.Anulado = ' ')
+  `);
+
+  const s = result.recordset[0] || { totalPedidos: 0, totalClientes: 0, totalMonto: 0, diasTrabajados: 0 };
+  const pedidos = Number(s.totalPedidos);
+  const dias = Number(s.diasTrabajados);
+
+  return {
+    mes,
+    pedidos,
+    clientes: Number(s.totalClientes),
+    monto: Number(s.totalMonto),
+    diasTrabajados: dias,
+    promedioPorDia: dias > 0 ? Math.round(pedidos / dias * 10) / 10 : 0,
+  };
+}
+
 // GET: preview
 export async function GET(req: NextRequest) {
   const secret = new URL(req.url).searchParams.get("secret");
@@ -86,25 +122,87 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
+  const monthly = new URL(req.url).searchParams.get("monthly");
+
   try {
     const preparadores = await getPreparadores();
+
+    if (monthly) {
+      const stats = await getMonthlyStats(monthly);
+      return NextResponse.json({ preparadores, stats, type: "monthly" });
+    }
+
     const stats = await getDailyStats();
-    return NextResponse.json({ preparadores, stats });
+    return NextResponse.json({ preparadores, stats, type: "daily" });
   } catch (error) {
     console.error("Preparadores error:", error);
     return NextResponse.json({ error: "Error" }, { status: 500 });
   }
 }
 
-// POST: send daily report
+// POST: send daily or monthly report
 export async function POST(req: NextRequest) {
   const secret = new URL(req.url).searchParams.get("secret");
   if (secret !== CRON_SECRET) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
+  const monthly = new URL(req.url).searchParams.get("monthly");
+
   try {
     const preparadores = await getPreparadores();
+
+    // Monthly report via email
+    if (monthly) {
+      const stats = await getMonthlyStats(monthly);
+      const fmt = (n: number) => "$" + n.toLocaleString("es-AR", { maximumFractionDigits: 0 });
+      const { Resend } = await import("resend");
+      const resend = new Resend(process.env.RESEND_API_KEY || "");
+      let sent = 0;
+
+      for (const prep of preparadores) {
+        // Get email from PunTouch
+        const pool = await getPool();
+        const dbEmp = getDbName("empleados");
+        const empResult = await pool.request().input("cod", prep.cod).query(
+          `SELECT LTRIM(RTRIM(ISNULL(Email,''))) AS email FROM [${dbEmp}].dbo.Empleados WHERE LTRIM(RTRIM(Cod)) = @cod`
+        );
+        const email = empResult.recordset[0]?.email;
+        if (!email) continue;
+
+        await resend.emails.send({
+          from: process.env.RESEND_FROM || "Administracion <no-responder@alertrasadmin.com>",
+          to: email,
+          subject: `Rendimiento ${monthly}`,
+          html: `<h2>Rendimiento mensual</h2>
+            <p><strong>Periodo:</strong> ${monthly}</p>
+            <table style="border-collapse:collapse;font-size:14px">
+              <tr><td style="padding:4px 12px">Pedidos preparados:</td><td style="text-align:right;font-weight:bold">${stats.pedidos}</td></tr>
+              <tr><td style="padding:4px 12px">Clientes atendidos:</td><td style="text-align:right;font-weight:bold">${stats.clientes}</td></tr>
+              <tr><td style="padding:4px 12px">Dias trabajados:</td><td style="text-align:right;font-weight:bold">${stats.diasTrabajados}</td></tr>
+              <tr><td style="padding:4px 12px">Promedio por dia:</td><td style="text-align:right;font-weight:bold">${stats.promedioPorDia}</td></tr>
+              <tr><td style="padding:4px 12px">Total facturado:</td><td style="text-align:right;font-weight:bold">${fmt(stats.monto)}</td></tr>
+            </table>`,
+        });
+        sent++;
+      }
+
+      // Also send via WhatsApp
+      for (const prep of preparadores) {
+        const chatId = toWaChatId(prep.telefono);
+        if (!chatId) continue;
+        const msg = `Rendimiento del mes ${monthly}:\n\nPedidos: ${stats.pedidos}\nClientes: ${stats.clientes}\nDias trabajados: ${stats.diasTrabajados}\nPromedio: ${stats.promedioPorDia} pedidos/dia\nTotal facturado: ${fmt(stats.monto)}`;
+        try {
+          await fetch("http://127.0.0.1:3099/send", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chatId, message: msg }) });
+        } catch {}
+        await new Promise((r) => setTimeout(r, 3000));
+      }
+
+      console.log(`[PREPARADORES] Monthly ${monthly} sent to ${sent} emails`);
+      return NextResponse.json({ ok: true, sent, stats, type: "monthly" });
+    }
+
+    // Daily report
     const stats = await getDailyStats();
 
     if (stats.pedidos === 0) {

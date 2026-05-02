@@ -51,10 +51,15 @@ function parseAccessFecha(dateStr: string): string | null {
   return `${y}-${m}-${d}`;
 }
 
+const CRON_SECRET = process.env.CRON_SECRET || (process.env.RESEND_API_KEY || "").substring(0, 16);
+
 // POST: import MDB file
 export async function POST(req: NextRequest) {
-  const session = await requireStaff();
-  if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  const secret = new URL(req.url).searchParams.get("secret");
+  if (secret !== CRON_SECRET) {
+    const session = await requireStaff();
+    if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  }
 
   try {
     // Check if file uploaded or use existing path
