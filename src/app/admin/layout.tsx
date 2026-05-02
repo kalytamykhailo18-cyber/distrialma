@@ -60,6 +60,7 @@ const MENU_CATEGORIES: MenuCategory[] = [
     label: "Reportes", icon: HiOutlineChartBar, items: [
       { href: "/admin/dashboard", label: "Dashboard", perm: "dashboard" },
       { href: "/admin/resumen-productos", label: "Resumen Prod.", perm: "dashboard" },
+      { href: "/admin/ventas-perdidas", label: "Ventas Perdidas", perm: "dashboard" },
     ],
   },
   {
