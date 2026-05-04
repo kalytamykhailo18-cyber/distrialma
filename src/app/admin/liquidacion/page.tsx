@@ -134,25 +134,14 @@ export default function LiquidacionPage() {
     const w = doc.internal.pageSize.getWidth();
     const pageH = doc.internal.pageSize.getHeight();
     const fmt = (n: number) => "$" + n.toLocaleString("es-AR", { maximumFractionDigits: 0 });
-    // Header (orange bar with logo)
-    doc.setFillColor(251, 154, 71);
-    doc.rect(0, 0, w, 24, "F");
-    // Load logo
-    try {
-      const logoRes = await fetch("/logo-pdf.txt");
-      const logoBase64 = await logoRes.text();
-      if (logoBase64) doc.addImage(logoBase64, "PNG", 8, 3, 18, 18);
-    } catch {}
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(16);
+    // Header (simple, no branding)
+    doc.setFontSize(14);
     doc.setFont("helvetica", "bold");
-    doc.text("Liquidacion", 30, 14);
+    doc.text("Liquidacion", 14, 14);
     doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
     doc.text(`${liqData.empleado.nombre} — ${liqData.mes}`, w - 14, 14, { align: "right" });
-    doc.text(`${liqData.empleado.area || ""} — ${liqData.horas.diasTrabajados} dias trabajados`, w - 14, 20, { align: "right" });
-    doc.setTextColor(0);
-    let y = 32;
+    let y = 22;
 
     // Haberes
     doc.setFontSize(10);
@@ -292,9 +281,9 @@ export default function LiquidacionPage() {
     doc.setFont("helvetica", "normal"); doc.setFontSize(8);
     doc.text("Firma: ____________________________", 16, y);
     y += 6;
-    doc.text(`Aclaracion: ${liqData.empleado.nombre}`, 16, y);
+    doc.text("Aclaracion: ____________________________", 16, y);
     y += 5;
-    doc.text("DNI/CUIT: ___________________", 16, y);
+    doc.text("DNI/CUIT: ____________________________", 16, y);
 
     doc.save(`Liquidacion-${liqData.empleado.nombre.replace(/\s+/g, "_")}-${liqData.mes}.pdf`);
   }

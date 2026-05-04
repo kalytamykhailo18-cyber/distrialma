@@ -97,7 +97,6 @@ export async function GET(req: NextRequest) {
     let totalMinutos = 0;
     let totalExtra = 0;
     let diasTrabajados = 0;
-    let feriadoTrabajadoMin = 0;
     let totalTardeMin = 0;
     let domingosTrabajados = 0;
     const dayResults: Array<{ dateStr: string; worked: number; descansoReal: number; tardeDia: number; entradas: string[]; salidas: string[] }> = [];
@@ -132,7 +131,7 @@ export async function GET(req: NextRequest) {
         diasTrabajados++;
         totalMinutos += worked;
         if (fichEmp.horasExtras && worked > shiftMin) totalExtra += worked - shiftMin;
-        if (feriadoSet.has(dateStr)) feriadoTrabajadoMin += worked;
+        // feriadoTrabajadoMin no longer used — feriado pays daily rate
         const dayOfWeek = new Date(year, month - 1, d).getDay();
         if (dayOfWeek === 0 && fichEmp.tipoTurno === "rotativo") domingosTrabajados++;
       }
@@ -156,7 +155,9 @@ export async function GET(req: NextRequest) {
     const dailyRate = basico > 0 && workingDays > 0 ? Math.round(basico / workingDays) : 0;
     const hourlyRate = basico > 0 && workingDays > 0 ? basico / (workingDays * (fichEmp.horasTurno || 9)) : 0;
     const extraAmount = Math.round(hourlyRate * 2 * (totalExtra / 60));
-    const feriadoAmount = Math.round(hourlyRate * (feriadoTrabajadoMin / 60));
+    // Feriado: count days worked on feriados, pay daily rate per day
+    const feriadoDias = dayResults.filter((d) => feriadoSet.has(d.dateStr) && d.worked > 0).length;
+    const feriadoAmount = feriadoDias * dailyRate;
     const plusDomingoSetting = await prisma.setting.findUnique({ where: { key: "plus_domingo" } });
     const plusDomingo = parseInt(plusDomingoSetting?.value || "8000");
     const domingoAmount = domingosTrabajados * plusDomingo;
