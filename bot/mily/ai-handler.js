@@ -15,7 +15,7 @@ PRODUCTOS: Usa search_products. Mostra precio Mayorista + Caja Cerrada si hay. P
 COMBOS: Usa search_combos.
 MARCA: Incluir link de marca.
 LISTA PRECIOS: Preguntar rubro/marca primero, luego send_price_list con filtro. Nunca completa.
-PEDIDOS: Hacer en distrialma.com.ar. No dar telefono.
+PEDIDOS: Si el cliente esta registrado, puede armar el pedido por chat. Usa search_products para buscar, add_to_cart para agregar, view_cart para mostrar, confirm_order para confirmar. Siempre mostrar el carrito actualizado despues de agregar. Antes de confirmar, mostrar resumen y preguntar si esta listo. Si no esta registrado, decirle que haga el pedido en distrialma.com.ar.
 SALDO: Si registrado, dar saldo. Detalle en distrialma.com.ar/mis-pedidos.
 PAGOS/ALIAS/TRANSFERENCIA: NO dar el alias bancario. Decir "el alias para transferencia te lo indican en el comercio a la hora de abonar."
 NO SABE: "Un asesor te contacta." No inventar.
@@ -52,7 +52,29 @@ const TOOLS = [
   { name: "send_price_list", description: "Genera y envia una lista de precios en PDF al cliente por WhatsApp, filtrada por rubro o marca. SIEMPRE usar con filtro.", input_schema: { type: "object", properties: { filter: { type: "string", description: "Filtro OBLIGATORIO por rubro o marca" } }, required: ["filter"] } },
   { name: "send_sticker", description: "Envia el sticker de Alma al cliente. Solo al final de una buena conversacion.", input_schema: { type: "object", properties: {}, required: [] } },
   { name: "register_client", description: "Registra un cliente nuevo. Necesitas nombre completo, telefono y direccion. CUIT es opcional. NO registrar si falta nombre o telefono.", input_schema: { type: "object", properties: { nombre: { type: "string", description: "Nombre completo" }, direccion: { type: "string", description: "Direccion del local o domicilio" }, telefono: { type: "string", description: "Numero de telefono" }, cuit: { type: "string", description: "CUIT (opcional)" } }, required: ["nombre", "telefono", "direccion"] } },
+  { name: "add_to_cart", description: "Agrega un producto al carrito del cliente. Necesitas el SKU del producto (obtenido de search_products) y la cantidad. Solo para clientes REGISTRADOS.", input_schema: { type: "object", properties: { sku: { type: "string", description: "SKU del producto" }, nombre: { type: "string", description: "Nombre del producto" }, cantidad: { type: "number", description: "Cantidad a agregar" }, precio: { type: "number", description: "Precio unitario mayorista" } }, required: ["sku", "nombre", "cantidad", "precio"] } },
+  { name: "view_cart", description: "Muestra el carrito actual del cliente con todos los productos, cantidades y total.", input_schema: { type: "object", properties: {}, required: [] } },
+  { name: "confirm_order", description: "Confirma el pedido del carrito. Crea el pedido en el sistema. Solo usar cuando el cliente diga que esta listo o confirme. Preguntar antes de confirmar.", input_schema: { type: "object", properties: { notas: { type: "string", description: "Notas opcionales del pedido" } }, required: [] } },
 ];
+
+// In-memory cart per chat (expires after 24h)
+const carts = new Map();
+const CART_EXPIRY = 24 * 60 * 60 * 1000;
+
+function getCart(chatId) {
+  const cart = carts.get(chatId);
+  if (!cart) return [];
+  if (Date.now() - cart.updatedAt > CART_EXPIRY) { carts.delete(chatId); return []; }
+  return cart.items;
+}
+
+function setCart(chatId, items) {
+  carts.set(chatId, { items, updatedAt: Date.now() });
+}
+
+function clearCart(chatId) {
+  carts.delete(chatId);
+}
 
 export async function callClaude(chatId, userMessage, clientInfo, phoneNumber, { conversations, client, storeMessage }) {
   const history = conversations.get(chatId) || [];
@@ -89,6 +111,13 @@ export async function callClaude(chatId, userMessage, clientInfo, phoneNumber, {
     }
   } else {
     systemWithContext += `\n\nESTÁS HABLANDO CON UN CLIENTE NO REGISTRADO.\nSu número de teléfono es: ${phoneNumber}\nYa le pedimos sus datos para registrarse. Si te los pasa, usá register_client. Usá el teléfono ${phoneNumber} como teléfono si no te da otro.`;
+  }
+
+  // Inject cart state
+  const currentCart = getCart(chatId);
+  if (currentCart.length > 0) {
+    const cartTotal = currentCart.reduce((s, i) => s + i.precio * i.cantidad, 0);
+    systemWithContext += `\n\nCARRITO ACTUAL (${currentCart.length} productos, total ${formatPrice(cartTotal)}):\n` + currentCart.map((i) => `- ${i.cantidad}x ${i.nombre} (${formatPrice(i.precio)}/u) = ${formatPrice(i.precio * i.cantidad)}`).join("\n");
   }
 
   let iteration = 0;
@@ -169,6 +198,64 @@ export async function callClaude(chatId, userMessage, clientInfo, phoneNumber, {
             await client.sendMessage(chatId, `Ya estas registrado! Podes entrar a nuestra web:\n\nwww.distrialma.com.ar\nUsuario: ${usuario}\nClave: ALMA2026\n\nAhi ves todos los productos con precios y podes hacer pedidos.`);
             storeMessage(chatId, "out", `[Credenciales enviadas] Usuario: ${usuario}`, "bot");
             result = { success: true, clienteCod: reg.cod, nombre: reg.nombre, message: "Cliente registrado y credenciales enviadas." };
+          } else if (tu.name === "add_to_cart") {
+            if (!clientInfo) { result = { error: "Cliente no registrado. No puede armar pedido por chat." }; }
+            else {
+              const cart = getCart(chatId);
+              const existing = cart.find((i) => i.sku === tu.input.sku);
+              if (existing) {
+                existing.cantidad += tu.input.cantidad;
+              } else {
+                cart.push({ sku: tu.input.sku, nombre: tu.input.nombre, cantidad: tu.input.cantidad, precio: tu.input.precio });
+              }
+              setCart(chatId, cart);
+              const total = cart.reduce((s, i) => s + i.precio * i.cantidad, 0);
+              result = { ok: true, items: cart.length, total: formatPrice(total), carrito: cart.map((i) => `${i.cantidad}x ${i.nombre} = ${formatPrice(i.precio * i.cantidad)}`).join("\n") };
+            }
+          } else if (tu.name === "view_cart") {
+            const cart = getCart(chatId);
+            if (cart.length === 0) { result = { empty: true, message: "El carrito esta vacio." }; }
+            else {
+              const total = cart.reduce((s, i) => s + i.precio * i.cantidad, 0);
+              result = { items: cart.length, total: formatPrice(total), carrito: cart.map((i) => `${i.cantidad}x ${i.nombre} (${formatPrice(i.precio)}/u) = ${formatPrice(i.precio * i.cantidad)}`).join("\n") };
+            }
+          } else if (tu.name === "confirm_order") {
+            if (!clientInfo) { result = { error: "Cliente no registrado." }; }
+            else {
+              const cart = getCart(chatId);
+              if (cart.length === 0) { result = { error: "Carrito vacio. Agrega productos primero." }; }
+              else {
+                try {
+                  const total = cart.reduce((s, i) => s + i.precio * i.cantidad, 0);
+                  const clienteCod = clientInfo.accounts ? clientInfo.accounts[0].cod : clientInfo.cod;
+                  const clienteNombre = clientInfo.accounts ? clientInfo.accounts[0].nombre : clientInfo.nombre;
+                  // Save order to PostgreSQL
+                  const now2 = new Date();
+                  const fechora = now2.getFullYear().toString() + String(now2.getMonth()+1).padStart(2,"0") + String(now2.getDate()).padStart(2,"0") + String(now2.getHours()).padStart(2,"0") + String(now2.getMinutes()).padStart(2,"0") + String(now2.getSeconds()).padStart(2,"0");
+                  const boleta = "WA" + fechora.slice(4);
+                  await prisma.archivedOrder.create({
+                    data: {
+                      boleta,
+                      nroped: boleta,
+                      fechora,
+                      clienteCod: clienteCod.padStart(7, " "),
+                      clienteName: clienteNombre,
+                      totalCant: cart.reduce((s, i) => s + i.cantidad, 0),
+                      total,
+                      notas: (tu.input.notas || "Pedido por WhatsApp").substring(0, 200),
+                      items: { create: cart.map((i) => ({ sku: i.sku.padStart(7, " "), productName: i.nombre, cant: i.cantidad, precio: i.precio, impo: i.precio * i.cantidad, listaPrecio: 2 })) },
+                    },
+                  });
+                  // Notify admin via WhatsApp
+                  const gastonPhone = process.env.GASTON_PHONE || "5491122254949";
+                  const orderMsg = `NUEVO PEDIDO WhatsApp\n\nCliente: ${clienteNombre}\n${cart.map((i) => `${i.cantidad}x ${i.nombre} = ${formatPrice(i.precio * i.cantidad)}`).join("\n")}\n\nTotal: ${formatPrice(total)}`;
+                  await fetch("http://127.0.0.1:3099/send", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chatId: gastonPhone + "@c.us", message: orderMsg }) }).catch(() => {});
+                  clearCart(chatId);
+                  result = { success: true, total: formatPrice(total), items: cart.length, message: "Pedido confirmado!" };
+                  console.log(`[ORDER] ${chatId}: WhatsApp order ${cart.length} items, total ${total}`);
+                } catch (e) { result = { error: "Error al procesar pedido: " + e.message }; }
+              }
+            }
           } else {
             result = { error: "Herramienta desconocida" };
           }
