@@ -52,6 +52,7 @@ export default function LiquidacionPage() {
   const [ajusteConcepto, setAjusteConcepto] = useState("");
   const [ajusteMonto, setAjusteMonto] = useState("");
   const [addingAjuste, setAddingAjuste] = useState(false);
+  const [includePagare, setIncludePagare] = useState(true);
   const [deletingAjuste, setDeletingAjuste] = useState<number | null>(null);
 
   // Suspension/feriado forms
@@ -253,7 +254,8 @@ export default function LiquidacionPage() {
       if (liqData.horas.tardeMinutos > 0) { doc.setTextColor(200, 0, 0); doc.text(liqData.horas.tardeHoras, 148, y); doc.setTextColor(0); }
     }
 
-    // Pagaré + signature section
+    // Pagaré + signature section (optional)
+    if (includePagare) {
     y += 10;
     if (y > pageH - 70) { doc.addPage(); y = 15; }
 
@@ -287,13 +289,10 @@ export default function LiquidacionPage() {
     doc.text(pagare2Lines, 16, y);
     y += pagare2Lines.length * 3 + 3;
 
-    doc.setFont("helvetica", "bold");
     const clausula1 = `Clausula SIN PROTESTO: El presente titulo se emite con la clausula "SIN PROTESTO" (Art. 50 del Decreto Ley 5965/63), dispensando al portador de la obligacion de formalizar el protesto por falta de pago.`;
     const clausula1Lines = doc.splitTextToSize(clausula1, w - 32);
     doc.text(clausula1Lines, 16, y);
     y += clausula1Lines.length * 3 + 2;
-
-    doc.setFont("helvetica", "normal");
     const clausula2 = `Para cualquier cuestion judicial, las partes se someten a la jurisdiccion de los Tribunales Ordinarios de Moron, renunciando a cualquier otro fuero o jurisdiccion que pudiera corresponder, inclusive el Federal.`;
     const clausula2Lines = doc.splitTextToSize(clausula2, w - 32);
     doc.text(clausula2Lines, 16, y);
@@ -306,6 +305,7 @@ export default function LiquidacionPage() {
     doc.text("Firma", 43, y + 4, { align: "center" });
     doc.text("Aclaracion: ____________________________", 90, y - 3);
     doc.text("DNI: ____________________", 90, y + 4);
+    } // end includePagare
 
     doc.save(`Liquidacion-${liqData.empleado.nombre.replace(/\s+/g, "_")}-${liqData.mes}.pdf`);
   }
@@ -364,9 +364,15 @@ export default function LiquidacionPage() {
                 {empleados.map((e) => <option key={e.empleadoCod} value={e.empleadoCod}>{e.nombre} ({e.area})</option>)}
               </select>
               {liqData && (
+                <>
+                <label className="flex items-center gap-1.5 text-xs text-gray-500 cursor-pointer">
+                  <input type="checkbox" checked={includePagare} onChange={(e) => setIncludePagare(e.target.checked)} className="rounded" />
+                  Pagare
+                </label>
                 <button onClick={generatePDF} className={`px-3 py-2 bg-red-50 text-red-600 border border-red-200 rounded-xl text-sm font-medium flex items-center gap-1 ${springBtn}`}>
                   <HiOutlineDocumentDownload className="w-4 h-4" /> PDF
                 </button>
+                </>
               )}
             </div>
           </Stagger>
