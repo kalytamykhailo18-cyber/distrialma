@@ -182,15 +182,25 @@ export default function PosPage() {
   function getEffectivePrice(product: PosProduct, lista: number, qty: number): { unitPrice: number; lineTotal: number; isPromo: boolean; promoLabel?: string } {
     const basePrice = product.precios[lista] || 0;
     if (!product.promos?.length || qty <= 0) return { unitPrice: basePrice, lineTotal: qty * basePrice, isPromo: false };
-    // Find the best promo that applies (highest desde that qty meets)
-    const applicable = product.promos.filter((p) => qty >= p.desde).sort((a, b) => b.desde - a.desde);
+
+    // Check for 3x2 promo first
+    const promo3x2 = product.promos.find((p) => p.label === "3x2");
+    if (promo3x2 && qty >= 3) {
+      const groups = Math.floor(qty / 3); // groups of 3 where 1 is free
+      const remainder = qty % 3;
+      const paidUnits = groups * 2 + remainder; // pay for 2 per group + remainder at full price
+      const lineTotal = paidUnits * basePrice;
+      const unitPrice = lineTotal / qty;
+      return { unitPrice, lineTotal, isPromo: true, promoLabel: `3x2 (${groups} gratis)` };
+    }
+
+    // Find the best regular promo that applies (highest desde that qty meets)
+    const applicable = product.promos.filter((p) => p.label !== "3x2" && qty >= p.desde).sort((a, b) => b.desde - a.desde);
     if (applicable.length === 0) return { unitPrice: basePrice, lineTotal: qty * basePrice, isPromo: false };
     const promo = applicable[0];
     if (promo.tipo === "precio-fijo") {
-      // Fixed total price for that qty tier
       return { unitPrice: promo.precio / promo.desde, lineTotal: promo.precio, isPromo: true, promoLabel: promo.label };
     }
-    // Per-unit promo price
     return { unitPrice: promo.precio, lineTotal: qty * promo.precio, isPromo: true, promoLabel: promo.label };
   }
 
@@ -220,7 +230,16 @@ export default function PosPage() {
 
   function setQty(sku: string, qty: number) {
     if (qty <= 0) return;
-    setCart((prev) => prev.map((i) => i.sku === sku ? { ...i, cantidad: qty } : i));
+    setCart((prev) => prev.map((i) => {
+      if (i.sku !== sku) return i;
+      // Recalculate price for 3x2 products
+      const product = searchResults.find((p) => p.sku === sku) || selectedProduct;
+      if (product) {
+        const eff = getEffectivePrice(product, i.lista, qty);
+        return { ...i, cantidad: qty, precio: eff.unitPrice };
+      }
+      return { ...i, cantidad: qty };
+    }));
   }
 
   function removeFromCart(sku: string) {
@@ -601,7 +620,10 @@ export default function PosPage() {
                         <div className="text-sm font-medium text-gray-900 truncate">{p.nombre}</div>
                         <div className="text-xs text-gray-400">
                           {p.sku} · {p.unidad === "KG" ? "/kg" : "/un"}
-                          {p.promos?.length > 0 && (
+                          {p.promos?.some((pr: { label: string }) => pr.label === "3x2") && (
+                            <span className="ml-1 px-1.5 py-0.5 bg-cyan-100 text-cyan-700 rounded font-medium">3x2</span>
+                          )}
+                          {p.promos?.length > 0 && !p.promos.some((pr: { label: string }) => pr.label === "3x2") && (
                             <span className="ml-1 px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded font-medium">{p.promos[0].label}</span>
                           )}
                         </div>

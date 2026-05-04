@@ -154,26 +154,42 @@ export async function GET(req: NextRequest) {
       imageMap.set(img.sku, list);
     }
 
+    // Fetch 3x2 offers
+    const ofertas3x2 = skus.length > 0
+      ? await prisma.oferta3x2.findMany({ where: { sku: { in: skus }, activo: true } })
+      : [];
+    const set3x2 = new Set(ofertas3x2.map((o) => o.sku));
+
     return NextResponse.json({
-      products: result.recordset.map((p: Record<string, unknown>) => ({
-        sku: p.sku as string,
-        nombre: p.nombre as string,
-        unidad: p.unidad as string,
-        precios: {
-          1: Number(p.precio1),
-          2: Number(p.precio2),
-          3: Number(p.precio3),
-          4: Number(p.precio4),
-          5: Number(p.precio5),
-        },
-        stock: Number(p.stock),
-        codBarra: p.codBarra as string,
-        filler1: p.filler1 as string,
-        filler2: p.filler2 as string,
-        cantPorCaja: Number(p.cantPorCaja),
-        images: imageMap.get((p.sku as string).trim()) || [],
-        promos: parsePromos(p.filler1 as string, p.filler2 as string, p.unidad as string),
-      })),
+      products: result.recordset.map((p: Record<string, unknown>) => {
+        const sku = (p.sku as string).trim();
+        const is3x2 = set3x2.has(sku);
+        const promos = parsePromos(p.filler1 as string, p.filler2 as string, p.unidad as string);
+        // Add 3x2 as a promo entry
+        if (is3x2) {
+          promos.push({ desde: 3, precio: 0, tipo: "3x2" as "por-unidad", label: "3x2" });
+        }
+        return {
+          sku,
+          nombre: p.nombre as string,
+          unidad: p.unidad as string,
+          precios: {
+            1: Number(p.precio1),
+            2: Number(p.precio2),
+            3: Number(p.precio3),
+            4: Number(p.precio4),
+            5: Number(p.precio5),
+          },
+          stock: Number(p.stock),
+          codBarra: p.codBarra as string,
+          filler1: p.filler1 as string,
+          filler2: p.filler2 as string,
+          cantPorCaja: Number(p.cantPorCaja),
+          images: imageMap.get(sku) || [],
+          promos,
+          is3x2,
+        };
+      }),
     });
   } catch (error) {
     console.error("POS product search error:", error);

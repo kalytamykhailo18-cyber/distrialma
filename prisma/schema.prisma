@@ -580,6 +580,16 @@ model EmpleadoDiaAjuste {
   @@map("empleado_dia_ajustes")
 }
 
+// 3x2 offers: buy 3, pay for 2
+model Oferta3x2 {
+  id        Int      @id @default(autoincrement())
+  sku       String   @unique @db.VarChar(7)
+  activo    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@map("ofertas_3x2")
+}
+
 // Cuentas propias (bancos x CUITs)
 model CuentaBancaria {
   id       Int      @id @default(autoincrement())
