@@ -14,7 +14,7 @@ const RRHH_PHONE = process.env.RRHH_PHONE || "5491176003814";
 // State
 const conversations = new Map();
 const humanTakeover = new Map();
-const HUMAN_SILENCE_MS = 2 * 60 * 60 * 1000;
+const HUMAN_SILENCE_MS = 30 * 60 * 1000; // 30 minutes
 const botReplying = new Set();
 const inboxReplying = new Set();
 
