@@ -134,15 +134,19 @@ export default function LiquidacionPage() {
     const w = doc.internal.pageSize.getWidth();
     const pageH = doc.internal.pageSize.getHeight();
     const fmt = (n: number) => "$" + n.toLocaleString("es-AR", { maximumFractionDigits: 0 });
-    let y = 15;
-
-    doc.setFontSize(14);
+    // Header (orange bar matching cierre style)
+    doc.setFillColor(251, 154, 71);
+    doc.rect(0, 0, w, 24, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(18);
     doc.setFont("helvetica", "bold");
-    doc.text("Liquidacion", 14, y);
+    doc.text("Distrialma — Liquidacion", 14, 14);
     doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
-    doc.text(`${liqData.empleado.nombre} — ${liqData.mes}`, w - 14, y, { align: "right" });
-    y += 10;
+    doc.text(`${liqData.empleado.nombre} — ${liqData.mes}`, w - 14, 14, { align: "right" });
+    doc.text(`${liqData.empleado.area || ""} — ${liqData.horas.diasTrabajados} dias trabajados`, w - 14, 20, { align: "right" });
+    doc.setTextColor(0);
+    let y = 32;
 
     // Haberes
     doc.setFontSize(10);
