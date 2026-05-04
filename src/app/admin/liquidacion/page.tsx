@@ -251,21 +251,37 @@ export default function LiquidacionPage() {
       if (liqData.horas.tardeMinutos > 0) { doc.setTextColor(200, 0, 0); doc.text(liqData.horas.tardeHoras, 146, y); doc.setTextColor(0); }
     }
 
-    // Signature section
-    y += 20;
-    if (y > pageH - 40) { doc.addPage(); y = 30; }
-    doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(0);
-    const sigW = 60;
-    const sig1X = 30;
-    const sig2X = w - 30 - sigW;
-    doc.line(sig1X, y, sig1X + sigW, y);
-    doc.line(sig2X, y, sig2X + sigW, y);
+    // Legal clause + signature (cut line)
+    y += 15;
+    if (y > pageH - 60) { doc.addPage(); y = 15; }
+
+    // Dashed cut line
+    doc.setDrawColor(180);
+    doc.setLineDashPattern([2, 2], 0);
+    doc.line(14, y, w - 14, y);
+    doc.setLineDashPattern([], 0);
+    doc.setDrawColor(0);
+    y += 6;
+
+    // Legal text
+    doc.setFontSize(6.5); doc.setFont("helvetica", "normal"); doc.setTextColor(80);
+    const legalText = `Clausula 'sin protesto' (Art. 50 y 103 Dec. Ley 5965/63). Para todos los efectos legales, el librador constituye domicilio en el abajo indicado y se somete a la jurisdiccion de los Tribunales de Moron.`;
+    const legalLines = doc.splitTextToSize(legalText, w - 32);
+    doc.text(legalLines, 16, y);
+    y += legalLines.length * 3 + 4;
+
+    // Amount in words placeholder
+    doc.setFontSize(8); doc.setTextColor(0); doc.setFont("helvetica", "normal");
+    doc.text(`Recibi conforme el valor de pesos (________________________________________________) ${fmt(liqData.resumen.totalACobrar)}`, 16, y);
+    y += 10;
+
+    // Signature lines
+    doc.setFont("helvetica", "normal"); doc.setFontSize(8);
+    doc.text("Firma: ____________________________", 16, y);
+    y += 6;
+    doc.text(`Aclaracion: ${liqData.empleado.nombre}`, 16, y);
     y += 5;
-    doc.text("Firma empleado", sig1X + sigW / 2, y, { align: "center" });
-    doc.text("Firma empleador", sig2X + sigW / 2, y, { align: "center" });
-    y += 5;
-    doc.text("Aclaracion: ___________________", sig1X, y);
-    doc.text("Aclaracion: ___________________", sig2X, y);
+    doc.text("DNI/CUIT: ___________________", 16, y);
 
     doc.save(`Liquidacion-${liqData.empleado.nombre.replace(/\s+/g, "_")}-${liqData.mes}.pdf`);
   }
