@@ -251,6 +251,22 @@ export default function LiquidacionPage() {
       if (liqData.horas.tardeMinutos > 0) { doc.setTextColor(200, 0, 0); doc.text(liqData.horas.tardeHoras, 146, y); doc.setTextColor(0); }
     }
 
+    // Signature section
+    y += 20;
+    if (y > pageH - 40) { doc.addPage(); y = 30; }
+    doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(0);
+    const sigW = 60;
+    const sig1X = 30;
+    const sig2X = w - 30 - sigW;
+    doc.line(sig1X, y, sig1X + sigW, y);
+    doc.line(sig2X, y, sig2X + sigW, y);
+    y += 5;
+    doc.text("Firma empleado", sig1X + sigW / 2, y, { align: "center" });
+    doc.text("Firma empleador", sig2X + sigW / 2, y, { align: "center" });
+    y += 5;
+    doc.text("Aclaracion: ___________________", sig1X, y);
+    doc.text("Aclaracion: ___________________", sig2X, y);
+
     doc.save(`Liquidacion-${liqData.empleado.nombre.replace(/\s+/g, "_")}-${liqData.mes}.pdf`);
   }
 
