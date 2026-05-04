@@ -25,6 +25,7 @@ export const ALL_PERMISSIONS = [
   { key: "difusion", label: "Difusion WhatsApp" },
   { key: "control-horario", label: "Control Horario" },
   { key: "liquidacion", label: "Liquidacion sueldos" },
+  { key: "mi-liquidacion", label: "Mi Liquidacion (ver propia)" },
 ] as const;
 
 // Special flags (not page permissions, but user config options)
@@ -73,6 +74,7 @@ export const PAGE_PERMISSION_MAP: Record<string, Permission> = {
   "/admin/bot-qr": "clientes",
   "/admin/control-horario": "control-horario",
   "/admin/liquidacion": "liquidacion",
+  "/admin/mi-liquidacion": "mi-liquidacion",
   "/admin/mis-descuentos": "etiquetas",
 };
 

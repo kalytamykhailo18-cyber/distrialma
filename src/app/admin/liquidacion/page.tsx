@@ -134,13 +134,19 @@ export default function LiquidacionPage() {
     const w = doc.internal.pageSize.getWidth();
     const pageH = doc.internal.pageSize.getHeight();
     const fmt = (n: number) => "$" + n.toLocaleString("es-AR", { maximumFractionDigits: 0 });
-    // Header (orange bar matching cierre style)
+    // Header (orange bar with logo)
     doc.setFillColor(251, 154, 71);
     doc.rect(0, 0, w, 24, "F");
+    // Load logo
+    try {
+      const logoRes = await fetch("/logo-pdf.txt");
+      const logoBase64 = await logoRes.text();
+      if (logoBase64) doc.addImage(logoBase64, "PNG", 8, 3, 18, 18);
+    } catch {}
     doc.setTextColor(255, 255, 255);
-    doc.setFontSize(18);
+    doc.setFontSize(16);
     doc.setFont("helvetica", "bold");
-    doc.text("Distrialma — Liquidacion", 14, 14);
+    doc.text("Liquidacion", 30, 14);
     doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
     doc.text(`${liqData.empleado.nombre} — ${liqData.mes}`, w - 14, 14, { align: "right" });
