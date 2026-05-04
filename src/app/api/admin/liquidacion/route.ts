@@ -164,7 +164,7 @@ export async function GET(req: NextRequest) {
     const totalACobrar = totalHaberes + totalAjustes - totalDescuentos;
 
     return NextResponse.json({
-      empleado: { cod: empleadoCod, nombre: fichEmp.nombre, area: fichEmp.area },
+      empleado: { cod: empleadoCod, nombre: fichEmp.nombre, area: fichEmp.area, horasTurno: fichEmp.horasTurno || 9 },
       mes,
       haberes: {
         basico, presentismo: presentismoFinal, presentismoOriginal: presentismo, pierdePresentismo, adicionalCaja, bono, viatico, plus,

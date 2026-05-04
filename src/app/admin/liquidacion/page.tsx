@@ -132,6 +132,7 @@ export default function LiquidacionPage() {
     const { jsPDF } = await import("jspdf");
     const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
     const w = doc.internal.pageSize.getWidth();
+    const pageH = doc.internal.pageSize.getHeight();
     const fmt = (n: number) => "$" + n.toLocaleString("es-AR", { maximumFractionDigits: 0 });
     let y = 15;
 
@@ -195,6 +196,59 @@ export default function LiquidacionPage() {
     // Hours summary
     doc.setFontSize(8); doc.setFont("helvetica", "normal"); doc.setTextColor(128);
     doc.text(`${liqData.horas.diasTrabajados} dias trabajados — ${liqData.horas.totalHoras} horas — Valor hora: ${fmt(liqData.haberes.hourlyRate)}`, 14, y);
+    y += 10;
+
+    // Daily hours table
+    if (liqData.dias && liqData.dias.length > 0) {
+      const minToHM = (m: number) => m > 0 ? Math.floor(m / 60) + ":" + String(m % 60).padStart(2, "0") : "";
+      const DIAS = ["DOM", "LUN", "MAR", "MIE", "JUE", "VIE", "SAB"];
+
+      // Check if we need a new page
+      if (y > pageH - 80) { doc.addPage(); y = 15; }
+
+      doc.setFontSize(10); doc.setFont("helvetica", "bold"); doc.setTextColor(0);
+      doc.text("Detalle de horarios", 14, y); y += 6;
+
+      // Header
+      doc.setFillColor(240, 240, 240);
+      doc.rect(14, y - 3, w - 28, 5, "F");
+      doc.setFontSize(6); doc.setFont("helvetica", "bold");
+      doc.text("Fecha", 16, y); doc.text("Dia", 32, y); doc.text("Entrada", 46, y); doc.text("Salida", 62, y);
+      doc.text("Entrada 2", 78, y); doc.text("Salida 2", 96, y); doc.text("Total", 114, y); doc.text("Extra", 130, y); doc.text("Tarde", 146, y);
+      y += 5;
+
+      doc.setFont("helvetica", "normal"); doc.setFontSize(6);
+      for (const d of liqData.dias) {
+        if (d.trabajado === 0 && d.entradas.length === 0) continue; // skip empty days
+        if (y > pageH - 10) { doc.addPage(); y = 15; }
+
+        const [yy, mm, dd] = d.fecha.split("-");
+        const dayOfWeek = new Date(parseInt(yy), parseInt(mm) - 1, parseInt(dd)).getDay();
+        const dateStr = `${dd}/${mm}`;
+        const dia = DIAS[dayOfWeek];
+
+        doc.text(dateStr, 16, y);
+        doc.text(dia, 32, y);
+        doc.text(d.entradas[0] || "", 46, y);
+        doc.text(d.salidas[0] || "", 62, y);
+        doc.text(d.entradas[1] || "", 78, y);
+        doc.text(d.salidas[1] || "", 96, y);
+        doc.text(minToHM(d.trabajado), 114, y);
+        if (d.trabajado > (liqData.empleado as { horasTurno?: number }).horasTurno! * 60) {
+          doc.text(minToHM(d.trabajado - (liqData.empleado as { horasTurno?: number }).horasTurno! * 60), 130, y);
+        }
+        if (d.tarde > 0) { doc.setTextColor(200, 0, 0); doc.text(minToHM(d.tarde), 146, y); doc.setTextColor(0); }
+        y += 4;
+      }
+
+      // Footer
+      doc.setFont("helvetica", "bold");
+      y += 2;
+      doc.text("TOTAL", 16, y);
+      doc.text(liqData.horas.totalHoras, 114, y);
+      if (liqData.horas.extraMinutos > 0) doc.text(Math.floor(liqData.horas.extraMinutos / 60) + ":" + String(liqData.horas.extraMinutos % 60).padStart(2, "0"), 130, y);
+      if (liqData.horas.tardeMinutos > 0) { doc.setTextColor(200, 0, 0); doc.text(liqData.horas.tardeHoras, 146, y); doc.setTextColor(0); }
+    }
 
     doc.save(`Liquidacion-${liqData.empleado.nombre.replace(/\s+/g, "_")}-${liqData.mes}.pdf`);
   }
