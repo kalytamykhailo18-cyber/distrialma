@@ -257,17 +257,27 @@ export default function LiquidacionPage() {
     y += 10;
     if (y > pageH - 70) { doc.addPage(); y = 15; }
 
-    // Dashed cut line
-    doc.setDrawColor(180);
-    doc.setLineDashPattern([2, 2], 0);
-    doc.line(14, y, w - 14, y);
-    doc.setLineDashPattern([], 0);
-    doc.setDrawColor(0);
-    y += 6;
+    // Number to words
+    const numToWords = (n: number): string => {
+      const units = ['', 'un', 'dos', 'tres', 'cuatro', 'cinco', 'seis', 'siete', 'ocho', 'nueve'];
+      const teens = ['diez', 'once', 'doce', 'trece', 'catorce', 'quince', 'dieciseis', 'diecisiete', 'dieciocho', 'diecinueve'];
+      const tens = ['', 'diez', 'veinte', 'treinta', 'cuarenta', 'cincuenta', 'sesenta', 'setenta', 'ochenta', 'noventa'];
+      const hundreds = ['', 'cien', 'doscientos', 'trescientos', 'cuatrocientos', 'quinientos', 'seiscientos', 'setecientos', 'ochocientos', 'novecientos'];
+      if (n === 0) return 'cero';
+      let r = '', v = Math.abs(Math.round(n));
+      if (v >= 1000000) { const m = Math.floor(v/1000000); r += (m===1?'un millon':numToWords(m)+' millones'); v%=1000000; if(v>0)r+=' '; }
+      if (v >= 1000) { const k = Math.floor(v/1000); r += (k===1?'mil':numToWords(k)+' mil'); v%=1000; if(v>0)r+=' '; }
+      if (v >= 100) { if(v===100){r+='cien';v=0;}else{r+=hundreds[Math.floor(v/100)];v%=100;if(v>0)r+=' ';} }
+      if (v >= 20) { r+=tens[Math.floor(v/10)];v%=10;if(v>0)r+=' y '; }
+      if (v >= 10) { r+=teens[v-10];v=0; }
+      if (v > 0) r+=units[v];
+      return r;
+    };
+    const montoLetras = numToWords(liqData.resumen.totalACobrar).toUpperCase();
 
     // Pagaré text
     doc.setFontSize(7); doc.setFont("helvetica", "normal"); doc.setTextColor(0);
-    const pagare1 = `Por este PAGARE, me obligo a pagar incondicionalmente a la vista, al señor/a Almipal distribuidora de comestibles y descartables merlo S.A.S., o a su orden, la cantidad de PESOS [____________________________________] por igual valor recibido en efectivo / mercaderias a mi entera satisfaccion.`;
+    const pagare1 = `Por este PAGARE, me obligo a pagar incondicionalmente a la vista, al señor/a Almipal distribuidora de comestibles y descartables merlo S.A.S., o a su orden, la cantidad de PESOS ${montoLetras} (${fmt(liqData.resumen.totalACobrar)}) por igual valor recibido en efectivo / mercaderias a mi entera satisfaccion.`;
     const pagare1Lines = doc.splitTextToSize(pagare1, w - 32);
     doc.text(pagare1Lines, 16, y);
     y += pagare1Lines.length * 3 + 2;
