@@ -73,8 +73,7 @@ export default function Navbar() {
     : session?.user
     ? [
         { href: "/productos", label: "Productos", match: "/productos" },
-        { href: "/mis-pedidos", label: "Mis Pedidos", match: "/mis-pedidos" },
-        { href: "/estado-cuenta", label: "Mi Cuenta", match: "/estado-cuenta" },
+        { href: "/mi-cuenta", label: "Mi Cuenta", match: "/mi-cuenta" },
         { href: "/mis-descuentos", label: "Mis Descuentos", match: "/mis-descuentos" },
       ]
     : [
