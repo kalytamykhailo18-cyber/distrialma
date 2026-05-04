@@ -47,6 +47,27 @@ export async function POST(req: NextRequest) {
       create: { clientId, fecha: dia, estado, observaciones: observaciones || null, deliveredBy: userName },
     });
 
+    // Queue post-delivery survey when marked as entregado
+    if (estado === "entregado") {
+      try {
+        const { getPool, getDbName } = await import("@/lib/mssql");
+        const pool = await getPool();
+        const dbCli = getDbName("clientes");
+        const cli = await pool.request().input("cod", clientId).query(
+          `SELECT LTRIM(RTRIM(Nombre)) AS nombre, LTRIM(RTRIM(ISNULL(Telclave3, ISNULL(TelClave1,'')))) AS telefono FROM [${dbCli}].dbo.Clientes WHERE LTRIM(RTRIM(Cod)) = @cod`
+        );
+        const c = cli.recordset[0];
+        if (c?.telefono?.trim()) {
+          const enviarA = new Date(Date.now() + 2 * 60 * 60 * 1000); // 2 hours from now
+          await prisma.encuestaEntrega.upsert({
+            where: { clientId_fecha: { clientId, fecha: dia } },
+            update: { enviarA, enviada: false },
+            create: { clientId, clientName: c.nombre?.trim() || "", telefono: c.telefono.trim(), fecha: dia, enviarA },
+          }).catch(() => {});
+        }
+      } catch {}
+    }
+
     return NextResponse.json({ status });
   } catch (error) {
     console.error("delivery status POST error:", error);

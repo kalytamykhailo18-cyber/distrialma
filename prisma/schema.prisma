@@ -580,6 +580,24 @@ model EmpleadoDiaAjuste {
   @@map("empleado_dia_ajustes")
 }
 
+// Post-delivery survey
+model EncuestaEntrega {
+  id           Int      @id @default(autoincrement())
+  clientId     String   @db.VarChar(7)
+  clientName   String   @db.VarChar(60)
+  telefono     String   @db.VarChar(20)
+  fecha        DateTime @db.Date
+  enviarA      DateTime // when to send (2h after entregado)
+  enviada      Boolean  @default(false)
+  respuesta    Int?     // 1=Excelente, 2=Bueno, 3=Regular, 4=Malo
+  respondida   Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  @@unique([clientId, fecha])
+  @@index([enviarA])
+  @@map("encuesta_entregas")
+}
+
 // 3x2 offers: buy 3, pay for 2
 model Oferta3x2 {
   id        Int      @id @default(autoincrement())

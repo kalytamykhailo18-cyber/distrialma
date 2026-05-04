@@ -77,6 +77,36 @@ client.on("message", async (msg) => {
     } catch {}
   }
 
+  // Survey response check (1-4)
+  const body = (msg.body || "").trim();
+  if (body.match(/^[1-4]$/)) {
+    try {
+      const phone = chatId.replace("@c.us", "").replace("@lid", "");
+      const pending = await prisma.encuestaEntrega.findFirst({
+        where: { telefono: { contains: phone.slice(-8) }, enviada: true, respondida: false },
+        orderBy: { createdAt: "desc" },
+      });
+      if (pending) {
+        const respuesta = parseInt(body);
+        await prisma.encuestaEntrega.update({ where: { id: pending.id }, data: { respuesta, respondida: true } });
+        const labels = { 1: "Excelente", 2: "Bueno", 3: "Regular", 4: "Malo" };
+        botReplying.add(chatId);
+        try {
+          if (respuesta >= 3) {
+            // Bad response — escalate to Gaston
+            const gastonPhone = process.env.GASTON_PHONE || "5491122254949";
+            await client.sendMessage(`${gastonPhone}@c.us`, `Encuesta entrega negativa:\nCliente: ${pending.clientName}\nRespuesta: ${labels[respuesta]}\nTelefono: ${pending.telefono}`);
+            await msg.reply("Gracias por tu respuesta. Lamentamos la experiencia, nuestra encargada te va a contactar.");
+          } else {
+            await msg.reply("Gracias por tu respuesta! Nos alegra que la entrega haya sido buena.");
+          }
+        } finally { setTimeout(() => botReplying.delete(chatId), 2000); }
+        storeMessage(chatId, "out", `[Encuesta] Respuesta: ${labels[respuesta]}`, "bot");
+        return;
+      }
+    } catch {}
+  }
+
   // Human takeover check
   const takeover = humanTakeover.get(chatId);
   if (takeover && Date.now() - takeover < HUMAN_SILENCE_MS) {
