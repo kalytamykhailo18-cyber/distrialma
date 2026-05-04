@@ -71,6 +71,8 @@ export const PAGE_PERMISSION_MAP: Record<string, Permission> = {
   "/admin/terminales": "terminales",
   "/admin/difusion": "difusion",
   "/admin/bot-qr": "clientes",
+  "/admin/control-horario": "control-horario",
+  "/admin/liquidacion": "liquidacion",
   "/admin/mis-descuentos": "etiquetas",
 };
 
