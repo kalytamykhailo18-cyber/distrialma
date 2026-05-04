@@ -125,7 +125,7 @@ export async function GET(req: NextRequest) {
         if (fichEmp.horasExtras && worked > shiftMin) totalExtra += worked - shiftMin;
         if (feriadoSet.has(dateStr)) feriadoTrabajadoMin += worked;
         const dayOfWeek = new Date(year, month - 1, d).getDay();
-        if (dayOfWeek === 0) domingosTrabajados++;
+        if (dayOfWeek === 0 && fichEmp.tipoTurno === "rotativo") domingosTrabajados++;
       }
 
       // Late arrival (fixed schedule only)
