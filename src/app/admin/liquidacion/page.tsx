@@ -253,9 +253,9 @@ export default function LiquidacionPage() {
       if (liqData.horas.tardeMinutos > 0) { doc.setTextColor(200, 0, 0); doc.text(liqData.horas.tardeHoras, 148, y); doc.setTextColor(0); }
     }
 
-    // Legal clause + signature (cut line)
-    y += 15;
-    if (y > pageH - 60) { doc.addPage(); y = 15; }
+    // Pagaré + signature section
+    y += 10;
+    if (y > pageH - 70) { doc.addPage(); y = 15; }
 
     // Dashed cut line
     doc.setDrawColor(180);
@@ -265,25 +265,37 @@ export default function LiquidacionPage() {
     doc.setDrawColor(0);
     y += 6;
 
-    // Legal text
-    doc.setFontSize(5.5); doc.setFont("helvetica", "normal"); doc.setTextColor(120);
-    const legalText = `Clausula 'sin protesto' (Art. 50 y 103 Dec. Ley 5965/63). Para todos los efectos legales, el librador constituye domicilio en el abajo indicado y se somete a la jurisdiccion de los Tribunales de Moron.`;
-    const legalLines = doc.splitTextToSize(legalText, w - 32);
-    doc.text(legalLines, 16, y);
-    y += legalLines.length * 3 + 4;
+    // Pagaré text
+    doc.setFontSize(7); doc.setFont("helvetica", "normal"); doc.setTextColor(0);
+    const pagare1 = `Por este PAGARE, me obligo a pagar incondicionalmente a la vista, al señor/a Almipal distribuidora de comestibles y descartables merlo S.A.S., o a su orden, la cantidad de PESOS [____________________________________] por igual valor recibido en efectivo / mercaderias a mi entera satisfaccion.`;
+    const pagare1Lines = doc.splitTextToSize(pagare1, w - 32);
+    doc.text(pagare1Lines, 16, y);
+    y += pagare1Lines.length * 3 + 2;
 
-    // Amount in words placeholder
-    doc.setFontSize(8); doc.setTextColor(0); doc.setFont("helvetica", "normal");
-    doc.text(`Recibi conforme el valor de pesos (________________________________________________) ${fmt(liqData.resumen.totalACobrar)}`, 16, y);
-    y += 10;
+    const pagare2 = `En caso de mora, se pacta un interes punitorio del valor TAMAR +4%, que se calculara desde el dia del vencimiento hasta el de su efectivo pago.`;
+    const pagare2Lines = doc.splitTextToSize(pagare2, w - 32);
+    doc.text(pagare2Lines, 16, y);
+    y += pagare2Lines.length * 3 + 3;
 
-    // Signature lines
-    doc.setFont("helvetica", "normal"); doc.setFontSize(8);
-    doc.text("Firma: ____________________________", 16, y);
-    y += 6;
-    doc.text("Aclaracion: ____________________________", 16, y);
-    y += 5;
-    doc.text("DNI/CUIT: ____________________________", 16, y);
+    doc.setFont("helvetica", "bold");
+    const clausula1 = `Clausula SIN PROTESTO: El presente titulo se emite con la clausula "SIN PROTESTO" (Art. 50 del Decreto Ley 5965/63), dispensando al portador de la obligacion de formalizar el protesto por falta de pago.`;
+    const clausula1Lines = doc.splitTextToSize(clausula1, w - 32);
+    doc.text(clausula1Lines, 16, y);
+    y += clausula1Lines.length * 3 + 2;
+
+    doc.setFont("helvetica", "normal");
+    const clausula2 = `Para cualquier cuestion judicial, las partes se someten a la jurisdiccion de los Tribunales Ordinarios de Moron, renunciando a cualquier otro fuero o jurisdiccion que pudiera corresponder, inclusive el Federal.`;
+    const clausula2Lines = doc.splitTextToSize(clausula2, w - 32);
+    doc.text(clausula2Lines, 16, y);
+    y += clausula2Lines.length * 3 + 12;
+
+    // Signature area
+    if (y > pageH - 25) { doc.addPage(); y = 15; }
+    doc.setFontSize(8);
+    doc.line(16, y, 70, y);
+    doc.text("Firma", 43, y + 4, { align: "center" });
+    doc.text("Aclaracion: ____________________________", 90, y - 3);
+    doc.text("DNI: ____________________", 90, y + 4);
 
     doc.save(`Liquidacion-${liqData.empleado.nombre.replace(/\s+/g, "_")}-${liqData.mes}.pdf`);
   }
