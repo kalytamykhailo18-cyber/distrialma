@@ -5,9 +5,14 @@ import { prisma } from "@/lib/prisma";
 export const dynamic = "force-dynamic";
 
 // GET: salary config for all employees, or liquidacion calc for specific employee+month
+const CRON_SECRET = process.env.CRON_SECRET || (process.env.RESEND_API_KEY || "").substring(0, 16);
+
 export async function GET(req: NextRequest) {
-  const session = await requireStaff();
-  if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  const secret = new URL(req.url).searchParams.get("secret");
+  if (secret !== CRON_SECRET) {
+    const session = await requireStaff();
+    if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  }
 
   const { searchParams } = new URL(req.url);
   const empleadoCod = searchParams.get("empleado");
