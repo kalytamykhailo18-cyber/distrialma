@@ -94,6 +94,7 @@ export async function GET(req: NextRequest) {
     let diasTrabajados = 0;
     let feriadoTrabajadoMin = 0;
     let totalTardeMin = 0;
+    let domingosTrabajados = 0;
     const dayResults: Array<{ dateStr: string; worked: number; tardeDia: number; entradas: string[]; salidas: string[] }> = [];
 
     const daysInMonth = new Date(year, month, 0).getDate();
@@ -123,6 +124,8 @@ export async function GET(req: NextRequest) {
         totalMinutos += worked;
         if (fichEmp.horasExtras && worked > shiftMin) totalExtra += worked - shiftMin;
         if (feriadoSet.has(dateStr)) feriadoTrabajadoMin += worked;
+        const dayOfWeek = new Date(year, month - 1, d).getDay();
+        if (dayOfWeek === 0) domingosTrabajados++;
       }
 
       // Late arrival (fixed schedule only)
@@ -145,6 +148,9 @@ export async function GET(req: NextRequest) {
     const hourlyRate = basico > 0 && workingDays > 0 ? basico / (workingDays * (fichEmp.horasTurno || 9)) : 0;
     const extraAmount = Math.round(hourlyRate * 2 * (totalExtra / 60));
     const feriadoAmount = Math.round(hourlyRate * (feriadoTrabajadoMin / 60));
+    const plusDomingoSetting = await prisma.setting.findUnique({ where: { key: "plus_domingo" } });
+    const plusDomingo = parseInt(plusDomingoSetting?.value || "8000");
+    const domingoAmount = domingosTrabajados * plusDomingo;
     const suspensionAmount = suspensiones.length * dailyRate;
     const pierdePresentismo = totalTardeMin >= 30;
     const presentismoFinal = pierdePresentismo ? 0 : presentismo;
@@ -158,7 +164,7 @@ export async function GET(req: NextRequest) {
       orderBy: { createdAt: "asc" },
     });
 
-    const totalHaberes = basico + presentismoFinal + adicionalCaja + bono + viatico + plus + extraAmount + feriadoAmount;
+    const totalHaberes = basico + presentismoFinal + adicionalCaja + bono + viatico + plus + extraAmount + feriadoAmount + domingoAmount;
     const totalAjustes = ajustes.reduce((s, a) => s + Number(a.monto), 0);
     const totalDescuentos = descuentosResult.total + suspensionAmount;
     const totalACobrar = totalHaberes + totalAjustes - totalDescuentos;
@@ -171,6 +177,7 @@ export async function GET(req: NextRequest) {
         extraHoras: Math.floor(totalExtra / 60) + ":" + String(totalExtra % 60).padStart(2, "0"),
         extraAmount,
         feriadoAmount,
+        domingoAmount, domingosTrabajados,
         hourlyRate: Math.round(hourlyRate),
         dailyRate,
       },

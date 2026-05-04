@@ -24,7 +24,7 @@ interface Ajuste { id: number; concepto: string; monto: number }
 interface LiquidacionData {
   empleado: { cod: string; nombre: string; area: string };
   mes: string;
-  haberes: { basico: number; presentismo: number; presentismoOriginal: number; pierdePresentismo: boolean; adicionalCaja: number; bono: number; viatico: number; plus: number; extraHoras: string; extraAmount: number; feriadoAmount: number; hourlyRate: number; dailyRate: number };
+  haberes: { basico: number; presentismo: number; presentismoOriginal: number; pierdePresentismo: boolean; adicionalCaja: number; bono: number; viatico: number; plus: number; extraHoras: string; extraAmount: number; feriadoAmount: number; domingoAmount: number; domingosTrabajados: number; hourlyRate: number; dailyRate: number };
   dias: Array<{ fecha: string; trabajado: number; tarde: number; entradas: string[]; salidas: string[] }>;
   horas: { totalHoras: string; diasTrabajados: number; extraMinutos: number; tardeMinutos: number; tardeHoras: string };
   descuentos: { mercaderia: number; faltantes: number; suspensiones: number; diasSuspension: number; total: number };
@@ -157,6 +157,7 @@ export default function LiquidacionPage() {
     ];
     if (liqData.haberes.extraAmount > 0) habItems.push(["Horas extra (" + liqData.haberes.extraHoras + ")", liqData.haberes.extraAmount]);
     if (liqData.haberes.feriadoAmount > 0) habItems.push(["Feriado trabajado", liqData.haberes.feriadoAmount]);
+    if (liqData.haberes.domingoAmount > 0) habItems.push(["Plus domingos (" + liqData.haberes.domingosTrabajados + ")", liqData.haberes.domingoAmount]);
     for (const [label, val] of habItems) {
       if (val > 0) { doc.text(label as string, 18, y); doc.text(fmt(val as number), w - 18, y, { align: "right" }); y += 5; }
     }
@@ -374,6 +375,12 @@ export default function LiquidacionPage() {
                     <div className={`flex justify-between ${hoverRow} px-2 py-1 rounded`}>
                       <span className="text-green-600">Feriado trabajado</span>
                       <span className="font-medium text-green-600">{formatPrice(liqData.haberes.feriadoAmount)}</span>
+                    </div>
+                  )}
+                  {liqData.haberes.domingoAmount > 0 && (
+                    <div className={`flex justify-between ${hoverRow} px-2 py-1 rounded`}>
+                      <span className="text-blue-600">Plus domingos ({liqData.haberes.domingosTrabajados})</span>
+                      <span className="font-medium text-blue-600">{formatPrice(liqData.haberes.domingoAmount)}</span>
                     </div>
                   )}
 
