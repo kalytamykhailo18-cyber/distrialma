@@ -25,7 +25,7 @@ interface LiquidacionData {
   empleado: { cod: string; nombre: string; area: string };
   mes: string;
   haberes: { basico: number; presentismo: number; presentismoOriginal: number; pierdePresentismo: boolean; adicionalCaja: number; bono: number; viatico: number; plus: number; extraHoras: string; extraAmount: number; feriadoAmount: number; domingoAmount: number; domingosTrabajados: number; hourlyRate: number; dailyRate: number };
-  dias: Array<{ fecha: string; trabajado: number; tarde: number; entradas: string[]; salidas: string[] }>;
+  dias: Array<{ fecha: string; trabajado: number; descanso: number; tarde: number; entradas: string[]; salidas: string[] }>;
   horas: { totalHoras: string; diasTrabajados: number; extraMinutos: number; tardeMinutos: number; tardeHoras: string };
   descuentos: { mercaderia: number; faltantes: number; suspensiones: number; diasSuspension: number; total: number };
   feriados: Array<{ fecha: string; nombre: string }>;
@@ -214,8 +214,8 @@ export default function LiquidacionPage() {
       doc.setFillColor(240, 240, 240);
       doc.rect(14, y - 3, w - 28, 5, "F");
       doc.setFontSize(6); doc.setFont("helvetica", "bold");
-      doc.text("Fecha", 16, y); doc.text("Dia", 32, y); doc.text("Entrada", 46, y); doc.text("Salida", 62, y);
-      doc.text("Entrada 2", 78, y); doc.text("Salida 2", 96, y); doc.text("Total", 114, y); doc.text("Extra", 130, y); doc.text("Tarde", 146, y);
+      doc.text("Fecha", 16, y); doc.text("Dia", 30, y); doc.text("Entrada", 43, y); doc.text("Salida", 57, y);
+      doc.text("Entrada 2", 71, y); doc.text("Salida 2", 87, y); doc.text("Total", 103, y); doc.text("Desc.", 118, y); doc.text("Extra", 133, y); doc.text("Tarde", 148, y);
       y += 5;
 
       doc.setFont("helvetica", "normal"); doc.setFontSize(6);
@@ -229,16 +229,17 @@ export default function LiquidacionPage() {
         const dia = DIAS[dayOfWeek];
 
         doc.text(dateStr, 16, y);
-        doc.text(dia, 32, y);
-        doc.text(d.entradas[0] || "", 46, y);
-        doc.text(d.salidas[0] || "", 62, y);
-        doc.text(d.entradas[1] || "", 78, y);
-        doc.text(d.salidas[1] || "", 96, y);
-        doc.text(minToHM(d.trabajado), 114, y);
+        doc.text(dia, 30, y);
+        doc.text(d.entradas[0] || "", 43, y);
+        doc.text(d.salidas[0] || "", 57, y);
+        doc.text(d.entradas[1] || "", 71, y);
+        doc.text(d.salidas[1] || "", 87, y);
+        doc.text(minToHM(d.trabajado), 103, y);
+        if (d.descanso > 0) doc.text(minToHM(d.descanso), 118, y);
         if (d.trabajado > (liqData.empleado as { horasTurno?: number }).horasTurno! * 60) {
-          doc.text(minToHM(d.trabajado - (liqData.empleado as { horasTurno?: number }).horasTurno! * 60), 130, y);
+          doc.text(minToHM(d.trabajado - (liqData.empleado as { horasTurno?: number }).horasTurno! * 60), 133, y);
         }
-        if (d.tarde > 0) { doc.setTextColor(200, 0, 0); doc.text(minToHM(d.tarde), 146, y); doc.setTextColor(0); }
+        if (d.tarde > 0) { doc.setTextColor(200, 0, 0); doc.text(minToHM(d.tarde), 148, y); doc.setTextColor(0); }
         y += 4;
       }
 
@@ -246,9 +247,11 @@ export default function LiquidacionPage() {
       doc.setFont("helvetica", "bold");
       y += 2;
       doc.text("TOTAL", 16, y);
-      doc.text(liqData.horas.totalHoras, 114, y);
-      if (liqData.horas.extraMinutos > 0) doc.text(Math.floor(liqData.horas.extraMinutos / 60) + ":" + String(liqData.horas.extraMinutos % 60).padStart(2, "0"), 130, y);
-      if (liqData.horas.tardeMinutos > 0) { doc.setTextColor(200, 0, 0); doc.text(liqData.horas.tardeHoras, 146, y); doc.setTextColor(0); }
+      doc.text(liqData.horas.totalHoras, 103, y);
+      const totalDescanso = liqData.dias.reduce((s: number, d: { descanso: number }) => s + (d.descanso || 0), 0);
+      if (totalDescanso > 0) doc.text(minToHM(totalDescanso), 118, y);
+      if (liqData.horas.extraMinutos > 0) doc.text(Math.floor(liqData.horas.extraMinutos / 60) + ":" + String(liqData.horas.extraMinutos % 60).padStart(2, "0"), 133, y);
+      if (liqData.horas.tardeMinutos > 0) { doc.setTextColor(200, 0, 0); doc.text(liqData.horas.tardeHoras, 148, y); doc.setTextColor(0); }
     }
 
     // Legal clause + signature (cut line)
@@ -264,7 +267,7 @@ export default function LiquidacionPage() {
     y += 6;
 
     // Legal text
-    doc.setFontSize(6.5); doc.setFont("helvetica", "normal"); doc.setTextColor(80);
+    doc.setFontSize(5.5); doc.setFont("helvetica", "normal"); doc.setTextColor(120);
     const legalText = `Clausula 'sin protesto' (Art. 50 y 103 Dec. Ley 5965/63). Para todos los efectos legales, el librador constituye domicilio en el abajo indicado y se somete a la jurisdiccion de los Tribunales de Moron.`;
     const legalLines = doc.splitTextToSize(legalText, w - 32);
     doc.text(legalLines, 16, y);

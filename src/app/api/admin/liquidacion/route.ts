@@ -95,7 +95,7 @@ export async function GET(req: NextRequest) {
     let feriadoTrabajadoMin = 0;
     let totalTardeMin = 0;
     let domingosTrabajados = 0;
-    const dayResults: Array<{ dateStr: string; worked: number; tardeDia: number; entradas: string[]; salidas: string[] }> = [];
+    const dayResults: Array<{ dateStr: string; worked: number; descansoReal: number; tardeDia: number; entradas: string[]; salidas: string[] }> = [];
 
     const daysInMonth = new Date(year, month, 0).getDate();
     for (let d = 1; d <= daysInMonth; d++) {
@@ -111,12 +111,16 @@ export async function GET(req: NextRequest) {
         list.push(p.hora.slice(0, 5));
       }
       let worked = 0;
+      let descansoReal = 0;
       if (entradas.length > 0 && salidas.length > 0) {
         const all = [...entradas.map((h) => ({ time: h, type: "E" })), ...salidas.map((h) => ({ time: h, type: "S" }))].sort((a, b) => a.time.localeCompare(b.time));
         let cur: string | null = null;
+        let lastExit: string | null = null;
         for (const ev of all) {
-          if (ev.type === "E") cur = ev.time;
-          else if (ev.type === "S" && cur) { worked += timeToMin(ev.time) - timeToMin(cur); cur = null; }
+          if (ev.type === "E") {
+            if (lastExit) { const gap = timeToMin(ev.time) - timeToMin(lastExit); if (gap > 0) descansoReal += gap; }
+            cur = ev.time;
+          } else if (ev.type === "S" && cur) { worked += timeToMin(ev.time) - timeToMin(cur); lastExit = ev.time; cur = null; }
         }
       }
       if (worked > 0) {
@@ -139,7 +143,7 @@ export async function GET(req: NextRequest) {
         }
       }
 
-      dayResults.push({ dateStr, worked, tardeDia, entradas, salidas });
+      dayResults.push({ dateStr, worked, descansoReal, tardeDia, entradas, salidas });
     }
 
     // Working days and daily/hourly rates
@@ -192,7 +196,7 @@ export async function GET(req: NextRequest) {
       descuentos: { ...descuentosResult, suspensiones: suspensionAmount, diasSuspension: suspensiones.length },
       feriados: feriados.map((f) => ({ fecha: f.fecha.toISOString().slice(0, 10), nombre: f.nombre })),
       suspensiones: diaAjustes.map((a) => ({ fecha: a.fecha.toISOString().slice(0, 10), tipo: a.tipo, motivo: a.motivo })),
-      dias: dayResults.map((d) => ({ fecha: d.dateStr, trabajado: d.worked, tarde: d.tardeDia, entradas: d.entradas, salidas: d.salidas })),
+      dias: dayResults.map((d) => ({ fecha: d.dateStr, trabajado: d.worked, descanso: d.descansoReal, tarde: d.tardeDia, entradas: d.entradas, salidas: d.salidas })),
       ajustes: ajustes.map((a) => ({ id: a.id, concepto: a.concepto, monto: Number(a.monto), createdAt: a.createdAt.toISOString() })),
       resumen: { totalHaberes, totalAjustes, totalDescuentos, totalACobrar },
     });
