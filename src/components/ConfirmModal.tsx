@@ -6,6 +6,8 @@ interface Props {
   onConfirm: () => void;
   onCancel: () => void;
   loading?: boolean;
+  confirmLabel?: string;
+  confirmColor?: string;
 }
 
 export default function ConfirmModal({
@@ -14,6 +16,8 @@ export default function ConfirmModal({
   onConfirm,
   onCancel,
   loading = false,
+  confirmLabel,
+  confirmColor,
 }: Props) {
   if (!open) return null;
 
@@ -36,9 +40,9 @@ export default function ConfirmModal({
           <button
             onClick={onConfirm}
             disabled={loading}
-            className="px-4 py-2 text-sm text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50"
+            className={`px-4 py-2 text-sm text-white rounded-lg disabled:opacity-50 ${confirmColor || "bg-brand-500 hover:bg-brand-600"}`}
           >
-            {loading ? "Eliminando..." : "Eliminar"}
+            {loading ? "Procesando..." : (confirmLabel || "Confirmar")}
           </button>
         </div>
       </div>
