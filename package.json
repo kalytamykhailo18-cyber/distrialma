@@ -31,6 +31,7 @@
     "sharp": "^0.34.5"
   },
   "devDependencies": {
+    "@playwright/test": "^1.59.1",
     "@types/bcryptjs": "^2.4.6",
     "@types/bwip-js": "^3.2.3",
     "@types/mssql": "^9.1.9",
