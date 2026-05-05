@@ -11,11 +11,16 @@ async function getSetting(key: string): Promise<string | null> {
   return setting?.value ?? null;
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const url = new URL(request.url);
+    const markupParam = url.searchParams.get("markup");
     const session = await getServerSession(authOptions);
     const userRole = (session?.user as { role?: string } | undefined)?.role;
     const isEspecial = userRole === "especial";
+
+    // Vendedor markup
+    let markupFactor = 1;
 
     const pool = await getPool();
     const db = getDbName("productos");
@@ -65,7 +70,20 @@ export async function GET() {
       ORDER BY r.[Desc], p.Nombre
     `);
 
-    return NextResponse.json({ products: result.recordset, isEspecial });
+    // Apply vendedor markup if requested
+    if (markupParam === "vendedor") {
+      const markupSetting = await prisma.setting.findUnique({ where: { key: "vendedor_markup" } });
+      const markup = parseFloat(markupSetting?.value || "3");
+      markupFactor = 1 + markup / 100;
+    }
+
+    const products = result.recordset.map((p: Record<string, unknown>) => ({
+      ...p,
+      precioMayorista: Math.round(Number(p.precioMayorista) * markupFactor),
+      precioCajaCerrada: Number(p.precioCajaCerrada) > 0 ? Math.round(Number(p.precioCajaCerrada) * markupFactor) : 0,
+    }));
+
+    return NextResponse.json({ products, isEspecial, isVendedor: markupParam === "vendedor" });
   } catch (error) {
     console.error("Price list error:", error);
     return NextResponse.json({ products: [], isEspecial: false });

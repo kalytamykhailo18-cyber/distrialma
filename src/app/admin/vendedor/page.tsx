@@ -374,11 +374,11 @@ export default function VendedorPage() {
                     <HiOutlineCamera className="w-5 h-5" />
                   </button>
                   <button
-                    onClick={() => window.open("/api/price-list?download=1", "_blank")}
+                    onClick={() => window.open("/api/price-list?download=1&markup=vendedor", "_blank")}
                     className={`px-3 py-2 border rounded-lg text-red-500 ${springBtn}`}
-                    title="Lista de precios PDF"
+                    title="Lista de precios con +3%"
                   >
-                    PDF
+                    PDF +3%
                   </button>
                 </div>
               </Stagger>
