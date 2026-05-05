@@ -15,10 +15,17 @@ export async function GET(req: NextRequest) {
   const desde = req.nextUrl.searchParams.get("desde");
   const hasta = req.nextUrl.searchParams.get("hasta");
 
+  const estado = req.nextUrl.searchParams.get("estado");
   const where: Record<string, unknown> = {};
   if (vendedorCod) where.vendedorCod = vendedorCod;
   if (desde && hasta) {
     where.createdAt = { gte: new Date(desde), lt: new Date(hasta) };
+  }
+  // By default exclude cancelled orders
+  if (estado) {
+    where.estado = estado;
+  } else {
+    where.estado = { not: "cancelado" };
   }
 
   const orders = await prisma.vendedorOrder.findMany({
@@ -365,4 +372,16 @@ export async function POST(req: NextRequest) {
     console.error("Error creating order:", error);
     return NextResponse.json({ error: "Error al crear pedido" }, { status: 500 });
   }
+}
+
+// PATCH: update order estado (facturado, cancelado, etc)
+export async function PATCH(req: NextRequest) {
+  const session = await requireStaff();
+  if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+
+  const { id, estado } = await req.json();
+  if (!id || !estado) return NextResponse.json({ error: "id y estado requeridos" }, { status: 400 });
+
+  await prisma.vendedorOrder.update({ where: { id }, data: { estado } });
+  return NextResponse.json({ ok: true });
 }

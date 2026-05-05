@@ -222,15 +222,20 @@ export default function ReporteVendedoresPage() {
               </div>
               <div className="divide-y">
                 {data.orders.map((o, oi) => (
-                  <div key={o.id} className={`px-4 py-2 flex items-center justify-between text-sm ${hoverRow}`} style={staggerStyle(true, oi)}>
-                    <div>
+                  <div key={o.id} className={`px-4 py-2 flex items-center justify-between text-sm ${hoverRow} ${o.estado === "cancelado" ? "opacity-40 line-through" : ""}`} style={staggerStyle(true, oi)}>
+                    <div className="flex items-center gap-2">
                       <span className="font-medium">#{o.id}</span>
-                      <span className="text-gray-400 ml-2">{new Date(o.createdAt).toLocaleDateString("es-AR")}</span>
-                      <span className="ml-2">{o.clienteName}</span>
+                      <span className="text-gray-400">{new Date(o.createdAt).toLocaleDateString("es-AR")}</span>
+                      <span>{o.clienteName}</span>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${o.estado === "facturado" ? "bg-green-100 text-green-700" : o.estado === "cancelado" ? "bg-red-100 text-red-600" : "bg-yellow-100 text-yellow-700"}`}>{o.estado}</span>
                     </div>
-                    <div className="text-right">
+                    <div className="flex items-center gap-2">
                       <span className="text-gray-700">{formatPrice(o.total)}</span>
-                      <span className="text-green-600 font-medium ml-3">{formatPrice(o.comisionTotal)}</span>
+                      <span className="text-green-600 font-medium">{formatPrice(o.comisionTotal)}</span>
+                      {o.estado === "preventa" && (
+                        <button onClick={async () => { await fetch("/api/vendedor/orders", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: o.id, estado: "cancelado" }) }); loadOrders(); }}
+                          className="text-red-400 hover:text-red-600 text-xs">✕</button>
+                      )}
                     </div>
                   </div>
                 ))}
