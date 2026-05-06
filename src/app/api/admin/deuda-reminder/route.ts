@@ -42,12 +42,12 @@ async function getDeudores(minSaldo: number) {
       LTRIM(RTRIM(c.Cod)) AS cod,
       LTRIM(RTRIM(c.Nombre)) AS nombre,
       LTRIM(RTRIM(ISNULL(c.Telclave3, ISNULL(c.TelClave1, '')))) AS telefono,
-      ISNULL(c.Saldo, 0) AS saldo
+      CASE WHEN ISNULL(c.FillerBit2, 0) = 1 THEN ISNULL(c.Saldo, 0) * 100 ELSE ISNULL(c.Saldo, 0) END AS saldo
     FROM [${dbClientes}].dbo.Clientes c
     WHERE (c.DeBaja = 0 OR c.DeBaja IS NULL)
-      AND ISNULL(c.Saldo, 0) > @minSaldo
+      AND CASE WHEN ISNULL(c.FillerBit2, 0) = 1 THEN ISNULL(c.Saldo, 0) * 100 ELSE ISNULL(c.Saldo, 0) END > @minSaldo
       AND (LTRIM(RTRIM(ISNULL(c.Telclave3, ''))) <> '' OR LTRIM(RTRIM(ISNULL(c.TelClave1, ''))) <> '')
-    ORDER BY c.Saldo DESC
+    ORDER BY saldo DESC
   `);
 
   return result.recordset.map((r: { cod: string; nombre: string; telefono: string; saldo: number }) => ({

@@ -27,7 +27,8 @@ export async function GET() {
         `SELECT LTRIM(RTRIM(c.Nombre)) AS nombre,
                 c.Saldo AS saldo,
                 c.TotalCompras AS totalCompras,
-                c.TotalVeces AS totalVeces
+                c.TotalVeces AS totalVeces,
+                ISNULL(c.FillerBit2, 0) AS saldoX100
          FROM [${dbClientes}].dbo.Clientes c
          WHERE c.Cod = @cod`
       );
@@ -37,16 +38,8 @@ export async function GET() {
     }
 
     const client = clientResult.recordset[0];
-
-    // Calculate real saldo from Transas (source of truth)
-    const saldoReal = await pool.request().input("codSaldo", user.clientId.padStart(7, " ")).query(`
-      SELECT ISNULL(SUM(Deuda), 0) AS saldo
-      FROM [${dbTransas}].dbo.Transas
-      WHERE Cliente = @codSaldo
-        AND (LTRIM(RTRIM(Itm)) = '0' OR LTRIM(RTRIM(Itm)) = '')
-        AND (Anulado IS NULL OR LTRIM(RTRIM(Anulado)) = '' OR Anulado = ' ')
-    `);
-    client.saldo = Number(saldoReal.recordset[0].saldo);
+    // Use PunTouch's Saldo field; FillerBit2 = true means stored ÷100
+    client.saldo = Number(client.saldo) * (client.saldoX100 ? 100 : 1);
 
     // Get monthly purchases (current month, Argentina time UTC-3)
     const now = new Date(Date.now() - 3 * 60 * 60 * 1000);

@@ -11,6 +11,7 @@ interface Mapping { id: number; sku: string; productName: string; proveedorCod: 
 interface RepoProduct { sku: string; nombre: string; unidad: string; stockActual: number; ventaSemanal: number; sugerido: number; costoUnit: number; costoTotal: number }
 interface RepoProveedor { cod: string; nombre: string; totalSugerido: number; productos: RepoProduct[] }
 interface ProvSummary { cod: string; nombre: string; cantProductos: number }
+interface SugProduct { sku: string; nombre: string; unidad: string; stock: number; costo: number; ventaSemanal: number; coberturaDias: number; sugerido: number; proveedor: string }
 
 const fmt = (n: number) => formatPrice(n);
 const fmtK = (n: number) => n >= 1000000 ? `${(n / 1000000).toFixed(1)}M` : n >= 1000 ? `${(n / 1000).toFixed(0)}K` : String(Math.round(n));
@@ -23,7 +24,7 @@ export default function ProveedoresProductosPage() {
   const [rubros, setRubros] = useState<Array<{ cod: string; nombre: string }>>([]);
   const [loading, setLoading] = useState(true);
   const [selectedProv, setSelectedProv] = useState("");
-  const [tab, setTab] = useState<"proveedores" | "resumen" | "asignar">("proveedores");
+  const [tab, setTab] = useState<"proveedores" | "resumen" | "asignar" | "sugerido">("proveedores");
   const [semanas, setSemanas] = useState(4);
 
   // Assign
@@ -77,6 +78,15 @@ export default function ProveedoresProductosPage() {
   const [provSearch, setProvSearch] = useState("");
   const [provPage, setProvPage] = useState(0);
   const PROV_PAGE_SIZE = 20;
+
+  // Sugerido auto tab
+  const [sugProducts, setSugProducts] = useState<SugProduct[]>([]);
+  const [sugLoading, setSugLoading] = useState(false);
+  const [sugProv, setSugProv] = useState("");
+  const [sugSemanas, setSugSemanas] = useState(2);
+  const [sugSearch, setSugSearch] = useState("");
+  const [sugOverrides, setSugOverrides] = useState<Record<string, number>>({});
+  const [sugProvList, setSugProvList] = useState<string[]>([]);
 
   // Asignar mappings filter/pagination
   const [mapSearch, setMapSearch] = useState("");
@@ -211,6 +221,87 @@ export default function ProveedoresProductosPage() {
     setResumenLoading(false);
   }
 
+  async function loadSugerido(prov?: string) {
+    setSugLoading(true);
+    try {
+      const params = new URLSearchParams({ semanas: String(sugSemanas) });
+      if (prov) params.set("proveedor", prov);
+      const res = await fetch(`/api/admin/pedidos-sugeridos?${params}`);
+      const d = await res.json();
+      const products: SugProduct[] = d.products || [];
+      setSugProducts(products);
+      // Extract unique proveedores
+      const provs = Array.from(new Set(products.map((p) => p.proveedor).filter(Boolean))).sort();
+      setSugProvList(provs);
+    } catch {}
+    setSugLoading(false);
+  }
+
+  function setSugOverride(sku: string, qty: number) {
+    setSugOverrides((prev) => {
+      const next = { ...prev };
+      if (isNaN(qty) || qty < 0) delete next[sku]; else next[sku] = qty;
+      return next;
+    });
+  }
+
+  async function exportSugExcel() {
+    const filtered = getFilteredSugProducts();
+    if (filtered.length === 0) return;
+    const ExcelJS = (await import("exceljs")).default;
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet("Pedido Sugerido");
+
+    ws.mergeCells("A1:G1");
+    const titleCell = ws.getCell("A1");
+    titleCell.value = `Pedido Sugerido${sugProv ? ` — ${sugProv}` : ""} — ${sugSemanas} semanas`;
+    titleCell.font = { bold: true, size: 14 };
+
+    const headerRow = ws.addRow(["SKU", "Producto", "Unidad", "Stock", "Venta/sem", "Cobertura dias", "Pedir", "Costo est."]);
+    headerRow.eachCell((cell) => {
+      cell.font = { bold: true, size: 10, color: { argb: "FFFFFFFF" } };
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFB9A47" } };
+      cell.alignment = { horizontal: "center" };
+    });
+    ws.getColumn(1).width = 10; ws.getColumn(2).width = 45; ws.getColumn(3).width = 8;
+    ws.getColumn(4).width = 12; ws.getColumn(5).width = 12; ws.getColumn(6).width = 14;
+    ws.getColumn(7).width = 12; ws.getColumn(8).width = 14;
+
+    for (const p of filtered) {
+      const qty = p.sku in sugOverrides ? sugOverrides[p.sku] : p.sugerido;
+      if (qty <= 0) continue;
+      const row = ws.addRow([p.sku, p.nombre, p.unidad, p.stock, p.ventaSemanal, p.coberturaDias, qty, qty * p.costo]);
+      for (let c = 4; c <= 8; c++) row.getCell(c).alignment = { horizontal: "right" };
+    }
+
+    const buf = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `Pedido-Sugerido${sugProv ? `-${sugProv}` : ""}.xlsx`; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function exportSugWhatsApp() {
+    const filtered = getFilteredSugProducts();
+    const lines: string[] = [`*Pedido${sugProv ? ` ${sugProv}` : ""}* (${sugSemanas} sem)\n`];
+    for (const p of filtered) {
+      const qty = p.sku in sugOverrides ? sugOverrides[p.sku] : p.sugerido;
+      if (qty <= 0) continue;
+      lines.push(`• ${p.nombre} — ${qty} ${p.unidad}`);
+    }
+    const text = lines.join("\n");
+    const encoded = encodeURIComponent(text);
+    window.open(`https://wa.me/?text=${encoded}`, "_blank");
+  }
+
+  function getFilteredSugProducts() {
+    let list = sugProducts;
+    if (sugProv) list = list.filter((p) => p.proveedor === sugProv);
+    if (sugSearch) list = list.filter((p) => p.nombre.toLowerCase().includes(sugSearch.toLowerCase()) || p.sku.includes(sugSearch));
+    return list;
+  }
+
   async function searchProducts(q: string) {
     if (q.length < 2) { setSearchResults([]); return; }
     try {
@@ -280,10 +371,11 @@ export default function ProveedoresProductosPage() {
         <div className="flex flex-wrap gap-1 mb-4 border-b pb-3">
           {[
             { key: "proveedores" as const, label: "Proveedores" },
+            { key: "sugerido" as const, label: "Sugerido Auto" },
             { key: "resumen" as const, label: "Resumen" },
             { key: "asignar" as const, label: "Asignar" },
           ].map((t) => (
-            <button key={t.key} onClick={() => { setTab(t.key); if (t.key === "resumen" && resumenData.length === 0) loadResumen(); }}
+            <button key={t.key} onClick={() => { setTab(t.key); if (t.key === "resumen" && resumenData.length === 0) loadResumen(); if (t.key === "sugerido" && sugProducts.length === 0) loadSugerido(); }}
               className={`px-4 py-2 rounded-xl text-sm font-medium ${springBtn} ${tab === t.key ? "bg-brand-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
               {t.label}
             </button>
@@ -455,6 +547,119 @@ export default function ProveedoresProductosPage() {
             </Stagger>
             );
           })()}
+
+          {/* ═══ SUGERIDO AUTO TAB ═══ */}
+          {tab === "sugerido" && (
+            <Stagger delay={150} y={8}>
+              <div className="space-y-3">
+                {/* Controls */}
+                <div className="flex flex-wrap gap-2 items-center">
+                  <select value={sugProv} onChange={(e) => setSugProv(e.target.value)}
+                    className="px-3 py-2 border rounded-xl text-sm min-w-[180px]">
+                    <option value="">Todos los proveedores</option>
+                    {sugProvList.map((p) => <option key={p} value={p}>{p}</option>)}
+                  </select>
+                  <select value={sugSemanas} onChange={(e) => { setSugSemanas(Number(e.target.value)); }}
+                    className="px-3 py-2 border rounded-xl text-sm">
+                    <option value={1}>1 semana</option>
+                    <option value={2}>2 semanas</option>
+                    <option value={3}>3 semanas</option>
+                    <option value={4}>4 semanas</option>
+                  </select>
+                  <button onClick={() => { setSugOverrides({}); loadSugerido(sugProv || undefined); }}
+                    className={`px-3 py-2 bg-brand-500 text-white rounded-xl text-sm font-medium ${springBtn}`}>
+                    Calcular
+                  </button>
+                  <div className="relative flex-1 min-w-[150px]">
+                    <HiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                    <input type="text" value={sugSearch} onChange={(e) => setSugSearch(e.target.value)}
+                      placeholder="Filtrar producto..."
+                      className="w-full pl-9 pr-3 py-2 border rounded-xl text-sm focus:outline-none focus:border-brand-500" />
+                  </div>
+                </div>
+
+                {/* Export buttons */}
+                <div className="flex gap-2">
+                  <button onClick={exportSugExcel} disabled={sugLoading || sugProducts.length === 0}
+                    className={`px-3 py-2 bg-green-600 text-white rounded-xl text-sm font-medium disabled:opacity-50 flex items-center gap-1 ${springBtn}`}>
+                    <HiOutlineDocumentDownload className="w-4 h-4" /> Excel
+                  </button>
+                  <button onClick={exportSugWhatsApp} disabled={sugLoading || sugProducts.length === 0}
+                    className={`px-3 py-2 bg-green-500 text-white rounded-xl text-sm font-medium disabled:opacity-50 ${springBtn}`}>
+                    WhatsApp
+                  </button>
+                  {Object.keys(sugOverrides).length > 0 && (
+                    <button onClick={() => setSugOverrides({})}
+                      className={`px-3 py-2 text-blue-600 border border-blue-300 rounded-xl text-sm font-medium ${springBtn}`}>
+                      Restablecer ({Object.keys(sugOverrides).length})
+                    </button>
+                  )}
+                  <span className="ml-auto text-xs text-gray-400 self-center">
+                    {getFilteredSugProducts().filter((p) => (p.sku in sugOverrides ? sugOverrides[p.sku] : p.sugerido) > 0).length} productos a pedir
+                  </span>
+                </div>
+
+                {/* Table */}
+                {sugLoading ? <LoadingCenter text="Calculando sugeridos..." /> : (
+                  <div className="bg-white border rounded-xl shadow-sm overflow-hidden">
+                    <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
+                      <table className="w-full text-sm">
+                        <thead className="sticky top-0">
+                          <tr className="bg-gray-100 text-xs text-gray-500">
+                            <th className="text-left p-2 pl-4">Producto</th>
+                            <th className="text-right p-2">Stock</th>
+                            <th className="text-right p-2">Venta/sem</th>
+                            <th className="text-right p-2">Cobertura</th>
+                            <th className="text-right p-2">Pedir</th>
+                            <th className="text-right p-2 pr-4">Costo est.</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y">
+                          {getFilteredSugProducts().map((p, idx) => {
+                            const hasOverride = p.sku in sugOverrides;
+                            const qty = hasOverride ? sugOverrides[p.sku] : p.sugerido;
+                            const cobColor = p.coberturaDias <= 3 ? "text-red-600 font-bold" : p.coberturaDias <= 7 ? "text-orange-600 font-medium" : "text-gray-600";
+                            return (
+                              <tr key={p.sku} className={`${hoverRow} ${hasOverride ? "bg-blue-50/50" : qty > 0 ? "bg-red-50/30" : ""}`}
+                                style={staggerStyle(true, idx, 50, 10)}>
+                                <td className="p-2 pl-4">
+                                  <span className="text-gray-400 text-xs font-mono mr-1">{p.sku}</span>
+                                  <span className="text-gray-900">{p.nombre}</span>
+                                  {p.proveedor && <span className="text-xs text-gray-400 ml-1">({p.proveedor})</span>}
+                                </td>
+                                <td className={`text-right p-2 ${p.stock <= 0 ? "text-red-600 font-bold" : "text-gray-600"}`}>
+                                  {p.stock.toLocaleString("es-AR", { maximumFractionDigits: 1 })} {p.unidad === "KG" ? "kg" : "u"}
+                                </td>
+                                <td className="text-right p-2 text-blue-600 font-medium">
+                                  {p.ventaSemanal.toLocaleString("es-AR", { maximumFractionDigits: 1 })}
+                                </td>
+                                <td className={`text-right p-2 ${cobColor}`}>
+                                  {p.coberturaDias >= 999 ? "∞" : `${p.coberturaDias}d`}
+                                </td>
+                                <td className="text-right p-2">
+                                  <input type="number" min="0" step={p.unidad === "KG" ? "0.1" : "1"}
+                                    value={hasOverride ? qty : (p.sugerido > 0 ? p.sugerido : "")}
+                                    onChange={(e) => setSugOverride(p.sku, parseFloat(e.target.value) || 0)}
+                                    placeholder="0"
+                                    className={`w-20 text-right px-2 py-1 border rounded text-sm font-bold focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 ${hasOverride ? "border-blue-400 text-blue-700 bg-blue-50" : "border-gray-300 text-brand-600"}`} />
+                                </td>
+                                <td className="text-right p-2 pr-4 text-gray-700">
+                                  {qty > 0 ? fmt(qty * p.costo) : ""}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                          {getFilteredSugProducts().length === 0 && (
+                            <tr><td colSpan={6} className="p-8 text-center text-gray-400">No hay productos que necesiten reposicion.</td></tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </Stagger>
+          )}
 
           {/* ═══ RESUMEN TAB ═══ */}
           {tab === "resumen" && (

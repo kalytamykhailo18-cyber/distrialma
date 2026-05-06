@@ -214,11 +214,12 @@ export async function POST(req: NextRequest) {
     }
 
     // Update client saldo if cuenta corriente was used
+    // FillerBit2 = true means saldo is stored ÷100
     if (deuda > 0 && clienteCod) {
       await pool.request()
         .input("cod", clienteCod.padStart(7, " "))
         .input("deuda", deuda)
-        .query(`UPDATE [${dbClientes}].dbo.Clientes SET Saldo = ISNULL(Saldo, 0) + @deuda WHERE Cod = @cod`);
+        .query(`UPDATE [${dbClientes}].dbo.Clientes SET Saldo = ISNULL(Saldo, 0) + CASE WHEN ISNULL(FillerBit2, 0) = 1 THEN @deuda / 100.0 ELSE @deuda END WHERE Cod = @cod`);
     }
 
     return NextResponse.json({

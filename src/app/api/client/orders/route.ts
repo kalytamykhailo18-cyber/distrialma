@@ -19,6 +19,7 @@ export async function GET() {
     const dbPedidos = getDbName("pedidos");
     const dbTransas = getDbName("transas");
     const dbProductos = getDbName("productos");
+    const dbClientes = getDbName("clientes");
     const clientePadded = user.clientId.padStart(7, " ");
 
     // Get web order headers (Pedidos)
@@ -128,13 +129,14 @@ export async function GET() {
       items: itemsByBoleta.get(h.boleta) || [],
     }));
 
-    // Get client account balance (saldo) — calculated from Transas, not Saldo field
+    // Get client account balance from PunTouch's Saldo field; FillerBit2 = true means stored ÷100
     let saldo = 0;
     try {
       const saldoResult = await pool.request().input("cliente", clientePadded).query(
-        `SELECT ISNULL(SUM(Deuda), 0) AS saldo FROM [${dbTransas}].dbo.Transas WHERE Cliente = @cliente AND (LTRIM(RTRIM(Itm)) = '0' OR LTRIM(RTRIM(Itm)) = '') AND (Anulado IS NULL OR LTRIM(RTRIM(Anulado)) = '' OR Anulado = ' ')`
+        `SELECT ISNULL(c.Saldo, 0) AS saldo, ISNULL(c.FillerBit2, 0) AS saldoX100 FROM [${dbClientes}].dbo.Clientes c WHERE c.Cod = @cliente`
       );
-      saldo = saldoResult.recordset[0]?.saldo || 0;
+      const row = saldoResult.recordset[0];
+      saldo = Number(row?.saldo || 0) * (row?.saldoX100 ? 100 : 1);
     } catch { /* silent */ }
 
     return NextResponse.json({ orders, saldo });

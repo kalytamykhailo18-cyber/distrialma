@@ -20,17 +20,17 @@ export async function GET(req: NextRequest) {
       SELECT
         LTRIM(RTRIM(Cod)) AS cod,
         LTRIM(RTRIM(Nombre)) AS nombre,
-        ISNULL(Saldo, 0) AS saldo,
+        CASE WHEN ISNULL(FillerBit2, 0) = 1 THEN ISNULL(Saldo, 0) * 100 ELSE ISNULL(Saldo, 0) END AS saldo,
         LTRIM(RTRIM(ISNULL(TelClave1, ''))) AS tel1,
         LTRIM(RTRIM(ISNULL(Telclave3, ''))) AS tel3,
         LTRIM(RTRIM(ISNULL(Calle, ''))) AS calle,
         LTRIM(RTRIM(ISNULL(Localidad, ''))) AS localidad
       FROM [${dbClientes}].dbo.Clientes
       WHERE (DeBaja = 0 OR DeBaja IS NULL)
-        AND ISNULL(Saldo, 0) > ${minMonto}
+        AND CASE WHEN ISNULL(FillerBit2, 0) = 1 THEN ISNULL(Saldo, 0) * 100 ELSE ISNULL(Saldo, 0) END > ${minMonto}
         AND (TelClave1 IS NOT NULL AND LTRIM(RTRIM(TelClave1)) != ''
           OR Telclave3 IS NOT NULL AND LTRIM(RTRIM(Telclave3)) != '')
-      ORDER BY ISNULL(Saldo, 0) DESC
+      ORDER BY saldo DESC
     `);
 
     const deudores = result.recordset.map((r: { cod: string; nombre: string; saldo: number; tel1: string; tel3: string; calle: string; localidad: string }) => ({

@@ -49,7 +49,7 @@ export async function GET(req: NextRequest) {
         LTRIM(RTRIM(c.Calle)) AS calle,
         LTRIM(RTRIM(c.TelClave1)) AS telefono,
         LTRIM(RTRIM(c.CUIT)) AS cuit,
-        c.Saldo AS saldo,
+        CASE WHEN ISNULL(c.FillerBit2, 0) = 1 THEN ISNULL(c.Saldo, 0) * 100 ELSE ISNULL(c.Saldo, 0) END AS saldo,
         c.FechaAlta AS fechaAlta
       FROM [${dbClientes}].dbo.Clientes c
       WHERE LTRIM(RTRIM(c.Cod)) COLLATE Modern_Spanish_CI_AS = @cod COLLATE Modern_Spanish_CI_AS

@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
           LTRIM(RTRIM(Cod)) AS cod,
           LTRIM(RTRIM(Nombre)) AS nombre,
           LTRIM(RTRIM(ISNULL(CUIT, ''))) AS cuit,
-          ISNULL(Saldo, 0) AS saldo,
+          CASE WHEN ISNULL(FillerBit2, 0) = 1 THEN ISNULL(Saldo, 0) * 100 ELSE ISNULL(Saldo, 0) END AS saldo,
           LTRIM(RTRIM(ISNULL(Calle, ''))) AS calle,
           LTRIM(RTRIM(ISNULL(Localidad, ''))) AS localidad,
           LTRIM(RTRIM(ISNULL(TelClave1, ''))) AS tel1,

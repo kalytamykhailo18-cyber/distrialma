@@ -40,7 +40,8 @@ export async function GET(req: NextRequest) {
           ISNULL(c.TotalVeces, 0) AS totalVeces,
           LTRIM(RTRIM(ISNULL(c.FechaAlta, ''))) AS fechaAlta,
           LTRIM(RTRIM(ISNULL(c.Observaciones, ''))) AS observaciones,
-          LTRIM(RTRIM(ISNULL(z.[Desc], ''))) AS zona
+          LTRIM(RTRIM(ISNULL(z.[Desc], ''))) AS zona,
+          ISNULL(c.FillerBit2, 0) AS saldoX100
         FROM [${dbClientes}].dbo.Clientes c
         LEFT JOIN [${dbClientes}].dbo.Zonas z ON z.Cod = c.Zona
         WHERE c.Cod = @cod
@@ -51,16 +52,8 @@ export async function GET(req: NextRequest) {
       }
 
       const client = clientResult.recordset[0];
-
-      // Calculate real saldo from Transas (source of truth, Saldo field can be stale)
-      const saldoReal = await pool.request().input("codSaldo", codPadded).query(`
-        SELECT ISNULL(SUM(Deuda), 0) AS saldo
-        FROM [${dbTransas}].dbo.Transas
-        WHERE Cliente = @codSaldo
-          AND (LTRIM(RTRIM(Itm)) = '0' OR LTRIM(RTRIM(Itm)) = '')
-          AND (Anulado IS NULL OR LTRIM(RTRIM(Anulado)) = '' OR Anulado = ' ')
-      `);
-      client.saldo = Number(saldoReal.recordset[0].saldo);
+      // Use PunTouch's Saldo field; FillerBit2 = true means stored ÷100
+      client.saldo = Number(client.saldo) * (client.saldoX100 ? 100 : 1);
 
       // Get recent invoices (last 50)
       const invoicesResult = await pool.request().input("cod", codPadded).query(`
@@ -214,7 +207,7 @@ export async function GET(req: NextRequest) {
           LTRIM(RTRIM(c.Nombre)) AS nombre,
           LTRIM(RTRIM(ISNULL(c.Calle, ''))) AS calle,
           LTRIM(RTRIM(ISNULL(c.TelClave1, ISNULL(c.Telclave3, '')))) AS telefono,
-          ISNULL((SELECT SUM(Deuda) FROM [${dbTransas}].dbo.Transas WHERE Cliente = c.Cod AND (LTRIM(RTRIM(Itm)) = '0' OR LTRIM(RTRIM(Itm)) = '') AND (Anulado IS NULL OR LTRIM(RTRIM(Anulado)) = '' OR Anulado = ' ')), 0) AS saldo,
+          CASE WHEN ISNULL(c.FillerBit2, 0) = 1 THEN ISNULL(c.Saldo, 0) * 100 ELSE ISNULL(c.Saldo, 0) END AS saldo,
           ISNULL(c.TotalVeces, 0) AS totalVeces
         FROM [${dbClientes}].dbo.Clientes c
         ${where}
