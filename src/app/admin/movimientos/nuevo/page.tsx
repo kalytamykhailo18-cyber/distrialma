@@ -81,6 +81,7 @@ export default function NuevoMovimiento() {
         if (d.sucursal) setSucursal(d.sucursal);
         if (d.motivo) setMotivo(d.motivo);
         if (d.notas) setNotas(d.notas);
+        if (d.imageUrl) setImageUrl(d.imageUrl);
         if (d.items?.length) setItems(d.items);
         if (d.selectedEmpleados?.length) setSelectedEmpleados(d.selectedEmpleados);
       }
@@ -90,9 +91,9 @@ export default function NuevoMovimiento() {
   // Save draft
   useEffect(() => {
     if (sucursal || motivo || items.length > 0) {
-      sessionStorage.setItem("movimiento_draft", JSON.stringify({ sucursal, motivo, notas, items, selectedEmpleados }));
+      sessionStorage.setItem("movimiento_draft", JSON.stringify({ sucursal, motivo, notas, imageUrl, items, selectedEmpleados }));
     }
-  }, [sucursal, motivo, notas, items, selectedEmpleados]);
+  }, [sucursal, motivo, notas, imageUrl, items, selectedEmpleados]);
 
   // Cleanup scanner on unmount
   useEffect(() => {
