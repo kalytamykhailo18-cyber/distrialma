@@ -127,12 +127,12 @@ export async function POST(req: NextRequest) {
     let msg = `📋 Anulaciones ${fechaDisplay}\n${anulaciones.length} ventas anuladas por ${formatPrice(totalMonto)}\n`;
 
     msg += "\nPor empleado:\n";
-    for (const [emp, data] of byEmpleado) {
+    for (const [emp, data] of Array.from(byEmpleado.entries())) {
       msg += `• ${emp}: ${data.count} (${formatPrice(data.total)})\n`;
     }
 
     msg += "\nPor sucursal:\n";
-    for (const [suc, data] of bySucursal) {
+    for (const [suc, data] of Array.from(bySucursal.entries())) {
       msg += `• ${suc}: ${data.count} (${formatPrice(data.total)})\n`;
     }
 
