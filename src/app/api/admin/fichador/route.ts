@@ -61,13 +61,16 @@ export async function POST(req: NextRequest) {
     if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
-  // Sync from Google Drive
+  // Sync from Google Drive — download only, then import below
   const action = new URL(req.url).searchParams.get("action");
   if (action === "sync") {
     try {
-      execSync("bash /home/distrialma/scripts/sync-fichador.sh", { timeout: 60000 });
-      // Now import the downloaded file
-      if (!existsSync(MDB_PATH)) return NextResponse.json({ error: "No se pudo descargar el archivo" }, { status: 500 });
+      const dlDir = "/tmp/fichador-sync-api";
+      execSync(`rm -rf ${dlDir} && gdown --folder "https://drive.google.com/drive/folders/1Om0-kOGnCMB4Lr0KzR9OdZPRqk0864KD" -O ${dlDir} --no-cookies 2>&1`, { timeout: 60000, maxBuffer: 10 * 1024 * 1024 });
+      const mdbFile = execSync(`find ${dlDir} -name "*.mdb" -type f | head -1`).toString().trim();
+      if (!mdbFile) return NextResponse.json({ error: "No se encontro archivo MDB en Drive" }, { status: 500 });
+      execSync(`cp "${mdbFile}" "${MDB_PATH}"`);
+      execSync(`rm -rf ${dlDir}`);
     } catch {
       return NextResponse.json({ error: "Error al sincronizar desde Drive" }, { status: 500 });
     }
