@@ -283,11 +283,21 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ error: "action requerida" }, { status: 400 });
 }
 
-// DELETE: remove adjustment
+// DELETE: remove adjustment or suspension
 export async function DELETE(req: NextRequest) {
   const session = await requireStaff();
   if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-  const { id } = await req.json();
+  const { id, tipo, empleadoCod, fecha } = await req.json();
+
+  // Delete suspension/day adjustment
+  if (tipo === "dia_ajuste" && empleadoCod && fecha) {
+    await prisma.empleadoDiaAjuste.delete({
+      where: { empleadoCod_fecha: { empleadoCod, fecha: new Date(fecha) } },
+    });
+    return NextResponse.json({ ok: true });
+  }
+
+  // Delete liquidacion ajuste
   if (!id) return NextResponse.json({ error: "ID requerido" }, { status: 400 });
   await prisma.liquidacionAjuste.delete({ where: { id } });
   return NextResponse.json({ ok: true });

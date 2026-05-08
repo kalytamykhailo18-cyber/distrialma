@@ -479,9 +479,18 @@ export default function LiquidacionPage() {
                   {liqData.suspensiones.length > 0 && (
                     <div className="space-y-1 mb-2 text-xs">
                       {liqData.suspensiones.map((s) => (
-                        <div key={s.fecha} className="flex justify-between text-red-500">
+                        <div key={s.fecha} className="flex items-center justify-between text-red-500">
                           <span>{s.fecha.slice(8, 10)}/{s.fecha.slice(5, 7)} {s.motivo || ""}</span>
-                          <span>-{formatPrice(liqData.haberes.dailyRate)}</span>
+                          <div className="flex items-center gap-2">
+                            <span>-{formatPrice(liqData.haberes.dailyRate)}</span>
+                            <button onClick={async () => {
+                              await fetch("/api/admin/liquidacion", {
+                                method: "DELETE", headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ tipo: "dia_ajuste", empleadoCod: selectedEmp, fecha: s.fecha }),
+                              });
+                              loadLiquidacion();
+                            }} className="text-red-400 hover:text-red-600 text-xs">✕</button>
+                          </div>
                         </div>
                       ))}
                     </div>
