@@ -61,6 +61,18 @@ export async function POST(req: NextRequest) {
     if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
+  // Sync from Google Drive
+  const action = new URL(req.url).searchParams.get("action");
+  if (action === "sync") {
+    try {
+      execSync("bash /home/distrialma/scripts/sync-fichador.sh", { timeout: 60000 });
+      // Now import the downloaded file
+      if (!existsSync(MDB_PATH)) return NextResponse.json({ error: "No se pudo descargar el archivo" }, { status: 500 });
+    } catch {
+      return NextResponse.json({ error: "Error al sincronizar desde Drive" }, { status: 500 });
+    }
+  }
+
   try {
     // Check if file uploaded or use existing path
     const contentType = req.headers.get("content-type") || "";

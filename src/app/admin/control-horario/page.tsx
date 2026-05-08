@@ -279,9 +279,18 @@ export default function ControlHorarioPage() {
           <Stagger delay={50}>
             <div className="flex flex-wrap gap-3 mb-4">
               <input type="file" ref={fileRef} accept=".mdb" className="hidden" onChange={(e) => e.target.files?.[0] && handleImport(e.target.files[0])} />
-              <button onClick={() => fileRef.current?.click()} disabled={importing}
+              <button onClick={async () => {
+                setImporting(true); setImportResult(null);
+                try {
+                  const res = await fetch("/api/admin/fichador?action=sync", { method: "POST" });
+                  const data = await res.json();
+                  setImportResult(data.error ? `Error: ${data.error}` : `Sincronizado: ${data.empleados || 0} empleados, ${data.fichadas || 0} fichadas`);
+                  loadData();
+                } catch { setImportResult("Error de conexion"); }
+                setImporting(false);
+              }} disabled={importing}
                 className={`px-4 py-2 bg-brand-400 text-white rounded-xl text-sm font-medium flex items-center gap-2 disabled:opacity-50 ${springBtn}`}>
-                <HiOutlineUpload className="w-4 h-4" />{importing ? "Importando..." : "Importar base.mdb"}
+                <HiOutlineUpload className="w-4 h-4" />{importing ? "Sincronizando..." : "Refrescar"}
               </button>
               <span className="text-sm text-gray-400 self-center">Vinculados: {mapped}/{empleados.filter(e => e.activo).length}</span>
               <input type="text" value={filter} onChange={(e) => setFilter(e.target.value)}
