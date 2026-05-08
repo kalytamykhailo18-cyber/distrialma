@@ -216,10 +216,14 @@ async function flushBatch(batch: Array<{ empleadoId: number; fecha: Date; hora: 
 
   for (const punch of batch) {
     try {
-      await prisma.fichadorPunch.create({ data: punch });
+      await prisma.fichadorPunch.upsert({
+        where: { empleadoId_fecha_hora: { empleadoId: punch.empleadoId, fecha: punch.fecha, hora: punch.hora } },
+        update: { tipo: punch.tipo },
+        create: punch,
+      });
       imported++;
     } catch {
-      duplicates++; // Unique constraint violation = duplicate
+      duplicates++;
     }
   }
 
