@@ -177,8 +177,8 @@ client.on("message", async (msg) => {
         const filename = `${dir}/${ts.toTimeString().slice(0, 8).replace(/:/g, "-")}_${String(contactName).replace(/[^a-zA-Z0-9]/g, "_").slice(0, 40)}.${ext}`;
         try { fs.writeFileSync(filename, Buffer.from(media.data, "base64")); console.log(`[TRANSFER] Saved: ${filename}`); } catch (e) { console.error("[TRANSFER] save error:", e.message); }
         try {
-          await prisma.whatsAppMessage.create({ data: { chatId, direction: "in", body: `[Imagen] ${filename.replace("./mily/session/", "")}`, sender: "contact", mediaType: media.mimetype || "image" } });
           await prisma.whatsAppChat.upsert({ where: { chatId }, create: { chatId, contactName: String(contactName), contactPhone: phoneNumber, lastMessage: "[Imagen — posible transferencia]", lastMessageAt: new Date(), unread: 1 }, update: { lastMessage: "[Imagen — posible transferencia]", lastMessageAt: new Date(), unread: { increment: 1 } } });
+          await prisma.whatsAppMessage.create({ data: { chatId, direction: "in", body: `[Imagen] ${filename.replace("./mily/session/", "")}`, sender: "contact", mediaType: media.mimetype || "image" } });
         } catch (e) { console.error("[TRANSFER] db error:", e.message); }
       }
       await msg.reply("Recibido, aguardá un momento que verificamos la transferencia y te confirmamos.");
