@@ -168,7 +168,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       router.push("/");
       return;
     }
-    // Panel de Control (/admin) is visible to all staff — no redirect needed
+    // If on /admin exactly, need dashboard permission (or admin role)
+    if (pathname === "/admin" && role !== "admin" && !hasPermission(role, permissions, "dashboard")) {
+      for (const cat of MENU_CATEGORIES) {
+        for (const item of cat.items) {
+          if (item.href !== "/admin" && hasPermission(role, permissions, item.perm as Parameters<typeof hasPermission>[2])) {
+            router.push(item.href); return;
+          }
+        }
+      }
+    }
   }, [session, status, router, allowed, isStaff, permissions, pathname, role]);
 
   if (status === "loading" || !session?.user || !allowed) {
