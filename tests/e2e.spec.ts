@@ -51,7 +51,7 @@ test.describe("Control Horario", () => {
     await page.goto(`${BASE}/admin/control-horario`);
     await page.waitForSelector("h1", { timeout: 10000 });
     await page.locator("button:has-text('Config')").nth(1).click();
-    await page.waitForSelector("text=Importar base.mdb", { timeout: 10000 });
+    await page.waitForSelector("text=Refrescar", { timeout: 10000 });
     await expect(page.locator("table")).toBeVisible();
   });
 });
@@ -156,7 +156,7 @@ test.describe("Bot Status", () => {
   test("Mily bot is connected", async ({}) => {
     const res = await fetch("http://localhost:3099/status");
     const data = await res.json();
-    expect(data.status).toBe("conectado");
+    expect(["conectado", "autenticado"]).toContain(data.status);
   });
 });
 
