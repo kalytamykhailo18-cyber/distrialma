@@ -38,11 +38,13 @@ export async function GET(req: NextRequest) {
         s.Stk AS stock,
         s.Costo AS costo,
         LTRIM(RTRIM(ISNULL(s.Proveedor1, ''))) AS proveedor1,
+        LTRIM(RTRIM(ISNULL(prov.Nombre, ''))) AS proveedorNombre,
         (SELECT SUM(t.Cant) FROM [${dbTransas}].dbo.Transas t
          WHERE t.Producto = p.Cod AND t.Tipo = 'I' AND t.Fechora >= @desde
          AND t.Cant > 0 AND (t.Anulado IS NULL OR LTRIM(RTRIM(t.Anulado)) = '')) AS vendido4sem
       FROM [${dbProd}].dbo.Stock s
       JOIN [${dbProd}].dbo.Productos p ON p.Cod = s.CodProducto
+      LEFT JOIN [${dbProd}].dbo.Proveedores prov ON prov.Cod = s.Proveedor1
       WHERE LTRIM(RTRIM(s.Deposito)) = '0'
         AND (p.DeBaja = 0 OR p.DeBaja IS NULL)
         AND s.Precio2 > 0
@@ -51,7 +53,7 @@ export async function GET(req: NextRequest) {
     `);
 
     const products = result.recordset
-      .map((p: { sku: string; nombre: string; unidad: string; stock: number; costo: number; proveedor1: string; vendido4sem: number | null }) => {
+      .map((p: { sku: string; nombre: string; unidad: string; stock: number; costo: number; proveedor1: string; proveedorNombre: string; vendido4sem: number | null }) => {
         const vendido = Number(p.vendido4sem) || 0;
         const ventaSemanal = vendido / 4;
         const stock = Number(p.stock);
@@ -66,7 +68,7 @@ export async function GET(req: NextRequest) {
           ventaSemanal: Math.round(ventaSemanal * 100) / 100,
           coberturaDias,
           sugerido,
-          proveedor: p.proveedor1.trim(),
+          proveedor: p.proveedorNombre.trim() || p.proveedor1.trim(),
         };
       })
       .filter((p: { ventaSemanal: number }) => p.ventaSemanal > 0)
