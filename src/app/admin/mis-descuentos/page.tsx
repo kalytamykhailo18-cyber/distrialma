@@ -21,11 +21,18 @@ export default function MisDescuentosPage() {
 
   const [empleados, setEmpleados] = useState<Array<{ cod: string; nombre: string }>>([]);
   const [selectedEmp, setSelectedEmp] = useState("");
+  const [selectedMes, setSelectedMes] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  });
 
-  async function load(empCod?: string) {
+  async function load(empCod?: string, mes?: string) {
     setLoading(true); setError("");
     try {
-      const url = empCod ? `/api/admin/mis-descuentos?empleado=${empCod}` : "/api/admin/mis-descuentos";
+      const params = new URLSearchParams();
+      if (empCod) params.set("empleado", empCod);
+      if (mes) params.set("mes", mes);
+      const url = `/api/admin/mis-descuentos?${params}`;
       const r = await fetch(url);
       const d = await r.json();
       if (d.empleados && !d.empleado) { setEmpleados(d.empleados); setError(""); }
@@ -35,19 +42,19 @@ export default function MisDescuentosPage() {
     setLoading(false);
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(undefined, selectedMes); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (loading) return <LoadingCenter text="Cargando descuentos..." />;
   if (empleados.length > 0 && !data) {
     // Auto-load first employee
     if (!selectedEmp && empleados.length > 0) {
       setSelectedEmp(empleados[0].cod);
-      load(empleados[0].cod);
+      load(empleados[0].cod, selectedMes);
     }
     return (
       <PageTransition className="max-w-2xl mx-auto px-4 py-6">
         <Stagger delay={0} y={-8}><h1 className="text-2xl font-bold text-gray-900 mb-4">Mis Descuentos</h1></Stagger>
-        <select value={selectedEmp} onChange={(e) => { setSelectedEmp(e.target.value); if (e.target.value) load(e.target.value); }}
+        <select value={selectedEmp} onChange={(e) => { setSelectedEmp(e.target.value); if (e.target.value) load(e.target.value, selectedMes); }}
           className="w-full px-3 py-2 border border-brand-400 rounded-lg text-sm">
           <option value="">Seleccionar empleado...</option>
           {empleados.map((e) => <option key={e.cod} value={e.cod}>{e.nombre}</option>)}
@@ -65,12 +72,13 @@ export default function MisDescuentosPage() {
         <h1 className="text-2xl font-bold text-gray-900 mb-1">Mis Descuentos</h1>
         {empleados.length > 0 ? (
           <div className="flex items-center gap-2 mb-4">
-            <select value={selectedEmp} onChange={(e) => { setSelectedEmp(e.target.value); if (e.target.value) load(e.target.value); }}
+            <select value={selectedEmp} onChange={(e) => { setSelectedEmp(e.target.value); if (e.target.value) load(e.target.value, selectedMes); }}
               className="flex-1 px-3 py-2 border border-brand-400 rounded-lg text-sm">
               <option value="">Todos los empleados...</option>
               {empleados.map((e) => <option key={e.cod} value={e.cod}>{e.nombre}</option>)}
             </select>
-            <span className="text-sm text-gray-400">{data.mes}</span>
+            <input type="month" value={selectedMes} onChange={(e) => { setSelectedMes(e.target.value); load(selectedEmp || undefined, e.target.value); }}
+              className="px-3 py-2 border border-brand-400 rounded-lg text-sm" />
           </div>
         ) : (
           <p className="text-sm text-gray-500 mb-6">{data.empleado} — {data.mes}</p>

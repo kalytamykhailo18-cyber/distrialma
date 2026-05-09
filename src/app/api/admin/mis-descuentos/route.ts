@@ -54,11 +54,17 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Empleado no encontrado" }, { status: 404 });
     }
 
-    // Get descuentos for this month
+    // Get descuentos for requested month (or current)
+    const mesParam = new URL(req.url).searchParams.get("mes"); // format: YYYY-MM
     const now = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Argentina/Buenos_Aires" }));
-    const start = new Date(now.getFullYear(), now.getMonth(), 1);
+    let year = now.getFullYear(), month = now.getMonth();
+    if (mesParam && /^\d{4}-\d{2}$/.test(mesParam)) {
+      const [y, m] = mesParam.split("-").map(Number);
+      year = y; month = m - 1;
+    }
+    const start = new Date(year, month, 1);
     start.setHours(start.getHours() + 3);
-    const end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    const end = new Date(year, month + 1, 1);
     end.setHours(end.getHours() + 3);
 
     const movements = await prisma.internalMovement.findMany({
@@ -120,7 +126,8 @@ export async function GET(req: NextRequest) {
     const totalDescuentos = descuentos.reduce((s, d) => s + d.monto, 0);
     const totalFaltantes = faltantes.reduce((s, f) => s + f.monto, 0);
 
-    const mesLabel = `${now.toLocaleString("es-AR", { month: "long" })} ${now.getFullYear()}`;
+    const mesDate = new Date(year, month, 15);
+    const mesLabel = `${mesDate.toLocaleString("es-AR", { month: "long" })} ${year}`;
 
     return NextResponse.json({
       empleado: emp.nombre,
