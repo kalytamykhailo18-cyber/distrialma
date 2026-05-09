@@ -374,11 +374,43 @@ export default function VendedorPage() {
                     <HiOutlineCamera className="w-5 h-5" />
                   </button>
                   <button
-                    onClick={() => window.open("/api/price-list?download=1&markup=vendedor", "_blank")}
+                    onClick={async () => {
+                      try {
+                        const res = await fetch("/api/price-list?markup=vendedor");
+                        const data = await res.json();
+                        if (!data.products?.length) { alert("No hay productos"); return; }
+                        const { generatePriceListPdf } = await import("@/lib/price-list-pdf");
+                        const doc = generatePriceListPdf("lista", data.products, false);
+                        const blob = doc.output("blob");
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement("a");
+                        a.href = url; a.target = "_blank"; document.body.appendChild(a); a.click(); document.body.removeChild(a);
+                      } catch { alert("Error al generar PDF"); }
+                    }}
                     className={`px-3 py-2 border rounded-lg text-red-500 ${springBtn}`}
                     title="Lista de precios con +3%"
                   >
                     PDF +3%
+                  </button>
+                  <button
+                    onClick={async () => {
+                      try {
+                        const res = await fetch("/api/price-list?markup=vendedor");
+                        const data = await res.json();
+                        if (!data.products?.length) { alert("No hay productos"); return; }
+                        const prods = data.products.map((p: Record<string, unknown>) => ({ ...p, precioMayorista: 0, precioCajaCerrada: 0 }));
+                        const { generatePriceListPdf } = await import("@/lib/price-list-pdf");
+                        const doc = generatePriceListPdf("lista", prods, false);
+                        const blob = doc.output("blob");
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement("a");
+                        a.href = url; a.target = "_blank"; document.body.appendChild(a); a.click(); document.body.removeChild(a);
+                      } catch { alert("Error al generar PDF"); }
+                    }}
+                    className={`px-3 py-2 border rounded-lg text-gray-500 ${springBtn}`}
+                    title="Catálogo sin precios"
+                  >
+                    Sin precio
                   </button>
                 </div>
               </Stagger>
