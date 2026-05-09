@@ -168,16 +168,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       router.push("/");
       return;
     }
-    // If on /admin exactly and not admin role, redirect to first permitted page
-    if (pathname === "/admin" && role !== "admin") {
-      for (const cat of MENU_CATEGORIES) {
-        for (const item of cat.items) {
-          if (item.href !== "/admin" && hasPermission(role, permissions, item.perm as Parameters<typeof hasPermission>[2])) {
-            router.push(item.href); return;
-          }
-        }
-      }
-    }
+    // Panel de Control (/admin) is visible to all staff — no redirect needed
   }, [session, status, router, allowed, isStaff, permissions, pathname, role]);
 
   if (status === "loading" || !session?.user || !allowed) {
