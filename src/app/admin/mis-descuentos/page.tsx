@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { formatPrice } from "@/lib/utils";
 import { PageTransition, Stagger, LoadingCenter } from "@/components/AnimateIn";
 
-interface DescuentoItem { nombre: string; cantidad: number; costo: number }
+interface DescuentoItem { nombre: string; sku?: string; cantidad: number; costo: number }
 interface Descuento {
   fecha: string; concepto: string; items: DescuentoItem[];
   compartidoCon: string[] | null; monto: number; cargadoPor: string; imageUrl: string | null;
@@ -120,7 +120,7 @@ export default function MisDescuentosPage() {
                     const cant = item.cantidad % 1 === 0 ? String(Math.round(item.cantidad)) : item.cantidad.toFixed(1);
                     return (
                       <div key={j} className="text-sm text-gray-800 flex justify-between">
-                        <span>{item.nombre} x{cant}</span>
+                        <span>{item.nombre}{item.sku ? ` (${item.sku})` : ""} x{cant}</span>
                         <span className="text-gray-500">{formatPrice(item.costo * item.cantidad)}</span>
                       </div>
                     );

@@ -95,7 +95,7 @@ export async function GET(req: NextRequest) {
       descuentos.push({
         fecha: mov.createdAt.toISOString(),
         concepto: mov.destino || "Descuento",
-        items: mov.items.map((i) => ({ nombre: i.productName, cantidad: Number(i.cantidad), costo: Number(i.costo || 0) })),
+        items: mov.items.map((i) => ({ nombre: i.productName, sku: i.sku, cantidad: Number(i.cantidad), costo: Number(i.costo || 0) })),
         compartidoCon: shareCount > 1 ? emps.filter((e) => e.cod !== emp.cod).map((e) => e.nombre) : null,
         monto: Math.round(montoTotal / shareCount),
         cargadoPor: mov.usuario,
