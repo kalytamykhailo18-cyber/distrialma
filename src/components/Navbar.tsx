@@ -79,9 +79,8 @@ export default function Navbar() {
       ]
     : [
         { href: "/productos", label: "Productos", match: "/productos" },
-        { href: "/#novedades", label: "Novedades", match: null },
-        { href: "/#marcas", label: "Marcas", match: null },
-        { href: "/#locales", label: "Locales", match: null },
+        { href: "/privacidad", label: "Privacidad", match: "/privacidad" },
+        { href: "/terms", label: "Términos", match: "/terms" },
       ];
 
   const navLinks = (
