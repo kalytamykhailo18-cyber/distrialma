@@ -188,20 +188,60 @@ export async function GET(req: NextRequest) {
       const prevStart = new Date(prevYear, prevMonth - 1, 1);
       const prevEnd = new Date(prevYear, prevMonth, 0);
 
-      // Previous month descuentos
+      // Previous month: full calculation including domingos, feriados, extras
       const prevDescuentos = await getDescuentos(empleadoCod, prevMes);
       const prevAjustes = await prisma.liquidacionAjuste.findMany({ where: { empleadoCod, mes: prevMes } });
       const prevTotalAjustes = prevAjustes.reduce((s, a) => s + Number(a.monto), 0);
 
-      // Previous month suspensiones
       const prevDiaAjustes = await prisma.empleadoDiaAjuste.findMany({
         where: { empleadoCod, fecha: { gte: prevStart, lte: prevEnd }, tipo: "suspension" },
       });
-      const prevWorkingDays = Array.from({ length: new Date(prevYear, prevMonth, 0).getDate() }, (_, i) => new Date(prevYear, prevMonth - 1, i + 1).getDay()).filter((d) => d !== 0).length;
+      const prevFeriados = await prisma.feriado.findMany({ where: { fecha: { gte: prevStart, lte: prevEnd } } });
+      const prevFeriadoSet = new Set(prevFeriados.map((f) => f.fecha.toISOString().slice(0, 10)));
+
+      const prevDaysInMonth = new Date(prevYear, prevMonth, 0).getDate();
+      const prevWorkingDays = Array.from({ length: prevDaysInMonth }, (_, i) => new Date(prevYear, prevMonth - 1, i + 1).getDay()).filter((d) => d !== 0).length;
       const prevDailyRate = basico > 0 && prevWorkingDays > 0 ? Math.round(basico / prevWorkingDays) : 0;
+      const prevHourlyRate = basico > 0 && prevWorkingDays > 0 ? basico / (prevWorkingDays * (fichEmp.horasTurno || 9)) : 0;
       const prevSuspAmount = prevDiaAjustes.length * prevDailyRate;
 
-      const prevTotalHaberes = basico + presentismo + adicionalCaja + bono + viatico + plus;
+      // Previous month punches for extras, domingos, feriados
+      const prevPunches = await prisma.fichadorPunch.findMany({
+        where: { empleadoId: fichEmp.id, fecha: { gte: prevStart, lte: prevEnd } },
+        orderBy: [{ fecha: "asc" }, { hora: "asc" }],
+      });
+      const prevByDate = new Map<string, Array<{ hora: string; tipo: string }>>();
+      for (const p of prevPunches) {
+        const key = p.fecha.toISOString().slice(0, 10);
+        if (!prevByDate.has(key)) prevByDate.set(key, []);
+        prevByDate.get(key)!.push({ hora: p.hora, tipo: p.tipo });
+      }
+      let prevTotalExtra = 0;
+      let prevDomingosTrabajados = 0;
+      let prevFeriadoDias = 0;
+      const horasTurno = fichEmp.horasTurno || 9;
+      for (const [dateStr, punches2] of Array.from(prevByDate.entries())) {
+        const entradas = punches2.filter((p) => p.tipo === "Entrada");
+        const salidas = punches2.filter((p) => p.tipo === "Salida");
+        let worked = 0;
+        for (let i = 0; i < Math.min(entradas.length, salidas.length); i++) {
+          const [eh, em] = entradas[i].hora.split(":").map(Number);
+          const [sh, sm] = salidas[i].hora.split(":").map(Number);
+          worked += (sh * 60 + sm) - (eh * 60 + em);
+        }
+        if (worked > 0) {
+          const extra = Math.max(0, worked - horasTurno * 60);
+          if (fichEmp.horasExtras) prevTotalExtra += extra;
+          const dayOfWeek = new Date(dateStr).getDay();
+          if (dayOfWeek === 0 && fichEmp.tipoTurno === "rotativo") prevDomingosTrabajados++;
+          if (prevFeriadoSet.has(dateStr)) prevFeriadoDias++;
+        }
+      }
+      const prevExtraAmount = Math.round(prevHourlyRate * 2 * (prevTotalExtra / 60));
+      const prevFeriadoAmount = prevFeriadoDias * prevDailyRate;
+      const prevDomingoAmount = prevDomingosTrabajados * plusDomingo;
+
+      const prevTotalHaberes = basico + presentismo + adicionalCaja + bono + viatico + plus + prevExtraAmount + prevFeriadoAmount + prevDomingoAmount;
       const prevTotalDescuentos = prevDescuentos.total + prevSuspAmount;
       const prevTotalACobrar = prevTotalHaberes + prevTotalAjustes - prevTotalDescuentos;
 
