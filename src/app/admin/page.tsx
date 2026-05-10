@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { formatPrice } from "@/lib/utils";
-import { HiOutlineShoppingCart, HiOutlineCash, HiOutlineExclamation, HiOutlineChat, HiOutlineTruck, HiOutlineStatusOnline } from "react-icons/hi";
+import { HiOutlineShoppingCart, HiOutlineCash, HiOutlineExclamation, HiOutlineChat, HiOutlineTruck, HiOutlineStatusOnline, HiOutlineCube, HiOutlineTag, HiOutlineDocumentDownload, HiOutlineCreditCard, HiOutlineChartBar, HiOutlineUserGroup, HiOutlinePrinter, HiOutlineSpeakerphone } from "react-icons/hi";
 import { PageTransition, Stagger, springBtn, LoadingCenter } from "@/components/AnimateIn";
 
 interface Resumen {
@@ -122,20 +122,24 @@ export default function AdminLandingPage() {
         <h2 className="text-sm font-semibold text-gray-500 mb-3">Acceso rapido</h2>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {[
-            { href: "/admin/productos", label: "Productos" },
-            { href: "/admin/precios", label: "Precios" },
-            { href: "/admin/compras", label: "Ingresos" },
-            { href: "/admin/cierre-caja", label: "Cierre de Caja" },
-            { href: "/admin/resumen-productos", label: "Resumen Ventas" },
-            { href: "/admin/clientes", label: "Clientes" },
-            { href: "/admin/etiquetas", label: "Etiquetas" },
-            { href: "/admin/difusion", label: "Difusion" },
-          ].map((link) => (
+            { href: "/admin/productos", label: "Productos", icon: HiOutlineCube, color: "text-blue-500" },
+            { href: "/admin/precios", label: "Precios", icon: HiOutlineTag, color: "text-green-500" },
+            { href: "/admin/compras", label: "Ingresos", icon: HiOutlineDocumentDownload, color: "text-purple-500" },
+            { href: "/admin/cierre-caja", label: "Cierre de Caja", icon: HiOutlineCreditCard, color: "text-orange-500" },
+            { href: "/admin/resumen-productos", label: "Resumen Ventas", icon: HiOutlineChartBar, color: "text-blue-600" },
+            { href: "/admin/clientes", label: "Clientes", icon: HiOutlineUserGroup, color: "text-teal-500" },
+            { href: "/admin/etiquetas", label: "Etiquetas", icon: HiOutlinePrinter, color: "text-gray-500" },
+            { href: "/admin/difusion", label: "Difusion", icon: HiOutlineSpeakerphone, color: "text-red-500" },
+          ].map((link) => {
+            const Icon = link.icon;
+            return (
             <Link key={link.href} href={link.href}
-              className={`px-3 py-2.5 bg-white border rounded-xl text-sm text-center text-gray-700 font-medium hover:bg-gray-50 ${springBtn}`}>
+              className={`px-3 py-3 bg-white border rounded-xl text-sm text-center text-gray-700 font-medium hover:bg-gray-50 hover:shadow-sm transition-all flex flex-col items-center gap-1.5 ${springBtn}`}>
+              <Icon className={`w-5 h-5 ${link.color}`} />
               {link.label}
             </Link>
-          ))}
+            );
+          })}
         </div>
       </Stagger>
     </PageTransition>
