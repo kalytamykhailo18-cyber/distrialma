@@ -202,6 +202,14 @@ export default function LiquidacionPage() {
     doc.text(fmt(liqData.resumen.totalACobrar), w - 18, y + 5, { align: "right" });
     y += 15;
 
+    // Previous month reference
+    if (liqData.mesAnterior) {
+      doc.setFontSize(8); doc.setFont("helvetica", "normal"); doc.setTextColor(80, 80, 180);
+      doc.text(`Cobrado en ${liqData.mesAnterior.mes}: ${fmt(liqData.mesAnterior.totalACobrar)}`, 14, y);
+      doc.setTextColor(0);
+      y += 8;
+    }
+
     // Hours summary
     doc.setFontSize(8); doc.setFont("helvetica", "normal"); doc.setTextColor(128);
     doc.text(`${liqData.horas.diasTrabajados} dias trabajados — ${liqData.horas.totalHoras} horas — Valor hora: ${fmt(liqData.haberes.hourlyRate)}`, 14, y);
