@@ -557,6 +557,21 @@ model LiquidacionAjuste {
   @@map("liquidacion_ajustes")
 }
 
+// Internal payroll balance: recibos (advances), aportes, creditos
+// These carry over month to month and are NOT shown on employee PDF
+model LiquidacionBalance {
+  id          Int      @id @default(autoincrement())
+  empleadoCod String   @db.VarChar(7)
+  mes         String   @db.VarChar(7) // YYYY-MM
+  tipo        String   @db.VarChar(20) // "recibo", "aportes", "credito"
+  concepto    String   @default("") @db.VarChar(60)
+  monto       Decimal  @db.Decimal(14, 2)
+  createdAt   DateTime @default(now())
+
+  @@index([empleadoCod, mes])
+  @@map("liquidacion_balance")
+}
+
 // Feriados
 model Feriado {
   id    Int      @id @default(autoincrement())

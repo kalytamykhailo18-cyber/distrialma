@@ -212,6 +212,18 @@ export async function GET(req: NextRequest) {
       };
     } catch { /* ignore */ }
 
+    // Internal balance: recibos, aportes, creditos (not shown on PDF, carries over)
+    const balance = await prisma.liquidacionBalance.findMany({
+      where: { empleadoCod, mes },
+      orderBy: { createdAt: "asc" },
+    });
+    const balanceTotals = {
+      recibos: balance.filter((b) => b.tipo === "recibo").reduce((s, b) => s + Number(b.monto), 0),
+      aportes: balance.filter((b) => b.tipo === "aportes").reduce((s, b) => s + Number(b.monto), 0),
+      creditos: balance.filter((b) => b.tipo === "credito").reduce((s, b) => s + Number(b.monto), 0),
+    };
+    const saldoReal = totalACobrar - balanceTotals.recibos - balanceTotals.aportes - balanceTotals.creditos;
+
     return NextResponse.json({
       empleado: { cod: empleadoCod, nombre: fichEmp.nombre, area: fichEmp.area, horasTurno: fichEmp.horasTurno || 9 },
       mes,
@@ -239,6 +251,9 @@ export async function GET(req: NextRequest) {
       ajustes: ajustes.map((a) => ({ id: a.id, concepto: a.concepto, monto: Number(a.monto), createdAt: a.createdAt.toISOString() })),
       resumen: { totalHaberes, totalAjustes, totalDescuentos, totalACobrar },
       mesAnterior,
+      balance: balance.map((b) => ({ id: b.id, tipo: b.tipo, concepto: b.concepto, monto: Number(b.monto), createdAt: b.createdAt.toISOString() })),
+      balanceTotals,
+      saldoReal,
     });
   } catch (error) {
     console.error("Liquidacion error:", error);
@@ -290,6 +305,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, id: ajuste.id });
   }
 
+  // Add balance entry (recibo, aportes, credito)
+  if (body.action === "balance") {
+    const { empleadoCod, mes, tipo, concepto, monto } = body;
+    if (!empleadoCod || !mes || !tipo) return NextResponse.json({ error: "Datos requeridos" }, { status: 400 });
+    if (!["recibo", "aportes", "credito"].includes(tipo)) return NextResponse.json({ error: "Tipo invalido" }, { status: 400 });
+    const entry = await prisma.liquidacionBalance.create({
+      data: { empleadoCod, mes, tipo, concepto: concepto || "", monto: parseFloat(monto) || 0 },
+    });
+    return NextResponse.json({ ok: true, id: entry.id });
+  }
+
   // Add feriado
   if (body.action === "feriado") {
     const { fecha, nombre } = body;
@@ -322,6 +348,12 @@ export async function DELETE(req: NextRequest) {
   const session = await requireStaff();
   if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   const { id, tipo, empleadoCod, fecha } = await req.json();
+
+  // Delete balance entry
+  if (tipo === "balance" && id) {
+    await prisma.liquidacionBalance.delete({ where: { id } });
+    return NextResponse.json({ ok: true });
+  }
 
   // Delete suspension/day adjustment
   if (tipo === "dia_ajuste" && empleadoCod && fecha) {

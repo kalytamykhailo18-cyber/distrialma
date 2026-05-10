@@ -33,6 +33,9 @@ interface LiquidacionData {
   ajustes: Ajuste[];
   resumen: { totalHaberes: number; totalAjustes: number; totalDescuentos: number; totalACobrar: number };
   mesAnterior: { mes: string; totalACobrar: number } | null;
+  balance: Array<{ id: number; tipo: string; concepto: string; monto: number }>;
+  balanceTotals: { recibos: number; aportes: number; creditos: number };
+  saldoReal: number;
 }
 
 export default function LiquidacionPage() {
@@ -61,6 +64,10 @@ export default function LiquidacionPage() {
   const [suspMotivo, setSuspMotivo] = useState("");
   const [feriadoFecha, setFeriadoFecha] = useState("");
   const [feriadoNombre, setFeriadoNombre] = useState("");
+  // Balance form
+  const [balTipo, setBalTipo] = useState("recibo");
+  const [balMonto, setBalMonto] = useState("");
+  const [balConcepto, setBalConcepto] = useState("");
 
   // Config
   const [saving, setSaving] = useState(false);
@@ -405,6 +412,58 @@ export default function LiquidacionPage() {
                   <span className="text-sm font-bold text-blue-800">{formatPrice(liqData.mesAnterior.totalACobrar)}</span>
                 </div>
               )}
+
+              {/* Balance interno (recibos, aportes, creditos) */}
+              <div className="bg-white border rounded-xl shadow-sm p-4 mb-4">
+                <h3 className="text-sm font-semibold text-gray-700 mb-2">Balance interno</h3>
+                {liqData.balance.length > 0 && (
+                  <div className="space-y-1 mb-3 text-xs">
+                    {liqData.balance.map((b) => (
+                      <div key={b.id} className="flex items-center justify-between">
+                        <span className={b.tipo === "recibo" ? "text-purple-600" : b.tipo === "aportes" ? "text-blue-600" : "text-orange-600"}>
+                          {b.tipo === "recibo" ? "Recibo" : b.tipo === "aportes" ? "Aportes" : "Crédito"}{b.concepto ? ` — ${b.concepto}` : ""}
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{formatPrice(b.monto)}</span>
+                          <button onClick={async () => {
+                            await fetch("/api/admin/liquidacion", {
+                              method: "DELETE", headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ tipo: "balance", id: b.id }),
+                            });
+                            loadLiquidacion();
+                          }} className="text-red-400 hover:text-red-600 text-xs">✕</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="grid grid-cols-2 gap-2 text-xs mb-2">
+                  <div className="flex justify-between"><span className="text-gray-500">Recibos:</span><span className="font-medium">{formatPrice(liqData.balanceTotals.recibos)}</span></div>
+                  <div className="flex justify-between"><span className="text-gray-500">Aportes:</span><span className="font-medium">{formatPrice(liqData.balanceTotals.aportes)}</span></div>
+                  <div className="flex justify-between"><span className="text-gray-500">Créditos:</span><span className="font-medium">{formatPrice(liqData.balanceTotals.creditos)}</span></div>
+                  <div className="flex justify-between border-t pt-1"><span className="text-gray-700 font-bold">Saldo real:</span><span className="font-bold text-green-700">{formatPrice(liqData.saldoReal)}</span></div>
+                </div>
+                <div className="flex gap-2 mt-2">
+                  <select value={balTipo} onChange={(e) => setBalTipo(e.target.value)} className="px-2 py-1.5 border rounded-lg text-xs">
+                    <option value="recibo">Recibo</option>
+                    <option value="aportes">Aportes</option>
+                    <option value="credito">Crédito</option>
+                  </select>
+                  <input type="number" value={balMonto} onChange={(e) => setBalMonto(e.target.value)} placeholder="Monto"
+                    className="flex-1 px-2 py-1.5 border rounded-lg text-xs" />
+                  <input type="text" value={balConcepto} onChange={(e) => setBalConcepto(e.target.value)} placeholder="Concepto (opc)"
+                    className="flex-1 px-2 py-1.5 border rounded-lg text-xs" />
+                  <button onClick={async () => {
+                    if (!balMonto || !selectedEmp) return;
+                    await fetch("/api/admin/liquidacion", {
+                      method: "POST", headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ action: "balance", empleadoCod: selectedEmp, mes, tipo: balTipo, concepto: balConcepto, monto: balMonto }),
+                    });
+                    setBalMonto(""); setBalConcepto("");
+                    loadLiquidacion();
+                  }} className="px-3 py-1.5 bg-brand-500 text-white rounded-lg text-xs font-medium">+</button>
+                </div>
+              </div>
 
               {/* Detail */}
               <div className="bg-white border rounded-xl shadow-sm p-4 mb-4">
