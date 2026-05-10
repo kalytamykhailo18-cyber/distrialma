@@ -32,6 +32,7 @@ interface LiquidacionData {
   suspensiones: Array<{ fecha: string; tipo: string; motivo: string | null }>;
   ajustes: Ajuste[];
   resumen: { totalHaberes: number; totalAjustes: number; totalDescuentos: number; totalACobrar: number };
+  mesAnterior: { mes: string; totalACobrar: number } | null;
 }
 
 export default function LiquidacionPage() {
@@ -398,6 +399,12 @@ export default function LiquidacionPage() {
                   <div className="text-lg font-bold text-gray-900">{formatPrice(liqData.resumen.totalACobrar)}</div>
                 </div>
               </div>
+              {liqData.mesAnterior && (
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 mb-4 flex justify-between items-center">
+                  <span className="text-sm text-blue-700">Cobrado en {liqData.mesAnterior.mes}</span>
+                  <span className="text-sm font-bold text-blue-800">{formatPrice(liqData.mesAnterior.totalACobrar)}</span>
+                </div>
+              )}
 
               {/* Detail */}
               <div className="bg-white border rounded-xl shadow-sm p-4 mb-4">

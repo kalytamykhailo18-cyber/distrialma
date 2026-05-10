@@ -179,6 +179,39 @@ export async function GET(req: NextRequest) {
     const totalDescuentos = descuentosResult.total + suspensionAmount;
     const totalACobrar = totalHaberes + totalAjustes - totalDescuentos;
 
+    // Previous month summary
+    let mesAnterior: { mes: string; totalACobrar: number } | null = null;
+    try {
+      const prevMonth = month === 1 ? 12 : month - 1;
+      const prevYear = month === 1 ? year - 1 : year;
+      const prevMes = `${prevYear}-${String(prevMonth).padStart(2, "0")}`;
+      const prevStart = new Date(prevYear, prevMonth - 1, 1);
+      const prevEnd = new Date(prevYear, prevMonth, 0);
+
+      // Previous month descuentos
+      const prevDescuentos = await getDescuentos(empleadoCod, prevMes);
+      const prevAjustes = await prisma.liquidacionAjuste.findMany({ where: { empleadoCod, mes: prevMes } });
+      const prevTotalAjustes = prevAjustes.reduce((s, a) => s + Number(a.monto), 0);
+
+      // Previous month suspensiones
+      const prevDiaAjustes = await prisma.empleadoDiaAjuste.findMany({
+        where: { empleadoCod, fecha: { gte: prevStart, lte: prevEnd }, tipo: "suspension" },
+      });
+      const prevWorkingDays = Array.from({ length: new Date(prevYear, prevMonth, 0).getDate() }, (_, i) => new Date(prevYear, prevMonth - 1, i + 1).getDay()).filter((d) => d !== 0).length;
+      const prevDailyRate = basico > 0 && prevWorkingDays > 0 ? Math.round(basico / prevWorkingDays) : 0;
+      const prevSuspAmount = prevDiaAjustes.length * prevDailyRate;
+
+      const prevTotalHaberes = basico + presentismo + adicionalCaja + bono + viatico + plus;
+      const prevTotalDescuentos = prevDescuentos.total + prevSuspAmount;
+      const prevTotalACobrar = prevTotalHaberes + prevTotalAjustes - prevTotalDescuentos;
+
+      const prevDate = new Date(prevYear, prevMonth - 1, 15);
+      mesAnterior = {
+        mes: `${prevDate.toLocaleString("es-AR", { month: "long" })} ${prevYear}`,
+        totalACobrar: prevTotalACobrar,
+      };
+    } catch { /* ignore */ }
+
     return NextResponse.json({
       empleado: { cod: empleadoCod, nombre: fichEmp.nombre, area: fichEmp.area, horasTurno: fichEmp.horasTurno || 9 },
       mes,
@@ -205,6 +238,7 @@ export async function GET(req: NextRequest) {
       dias: dayResults.map((d) => ({ fecha: d.dateStr, trabajado: d.worked, descanso: d.descansoReal, tarde: d.tardeDia, entradas: d.entradas, salidas: d.salidas })),
       ajustes: ajustes.map((a) => ({ id: a.id, concepto: a.concepto, monto: Number(a.monto), createdAt: a.createdAt.toISOString() })),
       resumen: { totalHaberes, totalAjustes, totalDescuentos, totalACobrar },
+      mesAnterior,
     });
   } catch (error) {
     console.error("Liquidacion error:", error);
