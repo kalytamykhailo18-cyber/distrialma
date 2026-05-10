@@ -106,7 +106,7 @@ export default function AdminLandingPage() {
                 <div className="flex items-start justify-between">
                   <div>
                     <p className="text-xs font-medium opacity-70">{card.label}</p>
-                    <p className="text-2xl font-bold mt-1">{card.value}</p>
+                    <p className="text-lg sm:text-2xl font-bold mt-1 truncate">{card.value}</p>
                     <p className="text-xs opacity-60 mt-0.5">{card.sub}</p>
                   </div>
                   <Icon className={`w-6 h-6 ${card.iconColor} opacity-50`} />
