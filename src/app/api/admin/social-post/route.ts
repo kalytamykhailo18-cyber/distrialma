@@ -78,33 +78,30 @@ async function publishToInstagramStory(imageUrl: string): Promise<string | null>
 async function publishToFacebookStory(imageUrl: string): Promise<string | null> {
   if (!FB_PAGE_ID || !FB_PAGE_TOKEN) return null;
   try {
-    const res = await fetch(`https://graph.facebook.com/v25.0/${FB_PAGE_ID}/photo_stories`, {
+    // Step 1: Upload photo as unpublished (must use form data)
+    const photoForm = new URLSearchParams();
+    photoForm.set("url", imageUrl);
+    photoForm.set("published", "false");
+    photoForm.set("access_token", FB_PAGE_TOKEN);
+    const photoRes = await fetch(`https://graph.facebook.com/v25.0/${FB_PAGE_ID}/photos`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ photo_id: imageUrl, access_token: FB_PAGE_TOKEN }),
+      body: photoForm,
     });
-    const data = await res.json();
-    // Facebook stories need a photo uploaded first, then published as story
-    // Alternative: upload photo and use as story
-    if (!data.id && !data.success) {
-      // Try uploading photo first
-      const photoRes = await fetch(`https://graph.facebook.com/v25.0/${FB_PAGE_ID}/photos`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: imageUrl, published: false, access_token: FB_PAGE_TOKEN }),
-      });
-      const photoData = await photoRes.json();
-      if (photoData.id) {
-        const storyRes = await fetch(`https://graph.facebook.com/v25.0/${FB_PAGE_ID}/photo_stories`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ photo_id: photoData.id, access_token: FB_PAGE_TOKEN }),
-        });
-        const storyData = await storyRes.json();
-        return storyData.id || storyData.post_id || null;
-      }
-    }
-    return data.id || null;
+    const photoData = await photoRes.json();
+    if (!photoData.id) { console.error("[SOCIAL] FB story photo upload error:", photoData); return null; }
+
+    // Step 2: Create story with the uploaded photo
+    const storyForm = new URLSearchParams();
+    storyForm.set("photo_id", photoData.id);
+    storyForm.set("access_token", FB_PAGE_TOKEN);
+    const storyRes = await fetch(`https://graph.facebook.com/v25.0/${FB_PAGE_ID}/photo_stories`, {
+      method: "POST",
+      body: storyForm,
+    });
+    const storyData = await storyRes.json();
+    if (!storyData.success && !storyData.post_id) { console.error("[SOCIAL] FB story error:", storyData); return null; }
+    console.log("[SOCIAL] FB story published:", storyData.post_id);
+    return storyData.post_id || null;
   } catch (e) { console.error("[SOCIAL] FB story error:", e); return null; }
 }
 
