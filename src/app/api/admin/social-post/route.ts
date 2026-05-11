@@ -54,6 +54,60 @@ Reglas:
   return (data.content?.[0]?.text || productName).trim();
 }
 
+async function publishToInstagramStory(imageUrl: string): Promise<string | null> {
+  if (!IG_ACCOUNT_ID || !FB_PAGE_TOKEN) return null;
+  try {
+    const containerRes = await fetch(`https://graph.facebook.com/v25.0/${IG_ACCOUNT_ID}/media`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ image_url: imageUrl, media_type: "STORIES", access_token: FB_PAGE_TOKEN }),
+    });
+    const containerData = await containerRes.json();
+    if (!containerData.id) { console.error("[SOCIAL] IG story container error:", containerData); return null; }
+    const publishRes = await fetch(`https://graph.facebook.com/v25.0/${IG_ACCOUNT_ID}/media_publish`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ creation_id: containerData.id, access_token: FB_PAGE_TOKEN }),
+    });
+    const publishData = await publishRes.json();
+    if (!publishData.id) { console.error("[SOCIAL] IG story publish error:", publishData); return null; }
+    return publishData.id;
+  } catch (e) { console.error("[SOCIAL] IG story error:", e); return null; }
+}
+
+async function publishToFacebookStory(imageUrl: string): Promise<string | null> {
+  if (!FB_PAGE_ID || !FB_PAGE_TOKEN) return null;
+  try {
+    const res = await fetch(`https://graph.facebook.com/v25.0/${FB_PAGE_ID}/photo_stories`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ photo_id: imageUrl, access_token: FB_PAGE_TOKEN }),
+    });
+    const data = await res.json();
+    // Facebook stories need a photo uploaded first, then published as story
+    // Alternative: upload photo and use as story
+    if (!data.id && !data.success) {
+      // Try uploading photo first
+      const photoRes = await fetch(`https://graph.facebook.com/v25.0/${FB_PAGE_ID}/photos`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: imageUrl, published: false, access_token: FB_PAGE_TOKEN }),
+      });
+      const photoData = await photoRes.json();
+      if (photoData.id) {
+        const storyRes = await fetch(`https://graph.facebook.com/v25.0/${FB_PAGE_ID}/photo_stories`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ photo_id: photoData.id, access_token: FB_PAGE_TOKEN }),
+        });
+        const storyData = await storyRes.json();
+        return storyData.id || storyData.post_id || null;
+      }
+    }
+    return data.id || null;
+  } catch (e) { console.error("[SOCIAL] FB story error:", e); return null; }
+}
+
 async function publishToInstagram(imageUrl: string, caption: string): Promise<string | null> {
   if (!IG_ACCOUNT_ID || !FB_PAGE_TOKEN) return null;
 
@@ -291,9 +345,11 @@ export async function POST(req: NextRequest) {
 
     if (publishTo.includes("instagram")) {
       igPostId = await publishToInstagram(flyerUrl, caption);
+      await publishToInstagramStory(flyerUrl);
     }
     if (publishTo.includes("facebook")) {
       fbPostId = await publishToFacebook(caption, flyerUrl);
+      await publishToFacebookStory(flyerUrl);
     }
 
     // Log post
