@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { getPool, getDbName } from "@/lib/mssql";
 import { requireStaff } from "@/lib/api-auth";
 import { prisma } from "@/lib/prisma";
-import Anthropic from "@anthropic-ai/sdk";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +15,6 @@ function formatPrice(n: number): string {
 }
 
 async function generatePostText(productName: string, price: number, priceCC?: number): Promise<string> {
-  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
   const prompt = `Genera un texto corto para una publicación de Instagram/Facebook de un producto de supermercado mayorista.
 
 Producto: ${productName}
@@ -31,13 +29,21 @@ Reglas:
 - NO usar markdown ni negritas
 - Terminar con "Distrialma - Av. Calle Real 387, Merlo"`;
 
-  const response = await anthropic.messages.create({
-    model: "claude-haiku-4-5-20251001",
-    max_tokens: 200,
-    messages: [{ role: "user", content: prompt }],
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": process.env.ANTHROPIC_API_KEY || "",
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 200,
+      messages: [{ role: "user", content: prompt }],
+    }),
   });
-
-  return (response.content[0] as { text: string }).text.trim();
+  const data = await res.json();
+  return (data.content?.[0]?.text || productName).trim();
 }
 
 async function publishToInstagram(imageUrl: string, caption: string): Promise<string | null> {
