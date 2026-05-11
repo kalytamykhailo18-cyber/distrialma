@@ -3,7 +3,7 @@ import { getPool, getDbName } from "@/lib/mssql";
 import { requireStaff } from "@/lib/api-auth";
 import { prisma } from "@/lib/prisma";
 import { v2 as cloudinary } from "cloudinary";
-import { generateFlyer } from "@/lib/flyer-generator";
+import { generateFlyer, generateStoryFlyer } from "@/lib/flyer-generator";
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -340,13 +340,27 @@ export async function POST(req: NextRequest) {
     let igPostId: string | null = null;
     let fbPostId: string | null = null;
 
+    // Generate vertical story flyer (9:16)
+    let storyFlyerUrl = flyerUrl;
+    try {
+      const storyBuffer = await generateStoryFlyer({ productName: prod.nombre.trim(), price, priceCC, imageUrl: image.filename });
+      const storyBase64 = `data:image/png;base64,${storyBuffer.toString("base64")}`;
+      const storyUpload = await cloudinary.uploader.upload(storyBase64, {
+        folder: "distrialma/flyers",
+        public_id: `story-${targetSku.trim()}-${Date.now()}`,
+      });
+      storyFlyerUrl = storyUpload.secure_url;
+    } catch (e) {
+      console.error("[SOCIAL] Story flyer generation error:", e);
+    }
+
     if (publishTo.includes("instagram")) {
       igPostId = await publishToInstagram(flyerUrl, caption);
-      await publishToInstagramStory(flyerUrl);
+      await publishToInstagramStory(storyFlyerUrl);
     }
     if (publishTo.includes("facebook")) {
       fbPostId = await publishToFacebook(caption, flyerUrl);
-      await publishToFacebookStory(flyerUrl);
+      await publishToFacebookStory(storyFlyerUrl);
     }
 
     // Log post
