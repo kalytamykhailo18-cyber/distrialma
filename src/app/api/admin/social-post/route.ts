@@ -2,6 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { getPool, getDbName } from "@/lib/mssql";
 import { requireStaff } from "@/lib/api-auth";
 import { prisma } from "@/lib/prisma";
+import { v2 as cloudinary } from "cloudinary";
+import { generateFlyer } from "@/lib/flyer-generator";
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
 export const dynamic = "force-dynamic";
 
@@ -258,15 +266,34 @@ export async function POST(req: NextRequest) {
     const text = customCaption || await generatePostText(prod.nombre.trim(), price, priceCC);
     const caption = `${text}\n\n${hashtags}`;
 
+    // Generate flyer image and upload to Cloudinary
+    let flyerUrl = image.filename; // fallback to product image
+    try {
+      const flyerBuffer = await generateFlyer({
+        productName: prod.nombre.trim(),
+        price,
+        priceCC,
+        imageUrl: image.filename,
+      });
+      const base64 = `data:image/png;base64,${flyerBuffer.toString("base64")}`;
+      const uploadResult = await cloudinary.uploader.upload(base64, {
+        folder: "distrialma/flyers",
+        public_id: `flyer-${targetSku.trim()}-${Date.now()}`,
+      });
+      flyerUrl = uploadResult.secure_url;
+    } catch (e) {
+      console.error("[SOCIAL] Flyer generation error:", e);
+    }
+
     const publishTo = platforms || ["instagram", "facebook"];
     let igPostId: string | null = null;
     let fbPostId: string | null = null;
 
     if (publishTo.includes("instagram")) {
-      igPostId = await publishToInstagram(image.filename, caption);
+      igPostId = await publishToInstagram(flyerUrl, caption);
     }
     if (publishTo.includes("facebook")) {
-      fbPostId = await publishToFacebook(caption, image.filename);
+      fbPostId = await publishToFacebook(caption, flyerUrl);
     }
 
     // Log post
@@ -275,7 +302,7 @@ export async function POST(req: NextRequest) {
         sku: targetSku.trim(),
         productName: prod.nombre.trim(),
         caption,
-        imageUrl: image.filename,
+        imageUrl: flyerUrl,
         igPostId,
         fbPostId,
         auto: autoMode,
