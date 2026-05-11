@@ -557,6 +557,23 @@ model LiquidacionAjuste {
   @@map("liquidacion_ajustes")
 }
 
+// Social media posts (Instagram + Facebook)
+model SocialPost {
+  id          Int      @id @default(autoincrement())
+  sku         String   @db.VarChar(7)
+  productName String   @db.VarChar(100)
+  caption     String   @db.Text
+  imageUrl    String   @db.Text
+  igPostId    String?  @db.VarChar(50)
+  fbPostId    String?  @db.VarChar(50)
+  auto        Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@index([sku])
+  @@index([createdAt])
+  @@map("social_posts")
+}
+
 // Internal payroll balance: recibos (advances), aportes, creditos
 // These carry over month to month and are NOT shown on employee PDF
 model LiquidacionBalance {
