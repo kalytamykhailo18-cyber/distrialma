@@ -407,7 +407,8 @@ export default function ChequesPage() {
         </div>
       </Stagger>
 
-      {/* Filters */}
+      {/* Filters + Cheques list */}
+      <div style={tab === "flujo" || tab === "informes" ? { display: "none" } : undefined}>
       <Stagger delay={120}>
         <div className="flex flex-wrap gap-2 mb-4">
           <div className="relative flex-1 min-w-[200px]">
@@ -844,7 +845,7 @@ export default function ChequesPage() {
       })()}
 
       {/* Pagination */}
-      {tab !== "flujo" && tab !== "informes" && cheques.length > CHEQUES_PER_PAGE && (
+      {cheques.length > CHEQUES_PER_PAGE && (
         <div className="flex items-center justify-center gap-3 mt-4">
           <button onClick={() => setChequePage((p) => Math.max(1, p - 1))} disabled={chequePage === 1}
             className={`px-3 py-1.5 rounded-lg text-sm font-medium ${springBtn} ${chequePage === 1 ? "bg-gray-100 text-gray-400" : "bg-white border text-gray-700 hover:bg-gray-50"}`}>
@@ -860,7 +861,7 @@ export default function ChequesPage() {
           </button>
         </div>
       )}
-
+      </div>
       {/* Flujo de cheques */}
       {tab === "flujo" && (
         <Stagger delay={100}>
