@@ -77,7 +77,7 @@ async function findProductBySKU(pool: ReturnType<typeof getPool> extends Promise
       orderBy: { id: "desc" },
       take: 30,
     });
-    const newSkus = [...new Set(recentEntries.map((e) => e.sku))];
+    const newSkus = Array.from(new Set(recentEntries.map((e) => e.sku)));
     for (const s of newSkus) {
       if (recentSkus.has(s)) continue;
       const img = await prisma.productImage.findFirst({ where: { sku: s } });
