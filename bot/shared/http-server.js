@@ -24,16 +24,19 @@ export function createHttpServer({ client, getStatus, port, name, onSend }) {
             return;
           }
 
+          const isNewsletter = target.includes("@newsletter");
+          const sendOpts = isNewsletter ? { sendSeen: false } : {};
+
           if (mediaBase64) {
             const { MessageMedia } = pkg;
             const media = new MessageMedia(mediaMime || "application/pdf", mediaBase64, mediaFilename || "document.pdf");
-            await client.sendMessage(target, media, { caption: mediaCaption || "" });
+            await client.sendMessage(target, media, { ...sendOpts, caption: mediaCaption || "" });
           } else if (mediaUrl) {
             const { MessageMedia } = pkg;
             const media = await MessageMedia.fromUrl(mediaUrl, { unsafeMime: true });
-            await client.sendMessage(target, media, { caption: mediaCaption || message || "" });
+            await client.sendMessage(target, media, { ...sendOpts, caption: mediaCaption || message || "" });
           } else {
-            await client.sendMessage(target, message);
+            await client.sendMessage(target, message, sendOpts);
           }
 
           const logMsg = mediaCaption || message || "";

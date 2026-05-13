@@ -47,9 +47,10 @@ export default function Navbar() {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const { totalItems } = useCart();
 
-  const user = session?.user as { role?: string; name?: string; permissions?: string[] } | undefined;
+  const user = session?.user as { role?: string; name?: string; permissions?: string[]; empleadoCod?: string | null } | undefined;
   const role = user?.role;
   const permissions = user?.permissions;
+  const empleadoCod = user?.empleadoCod;
   const isStaff = isStaffUser(role);
 
   // Close dropdown on outside click
@@ -74,8 +75,7 @@ export default function Navbar() {
     ? [
         { href: "/productos", label: "Productos", match: "/productos" },
         { href: "/mi-cuenta", label: "Mi Cuenta", match: "/mi-cuenta" },
-        { href: "/mi-liquidacion", label: "Mi Liquidacion", match: "/mi-liquidacion" },
-        { href: "/mis-descuentos", label: "Mis Descuentos", match: "/mis-descuentos" },
+        ...(empleadoCod ? [{ href: "/admin/mis-descuentos", label: "Mis Descuentos", match: "/admin/mis-descuentos" }] : []),
       ]
     : [
         { href: "/productos", label: "Productos", match: "/productos" },

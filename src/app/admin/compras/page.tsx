@@ -57,17 +57,22 @@ export default function ComprasPage() {
   const [tab, setTab] = useState<Tab>("pendiente");
   const [todaySummary, setTodaySummary] = useState<{ proveedorName: string; items: { productName: string; cantidad: number }[] }[]>([]);
   const [copied, setCopied] = useState(false);
+  const [desde, setDesde] = useState("");
+  const [hasta, setHasta] = useState("");
 
   useEffect(() => {
     setLoading(true);
-    fetch(`/api/admin/stock-entries?estado=${tab}&limit=200`)
+    const params = new URLSearchParams({ estado: tab, limit: "500" });
+    if (desde) params.set("desde", desde);
+    if (hasta) params.set("hasta", hasta);
+    fetch(`/api/admin/stock-entries?${params}`)
       .then((r) => r.json())
       .then((data) => setEntries(data.entries || []))
       .catch(() => setEntries([]))
       .finally(() => setLoading(false));
 
     // Load today's costed with items for summary
-    if (tab === "costeado") {
+    if (tab === "costeado" && !desde && !hasta) {
       fetch("/api/admin/stock-entries?estado=costeado&today=true&withItems=true&limit=100")
         .then((r) => r.json())
         .then((data) => {
@@ -79,7 +84,7 @@ export default function ComprasPage() {
         })
         .catch(() => setTodaySummary([]));
     }
-  }, [tab]);
+  }, [tab, desde, hasta]);
 
   function buildSummaryText(): string {
     if (todaySummary.length === 0) return "";
@@ -315,6 +320,31 @@ export default function ComprasPage() {
                 {TAB_LABELS[t]}
               </button>
             ))}
+          </div>
+
+          {/* Date filter */}
+          <div className="flex items-center gap-2">
+            <input
+              type="date"
+              value={desde}
+              onChange={(e) => setDesde(e.target.value)}
+              className="px-2 py-1.5 text-sm border border-brand-400 rounded-lg focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
+            />
+            <span className="text-gray-400 text-sm">a</span>
+            <input
+              type="date"
+              value={hasta}
+              onChange={(e) => setHasta(e.target.value)}
+              className="px-2 py-1.5 text-sm border border-brand-400 rounded-lg focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
+            />
+            {(desde || hasta) && (
+              <button
+                onClick={() => { setDesde(""); setHasta(""); }}
+                className={`px-2 py-1.5 text-xs text-red-500 hover:bg-red-50 rounded-lg ${springBtn}`}
+              >
+                Limpiar
+              </button>
+            )}
           </div>
 
           {/* Export buttons */}

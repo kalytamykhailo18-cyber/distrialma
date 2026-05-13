@@ -44,13 +44,15 @@ export async function GET() {
       if (!imageMap.has(img.sku)) imageMap.set(img.sku, img.filename);
     }
 
-    // Build XML feed
-    const items = result.recordset.map((p: {
+    // Build XML feed — only products with stock > 0 and image
+    const items = result.recordset.filter((p: { sku: string; stock: number }) =>
+      p.stock > 0 && imageMap.has(p.sku)
+    ).map((p: {
       sku: string; name: string; barcode: string; category: string;
       brand: string; price: number; stock: number;
     }) => {
-      const imageUrl = imageMap.get(p.sku);
-      const availability = p.stock > 0 ? "in_stock" : "out_of_stock";
+      const imageUrl = imageMap.get(p.sku)!;
+      const availability = "in_stock";
       const link = `${SITE_URL}/productos/${encodeURIComponent(p.sku)}`;
 
       const description = [p.name, p.brand, p.category].filter(Boolean).join(" — ");

@@ -319,6 +319,33 @@ export default function DifusionPage() {
                 </div>
                 <p className="text-sm text-gray-800 line-clamp-2">{d.mensaje}</p>
                 {d.imagenUrl && <span className="text-xs text-blue-500">Con imagen</span>}
+                {(d.estado === "enviando" || d.estado === "programada") && (
+                  <button
+                    onClick={async (e) => {
+                      const btn = e.currentTarget;
+                      if (btn.dataset.confirm !== "1") {
+                        btn.dataset.confirm = "1";
+                        btn.textContent = "¿Confirmar cancelar?";
+                        btn.classList.add("animate-pulse", "font-bold");
+                        const reset = () => { btn.dataset.confirm = ""; btn.textContent = "Cancelar envío"; btn.classList.remove("animate-pulse", "font-bold"); };
+                        btn.addEventListener("blur", reset, { once: true });
+                        setTimeout(reset, 5000);
+                        return;
+                      }
+                      btn.disabled = true;
+                      try {
+                        const res = await fetch(`/api/admin/difusion?id=${d.id}`, { method: "DELETE" });
+                        const data = await res.json();
+                        if (data.ok) { setToast(`Cancelada. ${data.cancelados} pendientes cancelados.`); loadDifusiones(); }
+                        else setToast(data.error || "Error");
+                      } catch { setToast("Error al cancelar"); }
+                      btn.disabled = false;
+                    }}
+                    className={`text-xs text-red-500 ml-2 hover:text-red-700 underline ${springBtn}`}
+                  >
+                    Cancelar envío
+                  </button>
+                )}
                 {d.fallidos > 0 && (
                   <button onClick={async () => {
                     if (expandedFallidos === d.id) { setExpandedFallidos(null); return; }

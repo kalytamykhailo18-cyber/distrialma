@@ -71,6 +71,7 @@ export default function CatalogoPage() {
   const [includeImages, setIncludeImages] = useState(true);
   const [conStock, setConStock] = useState(true);
   const [compactMode, setCompactMode] = useState(false);
+  const [showPrices, setShowPrices] = useState(true);
   const [lista, setLista] = useState<"vendedor" | "mayorista" | "especial">("vendedor");
   const [rubroSearch, setRubroSearch] = useState("");
   const [marcaSearch, setMarcaSearch] = useState("");
@@ -151,8 +152,12 @@ export default function CatalogoPage() {
     doc.setFontSize(12);
     doc.setFont("helvetica", "normal");
     doc.text(`${products.length} productos`, w / 2, 138, { align: "center" });
-    const listaLabel = lista === "vendedor" ? `Precios Vendedor (Mayorista + ${markup}%)` : lista === "mayorista" ? "Precios Mayorista" : "Precios Especial";
-    doc.text(listaLabel, w / 2, 146, { align: "center" });
+    if (showPrices) {
+      const listaLabel = lista === "vendedor" ? `Precios Vendedor (Mayorista + ${markup}%)` : lista === "mayorista" ? "Precios Mayorista" : "Precios Especial";
+      doc.text(listaLabel, w / 2, 146, { align: "center" });
+    } else {
+      doc.text("Catálogo sin precios", w / 2, 146, { align: "center" });
+    }
     doc.text(new Date().toLocaleDateString("es-AR", { day: "2-digit", month: "long", year: "numeric" }), w / 2, 154, { align: "center" });
 
     // Group by rubro
@@ -281,14 +286,16 @@ export default function CatalogoPage() {
         const skuText = `SKU: ${p.sku}${p.marca ? "  •  " + p.marca : ""}`;
         doc.text(skuText, textX, rowY + (compactMode ? 13 : 16));
 
-        // Price
-        doc.setFontSize(priceFontSize);
-        doc.setFont("helvetica", "bold");
-        doc.setTextColor(251, 154, 71);
-        const priceY = compactMode
-          ? (includeImages ? rowY + 23 : rowY + 8)
-          : (includeImages ? rowY + 28 : rowY + 10);
-        doc.text(formatPrice(p.precioVenta), textX, priceY);
+        // Price (only if enabled)
+        if (showPrices) {
+          doc.setFontSize(priceFontSize);
+          doc.setFont("helvetica", "bold");
+          doc.setTextColor(251, 154, 71);
+          const priceY = compactMode
+            ? (includeImages ? rowY + 23 : rowY + 8)
+            : (includeImages ? rowY + 28 : rowY + 10);
+          doc.text(formatPrice(p.precioVenta), textX, priceY);
+        }
 
         col++;
         if (col >= cols) {
@@ -368,7 +375,7 @@ export default function CatalogoPage() {
       </Stagger>
 
       <Stagger delay={50} y={10}>
-      <div className="bg-white border rounded-xl shadow-sm p-4 mb-4">
+      <div className={`bg-white border rounded-xl shadow-sm p-4 mb-4 ${!showPrices ? "opacity-50 pointer-events-none" : ""}`}>
         <label className="block text-sm font-medium text-gray-700 mb-2">Lista de precios</label>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
           <button
@@ -521,6 +528,15 @@ export default function CatalogoPage() {
             className="rounded border-brand-400"
           />
           Modo compacto (más productos por página)
+        </label>
+        <label className="flex items-center gap-2 mt-2 text-sm cursor-pointer">
+          <input
+            type="checkbox"
+            checked={!showPrices}
+            onChange={(e) => setShowPrices(!e.target.checked)}
+            className="rounded border-brand-400"
+          />
+          Sin precios (para compartir con clientes)
         </label>
       </div>
 

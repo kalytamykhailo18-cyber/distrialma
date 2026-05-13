@@ -78,7 +78,7 @@ const MENU_CATEGORIES: MenuCategory[] = [
       { href: "/admin/clientes", label: "Clientes", perm: "clientes" },
       { href: "/admin/vendedores", label: "Vendedores", perm: "vendedores" },
       { href: "/admin/usuarios", label: "Usuarios", perm: "usuarios" },
-      { href: "/admin/mis-descuentos", label: "Mis Descuentos", perm: "etiquetas" },
+      { href: "/admin/mis-descuentos", label: "Mis Descuentos", perm: "mis-descuentos" },
       { href: "/admin/mi-liquidacion", label: "Mi Liquidacion", perm: "mi-liquidacion" },
       { href: "/admin/control-horario", label: "Control Horario", perm: "control-horario" },
       { href: "/admin/liquidacion", label: "Liquidacion", perm: "liquidacion" },
@@ -128,7 +128,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [expandedCat, setExpandedCat] = useState<string | null>(null);
 
-  const user = session?.user as { role?: string; permissions?: string[] } | undefined;
+  const user = session?.user as { role?: string; permissions?: string[]; empleadoCod?: string | null } | undefined;
   const role = user?.role;
   const permissions = user?.permissions;
   const isStaff = isStaffUser(role);
@@ -138,7 +138,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       .sort((a, b) => b[0].length - a[0].length)
       .find(([path]) => pathname.startsWith(path + "/"))?.[1];
 
-  const allowed = isStaff && (!requiredPerm || hasPermission(role, permissions, requiredPerm));
+  // Allow client-role users with empleadoCod to access mis-descuentos
+  const isClientEmployee = !isStaff && !!user?.empleadoCod && pathname === "/admin/mis-descuentos";
+  const allowed = isClientEmployee || (isStaff && (!requiredPerm || hasPermission(role, permissions, requiredPerm)));
 
   // Auto-expand category of current page
   useEffect(() => {

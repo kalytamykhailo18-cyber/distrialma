@@ -183,3 +183,38 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Error" }, { status: 500 });
   }
 }
+
+// DELETE: cancel a broadcast
+export async function DELETE(req: NextRequest) {
+  if (!(await requireStaff())) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  }
+
+  const id = req.nextUrl.searchParams.get("id");
+  if (!id) return NextResponse.json({ error: "Falta id" }, { status: 400 });
+
+  const difusion = await prisma.difusion.findUnique({ where: { id: parseInt(id) } });
+  if (!difusion) return NextResponse.json({ error: "No encontrada" }, { status: 404 });
+  if (difusion.estado !== "enviando" && difusion.estado !== "programada") {
+    return NextResponse.json({ error: "Solo se puede cancelar una difusión en curso o programada" }, { status: 400 });
+  }
+
+  // Count pending recipients
+  const pendingCount = await prisma.difusionRecipient.count({
+    where: { difusionId: difusion.id, estado: "pendiente" },
+  });
+
+  // Mark pending recipients as cancelled
+  await prisma.difusionRecipient.updateMany({
+    where: { difusionId: difusion.id, estado: "pendiente" },
+    data: { estado: "cancelado" },
+  });
+
+  // Update difusion status
+  await prisma.difusion.update({
+    where: { id: difusion.id },
+    data: { estado: "cancelada" },
+  });
+
+  return NextResponse.json({ ok: true, cancelados: pendingCount });
+}

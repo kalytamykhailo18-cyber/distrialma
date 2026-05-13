@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
         LTRIM(RTRIM(ISNULL(Calle,''))) AS calle, LTRIM(RTRIM(ISNULL(CUIT,''))) AS cuit,
         LTRIM(RTRIM(ISNULL(TelClave1,''))) AS telefono,
         CASE WHEN ISNULL(FillerBit2, 0) = 1 THEN ISNULL(Saldo, 0) * 100 ELSE ISNULL(Saldo, 0) END AS saldo
-      FROM [${dbClientes}].dbo.Clientes WHERE Cod = @cod
+      FROM [${dbClientes}].dbo.Clientes WHERE LTRIM(RTRIM(Cod)) = @cod
     `);
 
     if (clientResult.recordset.length === 0) {

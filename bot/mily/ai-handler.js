@@ -11,24 +11,32 @@ const MODEL = "claude-haiku-4-5-20251001";
 const SYSTEM_PROMPT = `Soy Mily, asistente virtual de Distrialma (mayorista alimentos, Merlo, Buenos Aires). WhatsApp, español argentino, breve (1-3 oraciones), texto plano sin markdown. Personalidad amable y servicial, trato cercano.
 
 IDENTIDAD: Me llamo Mily. Si me preguntan quien soy digo "Soy Mily, la asistente virtual de Distrialma". No digo que soy IA ni robot.
-PRODUCTOS: Usa search_products. Mostra precio Mayorista + Caja Cerrada si hay. Precios con IVA. "Stock sujeto a disponibilidad." NO mostrar cantidad de stock exacta. Link: distrialma.com.ar/productos/{sku}
+PRODUCTOS: Usa search_products. SIEMPRE mostrar TODOS los resultados que devuelve la herramienta, no omitir ninguno. Mostra precio Mayorista + Caja Cerrada si hay. Precios con IVA. "Stock sujeto a disponibilidad." NO mostrar cantidad de stock exacta. Link: distrialma.com.ar/productos/{sku}
 COMBOS: Usa search_combos.
 MARCA: Incluir link de marca.
 LISTA PRECIOS: Preguntar rubro/marca primero, luego send_price_list con filtro. Nunca completa.
-PEDIDOS: Si el cliente esta registrado, puede armar el pedido por chat. Usa search_products para buscar, add_to_cart para agregar, view_cart para mostrar, confirm_order para confirmar. Siempre mostrar el carrito actualizado despues de agregar. Antes de confirmar, mostrar resumen y preguntar si esta listo. Si no esta registrado, decirle que haga el pedido en distrialma.com.ar.
+PEDIDOS: Si el cliente esta registrado, puede armar el pedido por chat. Usa search_products para buscar, add_to_cart para agregar, view_cart para mostrar, confirm_order para confirmar. Siempre mostrar el carrito actualizado despues de agregar. Antes de confirmar, mostrar resumen y preguntar:
+1. ¿Es para retirar o envío? Si es para retirar, preguntar en qué sucursal (Merlo o Pontevedra).
+2. Pasar sucursal y retiro=true/false en confirm_order.
+Si no esta registrado, decirle que haga el pedido en distrialma.com.ar.
 SALDO: Si registrado, dar saldo. Detalle en distrialma.com.ar/mis-pedidos.
 PAGOS/ALIAS/TRANSFERENCIA: NO dar el alias bancario. Decir "el alias para transferencia te lo indican en el comercio a la hora de abonar."
 NO SABE: "Un asesor te contacta." No inventar.
 RECLAMOS: "Tomamos nota, nuestra encargada te contacta." Se deriva automatico.
 PERSONA: "Te paso con un asesor."
-NO REGISTRADO: Pedir nombre completo, telefono y direccion ANTES de registrar. No registrar si falta algun dato. Despues de registrar, las credenciales se envian automaticamente.
+NO REGISTRADO: Pedir nombre completo, telefono, direccion y CUIT/CUIL/DNI ANTES de registrar. NUNCA registrar si falta el CUIT, CUIL o DNI — es OBLIGATORIO para que puedan entrar a la web después. Despues de registrar, las credenciales se envian automaticamente.
 STICKER: send_sticker al cerrar bien una conversacion.
 COMUNIDAD: Al cerrar una buena conversacion (despues del sticker o la despedida), invitar al cliente a unirse a la comunidad de WhatsApp: "Unite a nuestra comunidad para enterarte de cambios de precios y novedades: https://chat.whatsapp.com/LpfhYKk33eIFAdeshNWAYI". Solo invitar 1 vez por conversacion, no repetir si ya lo invitaste.
 PRIVACIDAD: No dar datos de otros clientes.
 
-Horarios: Minorista (Calle Real 435) Lun-Sab 7-22:30, Domingos 7-22:30. Mayorista Merlo (Av. Calle Real 387) Lun-Sab 8-18 (NO cierra a las 14, cierra a las 18). Pontevedra Lun-Sab 9-17. Web 24hs. PedidosYa disponible.
+Horarios y direcciones (SIEMPRE mencionar los 3 locales cuando pregunten por horarios):
+1. Minorista Merlo — Calle Real 435 — Lun-Dom 7 a 22:30
+2. Mayorista Merlo — Av. Calle Real 387 — Lun-Sab 8 a 18 (NO cierra a las 14, cierra a las 18)
+3. Mayorista Pontevedra — Av. San Martín 868 (esquina Av. Patricios 7399) — Lun-Sab 9 a 17
+Web: 24hs. PedidosYa disponible.
 DOMINGOS: Solo abre el local minorista de Calle Real 435. Los mayoristas NO abren los domingos.
-IMPORTANTE: NUNCA decir que cerramos a las 14. El mayorista cierra a las 18. NUNCA inventar direcciones. Si el cliente dice que viene en camino, decirle que lo esperamos.`;
+IMPORTANTE: NUNCA decir que cerramos a las 14. El mayorista cierra a las 18. NUNCA inventar direcciones. Si el cliente dice que viene en camino, decirle que lo esperamos.
+DIRECCIONES ALTERNATIVAS: Si el cliente pregunta por "Av. Patricios", "Patricios", o alguna calle cercana a alguno de los locales, NO decir que no tenemos local ahí. Responder con el local más cercano. Pontevedra (Av. San Martín 868) está cerca de Av. Patricios. Siempre ofrecer las 3 direcciones reales.`;
 
 export const NEW_CLIENT_MESSAGE = `Hola! Gracias por escribirnos.
 
@@ -52,10 +60,10 @@ const TOOLS = [
   { name: "search_combos", description: "Busca combos/promociones disponibles en Distrialma.", input_schema: { type: "object", properties: { query: { type: "string", description: "Palabras clave del combo" } }, required: ["query"] } },
   { name: "send_price_list", description: "Genera y envia una lista de precios en PDF al cliente por WhatsApp, filtrada por rubro o marca. SIEMPRE usar con filtro.", input_schema: { type: "object", properties: { filter: { type: "string", description: "Filtro OBLIGATORIO por rubro o marca" } }, required: ["filter"] } },
   { name: "send_sticker", description: "Envia el sticker de Alma al cliente. Solo al final de una buena conversacion.", input_schema: { type: "object", properties: {}, required: [] } },
-  { name: "register_client", description: "Registra un cliente nuevo. Necesitas nombre completo, telefono y direccion. CUIT es opcional. NO registrar si falta nombre o telefono.", input_schema: { type: "object", properties: { nombre: { type: "string", description: "Nombre completo" }, direccion: { type: "string", description: "Direccion del local o domicilio" }, telefono: { type: "string", description: "Numero de telefono" }, cuit: { type: "string", description: "CUIT (opcional)" } }, required: ["nombre", "telefono", "direccion"] } },
+  { name: "register_client", description: "Registra un cliente nuevo. Necesitas TODOS los datos: nombre completo, telefono, direccion y CUIT/CUIL/DNI. NUNCA registrar sin CUIT/CUIL/DNI.", input_schema: { type: "object", properties: { nombre: { type: "string", description: "Nombre completo" }, direccion: { type: "string", description: "Direccion del local o domicilio" }, telefono: { type: "string", description: "Numero de telefono" }, cuit: { type: "string", description: "CUIT, CUIL o DNI (OBLIGATORIO)" } }, required: ["nombre", "telefono", "direccion", "cuit"] } },
   { name: "add_to_cart", description: "Agrega un producto al carrito del cliente. Necesitas el SKU del producto (obtenido de search_products) y la cantidad. Solo para clientes REGISTRADOS.", input_schema: { type: "object", properties: { sku: { type: "string", description: "SKU del producto" }, nombre: { type: "string", description: "Nombre del producto" }, cantidad: { type: "number", description: "Cantidad a agregar" }, precio: { type: "number", description: "Precio unitario mayorista" } }, required: ["sku", "nombre", "cantidad", "precio"] } },
   { name: "view_cart", description: "Muestra el carrito actual del cliente con todos los productos, cantidades y total.", input_schema: { type: "object", properties: {}, required: [] } },
-  { name: "confirm_order", description: "Confirma el pedido del carrito. Crea el pedido en el sistema. Solo usar cuando el cliente diga que esta listo o confirme. Preguntar antes de confirmar.", input_schema: { type: "object", properties: { notas: { type: "string", description: "Notas opcionales del pedido" } }, required: [] } },
+  { name: "confirm_order", description: "Confirma el pedido del carrito. ANTES de confirmar preguntar: 1) si es para retirar o envío, 2) si retira, en qué sucursal (Merlo o Pontevedra). Si es Pontevedra avisa al encargado para que lo prepare.", input_schema: { type: "object", properties: { notas: { type: "string", description: "Notas opcionales del pedido" }, sucursal: { type: "string", enum: ["merlo", "pontevedra"], description: "Sucursal donde retira" }, retiro: { type: "boolean", description: "true si retira en sucursal, false si es envío" } }, required: ["sucursal", "retiro"] } },
 ];
 
 // In-memory cart per chat (expires after 24h)
@@ -230,6 +238,10 @@ export async function callClaude(chatId, userMessage, clientInfo, phoneNumber, {
                   const total = cart.reduce((s, i) => s + i.precio * i.cantidad, 0);
                   const clienteCod = clientInfo.accounts ? clientInfo.accounts[0].cod : clientInfo.cod;
                   const clienteNombre = clientInfo.accounts ? clientInfo.accounts[0].nombre : clientInfo.nombre;
+                  const sucursal = (tu.input.sucursal || "merlo").toLowerCase();
+                  const retiro = tu.input.retiro !== false;
+                  const sucLabel = sucursal === "pontevedra" ? "PONTEVEDRA" : "MERLO";
+                  const modoLabel = retiro ? `RETIRA en ${sucLabel}` : "ENVÍO";
                   // Save order to PostgreSQL
                   const now2 = new Date();
                   const fechora = now2.getFullYear().toString() + String(now2.getMonth()+1).padStart(2,"0") + String(now2.getDate()).padStart(2,"0") + String(now2.getHours()).padStart(2,"0") + String(now2.getMinutes()).padStart(2,"0") + String(now2.getSeconds()).padStart(2,"0");
@@ -243,14 +255,19 @@ export async function callClaude(chatId, userMessage, clientInfo, phoneNumber, {
                       clienteName: clienteNombre,
                       totalCant: cart.reduce((s, i) => s + i.cantidad, 0),
                       total,
-                      notas: (tu.input.notas || "Pedido por WhatsApp").substring(0, 200),
+                      notas: (`[${modoLabel}] ` + (tu.input.notas || "Pedido por WhatsApp")).substring(0, 200),
                       items: { create: cart.map((i) => ({ sku: i.sku.padStart(7, " "), productName: i.nombre, cant: i.cantidad, precio: i.precio, impo: i.precio * i.cantidad, listaPrecio: 2 })) },
                     },
                   });
                   // Notify admin via WhatsApp
                   const gastonPhone = process.env.GASTON_PHONE || "5491122254949";
-                  const orderMsg = `NUEVO PEDIDO WhatsApp\n\nCliente: ${clienteNombre}\n${cart.map((i) => `${i.cantidad}x ${i.nombre} = ${formatPrice(i.precio * i.cantidad)}`).join("\n")}\n\nTotal: ${formatPrice(total)}`;
+                  const pontevedraPhone = process.env.PONTEVEDRA_PHONE || gastonPhone;
+                  const orderMsg = `NUEVO PEDIDO WhatsApp — ${modoLabel}\n\nCliente: ${clienteNombre}\n${cart.map((i) => `${i.cantidad}x ${i.nombre} = ${formatPrice(i.precio * i.cantidad)}`).join("\n")}\n\nTotal: ${formatPrice(total)}`;
                   await fetch("http://127.0.0.1:3099/send", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chatId: gastonPhone + "@c.us", message: orderMsg }) }).catch(() => {});
+                  if (sucursal === "pontevedra" && retiro) {
+                    const ponteMsg = `PEDIDO PARA PREPARAR — PONTEVEDRA\n\nCliente: ${clienteNombre}\n${cart.map((i) => `${i.cantidad}x ${i.nombre}`).join("\n")}\n\nTotal: ${formatPrice(total)}\n\nEl cliente va a retirar.`;
+                    await fetch("http://127.0.0.1:3099/send", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chatId: pontevedraPhone + "@c.us", message: ponteMsg }) }).catch(() => {});
+                  }
                   clearCart(chatId);
                   result = { success: true, total: formatPrice(total), items: cart.length, message: "Pedido confirmado!" };
                   console.log(`[ORDER] ${chatId}: WhatsApp order ${cart.length} items, total ${total}`);

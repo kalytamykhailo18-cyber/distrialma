@@ -59,10 +59,13 @@ export const authOptions: NextAuthOptions = {
           if (result.recordset.length > 0) {
             const cliente = result.recordset[0];
             if (cliente.observaciones.toLowerCase() === credentials.password.toLowerCase()) {
+              // Check if this client is also an employee
+              const empMapping = await prisma.setting.findUnique({ where: { key: `emp_client_${cliente.cod}` } });
               return {
                 id: cliente.cod,
                 name: cliente.nombre,
                 role: cliente.listaPrecios === "3" ? "especial" : "customer",
+                empleadoCod: empMapping?.value || null,
               };
             }
             return null;
@@ -84,6 +87,19 @@ export const authOptions: NextAuthOptions = {
         token.permissions = u.permissions || [];
         token.empleadoCod = u.empleadoCod || null;
         token.userEmail = u.email || null;
+      }
+      // Refresh permissions from DB for staff users (so changes take effect without re-login)
+      if ((token.role === "staff" || token.role === "admin") && token.clientId) {
+        try {
+          const uid = parseInt(token.clientId as string);
+          if (!isNaN(uid)) {
+            const freshUser = await prisma.user.findUnique({ where: { id: uid }, select: { permissions: true, empleadoCod: true } });
+            if (freshUser) {
+              token.permissions = JSON.parse(freshUser.permissions || "[]");
+              token.empleadoCod = freshUser.empleadoCod || null;
+            }
+          }
+        } catch { /* ignore */ }
       }
       return token;
     },

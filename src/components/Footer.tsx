@@ -13,7 +13,7 @@ export default function Footer() {
         <div className="flex flex-wrap justify-between items-start gap-6">
           <div>
             <p className="text-sm font-semibold text-gray-700">Distrialma</p>
-            <p className="text-xs text-gray-500 mt-1">Almipal SAS — Av. Calle Real 387, Merlo, Buenos Aires</p>
+            <p className="text-xs text-gray-500 mt-1">Av. Calle Real 387, Merlo, Buenos Aires</p>
           </div>
           <div className="flex flex-wrap gap-4 text-xs text-gray-500">
             <Link href="/" className="hover:text-brand-500">Inicio</Link>

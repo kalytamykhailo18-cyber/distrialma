@@ -1,17 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireStaff } from "@/lib/api-auth";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getPool, getDbName } from "@/lib/mssql";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
-  const session = await requireStaff();
-  if (!session) {
+  // Allow staff OR clients with empleadoCod
+  const session = await getServerSession(authOptions);
+  if (!session?.user) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
-  const userName = ((session.user as { name?: string })?.name || "").trim().toUpperCase();
+  const userInfo = session.user as { role?: string; name?: string; empleadoCod?: string | null };
+  const isStaff = userInfo.role === "staff" || userInfo.role === "admin";
+  const empleadoCodFromSession = userInfo.empleadoCod;
+
+  if (!isStaff && !empleadoCodFromSession) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  }
+
+  const userName = (userInfo.name || "").trim().toUpperCase();
   if (!userName) {
     return NextResponse.json({ error: "Sin usuario" }, { status: 400 });
   }
@@ -32,8 +42,10 @@ export async function GET(req: NextRequest) {
     const empCodParam = searchParams.get("empleado");
 
     let emp;
-    if (empCodParam) {
+    if (empCodParam && isStaff) {
       emp = empResult.recordset.find((e: { cod: string }) => e.cod === empCodParam);
+    } else if (empleadoCodFromSession) {
+      emp = empResult.recordset.find((e: { cod: string }) => e.cod === empleadoCodFromSession);
     } else {
       emp = empResult.recordset.find((e: { cod: string; nombre: string }) => {
         const empName = e.nombre.trim().toUpperCase();
@@ -55,7 +67,9 @@ export async function GET(req: NextRequest) {
     }
 
     // Get descuentos for requested month (or current)
-    const mesParam = new URL(req.url).searchParams.get("mes"); // format: YYYY-MM
+    // Non-admin users can only see current month
+    const role = (session.user as { role?: string })?.role;
+    const mesParam = role === "admin" ? new URL(req.url).searchParams.get("mes") : null;
     const now = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Argentina/Buenos_Aires" }));
     let year = now.getFullYear(), month = now.getMonth();
     if (mesParam && /^\d{4}-\d{2}$/.test(mesParam)) {

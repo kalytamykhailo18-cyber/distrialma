@@ -22,11 +22,22 @@ export async function GET(req: NextRequest) {
     const where: Record<string, unknown> = {};
     if (estado !== "all") where.estado = estado;
     if (proveedor) where.proveedorCod = proveedor;
-    if (today) {
-      const now = new Date(Date.now() - 3 * 60 * 60 * 1000); // Argentina time
-      const todayStart = new Date(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
-      todayStart.setHours(todayStart.getHours() + 3); // back to UTC
-      where.createdAt = { gte: todayStart };
+    const desde = req.nextUrl.searchParams.get("desde");
+    const hasta = req.nextUrl.searchParams.get("hasta");
+    if (desde || hasta || today) {
+      const dateFilter: Record<string, Date> = {};
+      if (today) {
+        const now = new Date(Date.now() - 3 * 60 * 60 * 1000); // Argentina time
+        const todayStart = new Date(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+        todayStart.setHours(todayStart.getHours() + 3); // back to UTC
+        dateFilter.gte = todayStart;
+      }
+      if (desde) dateFilter.gte = new Date(desde + "T00:00:00-03:00");
+      if (hasta) {
+        const h = new Date(hasta + "T23:59:59-03:00");
+        dateFilter.lte = h;
+      }
+      where.createdAt = dateFilter;
     }
 
     const [entries, total] = await Promise.all([

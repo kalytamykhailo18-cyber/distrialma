@@ -64,6 +64,14 @@ async function publishToInstagramStory(imageUrl: string): Promise<string | null>
     });
     const containerData = await containerRes.json();
     if (!containerData.id) { console.error("[SOCIAL] IG story container error:", containerData); return null; }
+    // Wait for container to be ready
+    for (let i = 0; i < 10; i++) {
+      await new Promise((r) => setTimeout(r, 3000));
+      const statusRes = await fetch(`https://graph.facebook.com/v25.0/${containerData.id}?fields=status_code&access_token=${FB_PAGE_TOKEN}`);
+      const statusData = await statusRes.json();
+      if (statusData.status_code === "FINISHED") break;
+      if (statusData.status_code === "ERROR") { console.error("[SOCIAL] IG story processing error:", statusData); return null; }
+    }
     const publishRes = await fetch(`https://graph.facebook.com/v25.0/${IG_ACCOUNT_ID}/media_publish`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -127,7 +135,21 @@ async function publishToInstagram(imageUrl: string, caption: string): Promise<st
     return null;
   }
 
-  // Step 2: Publish the container
+  // Step 2: Wait for container to be ready (IG needs time to process)
+  for (let i = 0; i < 10; i++) {
+    await new Promise((r) => setTimeout(r, 3000));
+    const statusRes = await fetch(
+      `https://graph.facebook.com/v25.0/${containerData.id}?fields=status_code&access_token=${FB_PAGE_TOKEN}`
+    );
+    const statusData = await statusRes.json();
+    if (statusData.status_code === "FINISHED") break;
+    if (statusData.status_code === "ERROR") {
+      console.error("[SOCIAL] IG container processing error:", statusData);
+      return null;
+    }
+  }
+
+  // Step 3: Publish the container
   const publishRes = await fetch(
     `https://graph.facebook.com/v25.0/${IG_ACCOUNT_ID}/media_publish`,
     {
