@@ -74,6 +74,7 @@ export async function POST(req: NextRequest) {
           url: `${SITE_URL}/productos/${encodeURIComponent(p.sku)}`,
           image_url: imageMap.get(p.sku)!,
           brand: p.brand || undefined,
+          product_type: p.category || undefined,
           category: p.category || undefined,
         },
       };
@@ -111,12 +112,50 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    console.log(`[WA-CATALOG] Synced ${totalSynced}/${products.length} products, ${errors.length} errors`);
+    // Create/update collections by rubro
+    const rubroMap = new Map<string, string[]>();
+    for (const p of products) {
+      const cat = (p as { category: string }).category;
+      if (!cat) continue;
+      if (!rubroMap.has(cat)) rubroMap.set(cat, []);
+      rubroMap.get(cat)!.push((p as { sku: string }).sku);
+    }
+
+    // Get existing product sets
+    let existingSets: { id: string; name: string }[] = [];
+    try {
+      const setsRes = await fetch(`https://graph.facebook.com/v25.0/${CATALOG_ID}/product_sets?fields=id,name&limit=100&access_token=${FB_PAGE_TOKEN}`);
+      const setsData = await setsRes.json();
+      existingSets = setsData.data || [];
+    } catch { /* ignore */ }
+    const existingSetNames = new Map(existingSets.map((s) => [s.name, s.id]));
+
+    let collectionsCreated = 0;
+    for (const [rubro] of Array.from(rubroMap.entries())) {
+      if (existingSetNames.has(rubro)) continue;
+      try {
+        const res = await fetch(`https://graph.facebook.com/v25.0/${CATALOG_ID}/product_sets`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: rubro,
+            filter: JSON.stringify({ product_type: { eq: rubro } }),
+            access_token: FB_PAGE_TOKEN,
+          }),
+        });
+        const data = await res.json();
+        if (data.id) collectionsCreated++;
+      } catch { /* ignore */ }
+    }
+
+    console.log(`[WA-CATALOG] Synced ${totalSynced}/${products.length} products, ${collectionsCreated} new collections, ${errors.length} errors`);
 
     return NextResponse.json({
       ok: true,
       total: products.length,
       synced: totalSynced,
+      collections: rubroMap.size,
+      newCollections: collectionsCreated,
       errors: errors.length > 0 ? errors.slice(0, 20) : undefined,
     });
   } catch (error) {

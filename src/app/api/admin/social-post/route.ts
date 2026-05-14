@@ -234,7 +234,7 @@ export async function GET(req: NextRequest) {
     const hashtags = hashtagSetting?.value || "#distrialma #mayorista #merlo #ofertas #alimentos";
 
     const text = await generatePostText(prod.nombre.trim(), price, priceCC);
-    const caption = `${text}\n\n${hashtags}`;
+    const caption = `${text}\n\nSKU: ${sku.trim()}\n\n${hashtags}`;
 
     return NextResponse.json({
       sku: sku.trim(),
@@ -337,7 +337,7 @@ export async function POST(req: NextRequest) {
     const hashtags = hashtagSetting?.value || "#distrialma #mayorista #merlo #ofertas #alimentos";
 
     const text = customCaption || await generatePostText(prod.nombre.trim(), price, priceCC);
-    const caption = `${text}\n\n${hashtags}`;
+    const caption = `${text}\n\nSKU: ${targetSku.trim()}\n\n${hashtags}`;
 
     // Generate flyer image and upload to Cloudinary
     let flyerUrl = image.filename; // fallback to product image

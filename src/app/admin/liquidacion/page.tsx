@@ -17,6 +17,7 @@ interface Empleado {
   bono: number;
   viatico: number;
   plus: number;
+  clienteCod: string;
 }
 
 interface Ajuste { id: number; concepto: string; monto: number }
@@ -347,7 +348,7 @@ export default function LiquidacionPage() {
   }
 
   function updateEmpField(cod: string, field: string, value: string) {
-    setEmpleados((prev) => prev.map((e) => e.empleadoCod === cod ? { ...e, [field]: parseFloat(value) || 0 } : e));
+    setEmpleados((prev) => prev.map((e) => e.empleadoCod === cod ? { ...e, [field]: field === "clienteCod" ? value : (parseFloat(value) || 0) } : e));
   }
 
   if (loading) return <LoadingCenter text="Cargando..." />;
@@ -640,6 +641,7 @@ export default function LiquidacionPage() {
                 <thead>
                   <tr className="bg-gray-50 border-b text-left text-xs text-gray-500">
                     <th className="px-3 py-2">Empleado</th>
+                    <th className="px-3 py-2">Nro Cliente</th>
                     <th className="px-3 py-2 text-right">Basico</th>
                     <th className="px-3 py-2 text-right">Presentismo</th>
                     <th className="px-3 py-2 text-right">Ad. Caja</th>
@@ -653,6 +655,10 @@ export default function LiquidacionPage() {
                   {empleados.map((emp, i) => (
                     <tr key={emp.empleadoCod} className={hoverRow} style={staggerStyle(true, i, 0, 10)}>
                       <td className="px-3 py-2 font-medium text-gray-900 text-xs">{emp.nombre}</td>
+                      <td className="px-1 py-1">
+                        <input type="text" value={emp.clienteCod || ""} onChange={(e) => updateEmpField(emp.empleadoCod, "clienteCod", e.target.value)}
+                          placeholder="—" className="w-20 px-2 py-1 border rounded text-xs text-center focus:outline-none focus:border-brand-500" />
+                      </td>
                       {(["basico", "presentismo", "adicionalCaja", "bono", "viatico", "plus"] as const).map((field) => (
                         <td key={field} className="px-1 py-1">
                           <input type="number" value={emp[field] || ""} onChange={(e) => updateEmpField(emp.empleadoCod, field, e.target.value)}

@@ -10,7 +10,7 @@ export default function TermsPage() {
         <p><strong>Última actualización:</strong> Mayo 2026</p>
 
         <h2 className="text-lg font-semibold text-gray-800">1. Generalidades</h2>
-        <p>El uso del sitio web distrialma.com.ar y sus servicios implica la aceptación de estos términos y condiciones. Almipal SAS opera bajo la marca comercial Distrialma.</p>
+        <p>El uso del sitio web distrialma.com.ar y sus servicios implica la aceptación de estos términos y condiciones.</p>
 
         <h2 className="text-lg font-semibold text-gray-800">2. Registro y cuenta</h2>
         <p>Para realizar pedidos es necesario registrarse con datos verídicos. El usuario es responsable de mantener la confidencialidad de sus credenciales de acceso.</p>
@@ -28,13 +28,13 @@ export default function TermsPage() {
         <p>Las devoluciones se aceptan dentro de las 24 horas posteriores a la entrega para productos en mal estado o que no correspondan al pedido.</p>
 
         <h2 className="text-lg font-semibold text-gray-800">7. Propiedad intelectual</h2>
-        <p>Todo el contenido del sitio (imágenes, textos, diseño) es propiedad de Almipal SAS y no puede ser reproducido sin autorización.</p>
+        <p>Todo el contenido del sitio (imágenes, textos, diseño) es propiedad de Distrialma y no puede ser reproducido sin autorización.</p>
 
         <h2 className="text-lg font-semibold text-gray-800">8. Jurisdicción</h2>
         <p>Para cualquier controversia que se suscite, las partes se someten a los Tribunales Ordinarios de Morón, Provincia de Buenos Aires.</p>
 
         <h2 className="text-lg font-semibold text-gray-800">9. Contacto</h2>
-        <p>Almipal SAS (Distrialma)<br />Av. Calle Real 387, Merlo, Buenos Aires<br />CUIT: 30-71748546-3</p>
+        <p>Distrialma<br />Merlo, Buenos Aires</p>
       </div>
       <div className="mt-8">
         <Link href="/" className="text-brand-500 hover:underline text-sm">← Volver al inicio</Link>

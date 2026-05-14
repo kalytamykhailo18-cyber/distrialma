@@ -157,7 +157,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   useEffect(() => {
     if (status === "loading") return;
-    if (!session?.user || !isStaff) { router.push("/login"); return; }
+    if (!session?.user || (!isStaff && !isClientEmployee)) { router.push("/login"); return; }
     if (!allowed) {
       // Redirect to first permitted page
       for (const cat of MENU_CATEGORIES) {
@@ -180,7 +180,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         }
       }
     }
-  }, [session, status, router, allowed, isStaff, permissions, pathname, role]);
+  }, [session, status, router, allowed, isStaff, isClientEmployee, permissions, pathname, role]);
 
   if (status === "loading" || !session?.user || !allowed) {
     return <div className="max-w-7xl mx-auto px-4 py-12 text-center text-gray-500">Cargando...</div>;

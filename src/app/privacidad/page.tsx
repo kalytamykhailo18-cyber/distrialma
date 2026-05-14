@@ -34,7 +34,7 @@ export default function PrivacidadPage() {
         <p>Usted puede solicitar la modificación o eliminación de sus datos personales contactándonos por WhatsApp o correo electrónico.</p>
 
         <h2 className="text-lg font-semibold text-gray-800">7. Contacto</h2>
-        <p>Almipal SAS (Distrialma)<br />Av. Calle Real 387, Merlo, Buenos Aires<br />CUIT: 30-71748546-3</p>
+        <p>Distrialma<br />Merlo, Buenos Aires</p>
       </div>
       <div className="mt-8">
         <Link href="/" className="text-brand-500 hover:underline text-sm">← Volver al inicio</Link>

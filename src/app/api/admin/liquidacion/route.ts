@@ -25,6 +25,12 @@ export async function GET(req: NextRequest) {
       where: { activo: true, empleadoCod: { not: null } },
       orderBy: { nombre: "asc" },
     });
+    // Load client-employee mappings
+    const clientMappings = await prisma.setting.findMany({ where: { key: { startsWith: "emp_client_" } } });
+    const empToClient = new Map<string, string>();
+    for (const m of clientMappings) {
+      empToClient.set(m.value, m.key.replace("emp_client_", ""));
+    }
     return NextResponse.json({
       empleados: fichadorEmps.map((e) => {
         const sueldo = sueldos.find((s) => s.empleadoCod === e.empleadoCod);
@@ -39,6 +45,7 @@ export async function GET(req: NextRequest) {
           bono: Number(sueldo?.bono || 0),
           viatico: Number(sueldo?.viatico || 0),
           plus: Number(sueldo?.plus || 0),
+          clienteCod: empToClient.get(e.empleadoCod || "") || "",
         };
       }),
     });
@@ -310,7 +317,7 @@ export async function POST(req: NextRequest) {
 
   // Save salary config
   if (body.action === "sueldo") {
-    const { empleadoCod, basico, presentismo, adicionalCaja, bono, viatico, plus } = body;
+    const { empleadoCod, basico, presentismo, adicionalCaja, bono, viatico, plus, clienteCod } = body;
     if (!empleadoCod) return NextResponse.json({ error: "empleadoCod requerido" }, { status: 400 });
     await prisma.empleadoSueldo.upsert({
       where: { empleadoCod },
@@ -332,6 +339,16 @@ export async function POST(req: NextRequest) {
         plus: parseFloat(plus) || 0,
       },
     });
+    // Save client-employee mapping for Mis Descuentos
+    const settingKey = `emp_client_${(clienteCod || "").trim()}`;
+    if (clienteCod && clienteCod.trim()) {
+      // Remove old mapping for this employee
+      const oldMappings = await prisma.setting.findMany({ where: { key: { startsWith: "emp_client_" }, value: empleadoCod } });
+      for (const old of oldMappings) {
+        await prisma.setting.delete({ where: { key: old.key } });
+      }
+      await prisma.setting.upsert({ where: { key: settingKey }, create: { key: settingKey, value: empleadoCod }, update: { value: empleadoCod } });
+    }
     return NextResponse.json({ ok: true });
   }
 
