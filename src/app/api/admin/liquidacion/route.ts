@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireStaff } from "@/lib/api-auth";
 import { prisma } from "@/lib/prisma";
+import { getPool, getDbName } from "@/lib/mssql";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +19,8 @@ export async function GET(req: NextRequest) {
   const empleadoCod = searchParams.get("empleado");
   const mes = searchParams.get("mes"); // YYYY-MM
 
+  const pool = await getPool();
+
   // If no specific employee, return all salary configs
   if (!empleadoCod) {
     const sueldos = await prisma.empleadoSueldo.findMany();
@@ -31,6 +34,16 @@ export async function GET(req: NextRequest) {
     for (const m of clientMappings) {
       empToClient.set(m.value, m.key.replace("emp_client_", ""));
     }
+    // Load emails from PunTouch
+    const dbEmpleados = getDbName("empleados");
+    const emailResult = await pool.request().query(`
+      SELECT LTRIM(RTRIM(Cod)) AS cod, LTRIM(RTRIM(ISNULL(Email,''))) AS email
+      FROM [${dbEmpleados}].dbo.Empleados
+      WHERE LTRIM(RTRIM(ISNULL(Email,''))) <> ''
+    `);
+    const emailMap = new Map<string, string>();
+    for (const e of emailResult.recordset) emailMap.set(e.cod, e.email);
+
     return NextResponse.json({
       empleados: fichadorEmps.map((e) => {
         const sueldo = sueldos.find((s) => s.empleadoCod === e.empleadoCod);
@@ -46,6 +59,7 @@ export async function GET(req: NextRequest) {
           viatico: Number(sueldo?.viatico || 0),
           plus: Number(sueldo?.plus || 0),
           clienteCod: empToClient.get(e.empleadoCod || "") || "",
+          email: emailMap.get(e.empleadoCod || "") || "",
         };
       }),
     });

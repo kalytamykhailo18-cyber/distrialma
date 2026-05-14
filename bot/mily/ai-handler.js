@@ -199,7 +199,12 @@ export async function callClaude(chatId, userMessage, clientInfo, phoneNumber, {
               result = { sent: true };
             } catch (e) { result = { sent: false, error: e.message }; }
           } else if (tu.name === "register_client") {
-            const reg = await registerClient({ nombre: tu.input.nombre, direccion: tu.input.direccion || "", telefono: tu.input.telefono, cuit: tu.input.cuit || "" });
+            // Use WhatsApp phone number, formatted for Argentina (11-XXXX-XXXX)
+            let telFormatted = phoneNumber || tu.input.telefono || "";
+            if (telFormatted.startsWith("549")) telFormatted = telFormatted.slice(3); // remove country code
+            if (telFormatted.startsWith("54")) telFormatted = telFormatted.slice(2);
+            if (telFormatted.length === 10) telFormatted = telFormatted.slice(0, 2) + "-" + telFormatted.slice(2, 6) + "-" + telFormatted.slice(6);
+            const reg = await registerClient({ nombre: tu.input.nombre, direccion: tu.input.direccion || "", telefono: telFormatted, cuit: tu.input.cuit || "" });
             console.log(`[REGISTER] ${chatId}: registered ${reg.nombre} as client ${reg.cod}`);
             // Send credentials to client
             const cuitUser = (tu.input.cuit || "").replace(/[^0-9]/g, "");

@@ -51,7 +51,7 @@ export async function GET() {
       .query(
         `SELECT ISNULL(SUM(t.Total), 0) AS monthlyTotal
          FROM [${dbTransas}].dbo.Transas t
-         WHERE t.Cliente = @cod2
+         WHERE LTRIM(RTRIM(t.Cliente)) = @cod2
            AND t.Tipo IN ('N', 'V')
            AND (LTRIM(RTRIM(t.Itm)) = '0' OR LTRIM(RTRIM(t.Itm)) = '')
            AND t.Fechora >= @monthStart`
@@ -66,7 +66,7 @@ export async function GET() {
           LTRIM(RTRIM(t.Fechora)) AS fechora,
           ABS(t.Deuda) AS amount
          FROM [${dbTransas}].dbo.Transas t
-         WHERE t.Cliente = @cod3
+         WHERE LTRIM(RTRIM(t.Cliente)) = @cod3
            AND t.MovCaja = 'P'
            AND (LTRIM(RTRIM(t.Itm)) = '0' OR LTRIM(RTRIM(t.Itm)) = '')
          ORDER BY t.Fechora DESC`
@@ -97,7 +97,7 @@ export async function GET() {
           t.Tarjeta AS tarjeta,
           LTRIM(RTRIM(ISNULL(t.MovCaja, ''))) AS movCaja
         FROM [${dbTransas}].dbo.Transas t
-        WHERE t.Cliente = @cod
+        WHERE LTRIM(RTRIM(t.Cliente)) = @cod
           AND t.Tipo IN ('N', 'V', 'M')
           AND (LTRIM(RTRIM(t.Itm)) = '0' OR LTRIM(RTRIM(t.Itm)) = '')
         ORDER BY t.Fechora DESC`

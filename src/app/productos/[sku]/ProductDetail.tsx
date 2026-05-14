@@ -252,6 +252,7 @@ export default function ProductDetailPage() {
             {(() => {
               const isKg = product.unit === "KG";
               const priceLabel = isKg ? "/KG" : "";
+              if (product.stock <= (product.stockThreshold || 0)) return null;
               return (
                 <>
                   {product.precioMayorista > 0 && (
@@ -319,8 +320,15 @@ export default function ProductDetailPage() {
             </div>
           )}
 
+          {/* Out of stock notice */}
+          {product.stock <= (product.stockThreshold || 0) && (
+            <div className="mb-4 bg-red-50 border border-red-200 rounded-xl p-3 text-center">
+              <span className="text-red-600 font-semibold text-sm">Sin stock — Producto temporalmente no disponible</span>
+            </div>
+          )}
+
           {/* Add to cart */}
-          {!isAdmin && product.precioMayorista > 0 && (() => {
+          {!isAdmin && product.precioMayorista > 0 && product.stock > (product.stockThreshold || 0) && (() => {
             const unitMin = product.pesoMayorista > 0 ? product.pesoMayorista : 1;
             const unitStep = product.pesoMayorista > 0 ? product.pesoMayorista : 1;
             const itemData = {

@@ -46,7 +46,10 @@ export async function GET(
       }
     }
 
-    return NextResponse.json(product);
+    const thresholdSetting = await prisma.setting.findUnique({ where: { key: "stock_threshold" } });
+    const stockThreshold = parseInt(thresholdSetting?.value || "0") || 0;
+
+    return NextResponse.json({ ...product, stockThreshold });
   } catch (error) {
     console.error("Error fetching product:", error);
     return NextResponse.json(

@@ -38,7 +38,7 @@ export async function GET() {
           'web' AS origen
         FROM [${dbPedidos}].dbo.Pedidos p
         WHERE p.Tipo = 'V'
-          AND p.Cliente = @cliente
+          AND LTRIM(RTRIM(p.Cliente)) = @cliente
           AND (p.Anulado IS NULL OR LTRIM(RTRIM(p.Anulado)) = '' OR p.Anulado = ' ')
         ORDER BY p.Fechora DESC`
       );
@@ -60,7 +60,7 @@ export async function GET() {
         FROM [${dbTransas}].dbo.Transas t
         WHERE t.Tipo IN ('V', 'N')
           AND (LTRIM(RTRIM(t.Itm)) = '0' OR LTRIM(RTRIM(t.Itm)) = '')
-          AND t.Cliente = @cliente
+          AND LTRIM(RTRIM(t.Cliente)) = @cliente
         ORDER BY t.Fechora DESC`
       );
 
@@ -86,7 +86,7 @@ export async function GET() {
         FROM [${dbPedidos}].dbo.Pedidos p
         LEFT JOIN [${dbProductos}].dbo.Productos pr ON pr.Cod = p.Producto
         WHERE p.Tipo = 'I'
-          AND p.Cliente = @cliente
+          AND LTRIM(RTRIM(p.Cliente)) = @cliente
           AND (p.Anulado IS NULL OR LTRIM(RTRIM(p.Anulado)) = '' OR p.Anulado = ' ')`
       );
 
@@ -108,7 +108,7 @@ export async function GET() {
         FROM [${dbTransas}].dbo.Transas t
         LEFT JOIN [${dbProductos}].dbo.Productos pr ON pr.Cod = t.Producto
         WHERE t.Tipo = 'I'
-          AND t.Cliente = @cliente`
+          AND LTRIM(RTRIM(t.Cliente)) = @cliente`
       );
 
     const itemsByBoleta = new Map<string, Array<{ sku: string; name: string; cant: number; precio: number; impo: number; unit: string; pesoHorma: string }>>();

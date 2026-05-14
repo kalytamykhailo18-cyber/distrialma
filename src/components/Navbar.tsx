@@ -75,7 +75,10 @@ export default function Navbar() {
     ? [
         { href: "/productos", label: "Productos", match: "/productos" },
         { href: "/mi-cuenta", label: "Mi Cuenta", match: "/mi-cuenta" },
-        ...(empleadoCod ? [{ href: "/admin/mis-descuentos", label: "Mis Descuentos", match: "/admin/mis-descuentos" }] : []),
+        ...(empleadoCod ? [
+          { href: "/admin/mis-descuentos", label: "Mis Descuentos", match: "/admin/mis-descuentos" },
+          { href: "/admin/mi-horario", label: "Mi Horario", match: "/admin/mi-horario" },
+        ] : []),
       ]
     : [
         { href: "/productos", label: "Productos", match: "/productos" },

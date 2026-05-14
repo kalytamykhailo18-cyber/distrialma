@@ -60,7 +60,7 @@ export async function GET(req: NextRequest) {
           t.Efectivo AS efectivo,
           t.Deuda AS deuda
         FROM [${dbTransas}].dbo.Transas t
-        WHERE t.Cliente = @cod AND (LTRIM(RTRIM(t.Itm)) = '0' OR LTRIM(RTRIM(t.Itm)) = '')
+        WHERE LTRIM(RTRIM(t.Cliente)) = @cod AND (LTRIM(RTRIM(t.Itm)) = '0' OR LTRIM(RTRIM(t.Itm)) = '')
           AND t.Tipo IN ('V', 'N', 'R')
           AND (t.Anulado IS NULL OR LTRIM(RTRIM(t.Anulado)) = '' OR t.Anulado = ' ')
         ORDER BY t.Fechora DESC

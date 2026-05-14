@@ -63,11 +63,7 @@ export async function getProducts(opts: {
 
   const params: Record<string, unknown> = {};
 
-  const [hiddenIds, hideOutOfStock, stockThreshold] = await Promise.all([
-    getHiddenCategoryIds(),
-    getSetting("hide_out_of_stock"),
-    getSetting("stock_threshold"),
-  ]);
+  const hiddenIds = await getHiddenCategoryIds();
 
   if (hiddenIds.length > 0) {
     const placeholders = hiddenIds.map((_, i) => `@hidden${i}`).join(",");
@@ -77,10 +73,7 @@ export async function getProducts(opts: {
     });
   }
 
-  if (hideOutOfStock === "true") {
-    const threshold = parseInt(stockThreshold || "0") || 0;
-    where += ` AND s.Stk > ${threshold}`;
-  }
+  // Products without stock are shown but marked as "Sin stock" (not hidden)
 
   if (categoryId) {
     where += " AND LTRIM(RTRIM(p.Rubro)) = @categoryId";

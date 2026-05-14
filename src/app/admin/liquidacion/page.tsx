@@ -18,6 +18,7 @@ interface Empleado {
   viatico: number;
   plus: number;
   clienteCod: string;
+  email: string;
 }
 
 interface Ajuste { id: number; concepto: string; monto: number }
@@ -641,6 +642,7 @@ export default function LiquidacionPage() {
                 <thead>
                   <tr className="bg-gray-50 border-b text-left text-xs text-gray-500">
                     <th className="px-3 py-2">Empleado</th>
+                    <th className="px-3 py-2">Email</th>
                     <th className="px-3 py-2">Nro Cliente</th>
                     <th className="px-3 py-2 text-right">Basico</th>
                     <th className="px-3 py-2 text-right">Presentismo</th>
@@ -655,6 +657,7 @@ export default function LiquidacionPage() {
                   {empleados.map((emp, i) => (
                     <tr key={emp.empleadoCod} className={hoverRow} style={staggerStyle(true, i, 0, 10)}>
                       <td className="px-3 py-2 font-medium text-gray-900 text-xs">{emp.nombre}</td>
+                      <td className="px-2 py-2 text-xs text-gray-500">{emp.email || "—"}</td>
                       <td className="px-1 py-1">
                         <input type="text" value={emp.clienteCod || ""} onChange={(e) => updateEmpField(emp.empleadoCod, "clienteCod", e.target.value)}
                           placeholder="—" className="w-20 px-2 py-1 border rounded text-xs text-center focus:outline-none focus:border-brand-500" />

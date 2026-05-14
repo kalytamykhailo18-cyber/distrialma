@@ -79,6 +79,7 @@ const MENU_CATEGORIES: MenuCategory[] = [
       { href: "/admin/vendedores", label: "Vendedores", perm: "vendedores" },
       { href: "/admin/usuarios", label: "Usuarios", perm: "usuarios" },
       { href: "/admin/mis-descuentos", label: "Mis Descuentos", perm: "mis-descuentos" },
+      { href: "/admin/mi-horario", label: "Mi Horario", perm: "mis-descuentos" },
       { href: "/admin/mi-liquidacion", label: "Mi Liquidacion", perm: "mi-liquidacion" },
       { href: "/admin/control-horario", label: "Control Horario", perm: "control-horario" },
       { href: "/admin/liquidacion", label: "Liquidacion", perm: "liquidacion" },
@@ -139,7 +140,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       .find(([path]) => pathname.startsWith(path + "/"))?.[1];
 
   // Allow client-role users with empleadoCod to access mis-descuentos
-  const isClientEmployee = !isStaff && !!user?.empleadoCod && pathname === "/admin/mis-descuentos";
+  const isClientEmployee = !isStaff && !!user?.empleadoCod && (pathname === "/admin/mis-descuentos" || pathname === "/admin/mi-horario");
   const allowed = isClientEmployee || (isStaff && (!requiredPerm || hasPermission(role, permissions, requiredPerm)));
 
   // Auto-expand category of current page

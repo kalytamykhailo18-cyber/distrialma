@@ -39,6 +39,7 @@ export default function ProductGrid({
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(!initialProducts);
+  const [stockThreshold, setStockThreshold] = useState(0);
   const prevFilters = useRef({ categoryId, brandId, search });
   const scrollRestored = useRef(false);
 
@@ -78,6 +79,7 @@ export default function ProductGrid({
       setProducts(data.products || []);
       setTotalPages(data.totalPages || 1);
       setTotal(data.total || 0);
+      if (data.stockThreshold !== undefined) setStockThreshold(data.stockThreshold);
     } catch {
       setProducts([]);
       setTotalPages(1);
@@ -133,7 +135,7 @@ export default function ProductGrid({
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {products.map((product, i) => (
-            <ProductCard key={product.sku} product={product} index={i} />
+            <ProductCard key={product.sku} product={product} index={i} stockThreshold={stockThreshold} />
           ))}
         </div>
       )}
