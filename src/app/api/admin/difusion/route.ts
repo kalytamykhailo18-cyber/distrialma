@@ -122,25 +122,7 @@ export async function POST(req: NextRequest) {
     const filtroLabel = (filtro === "rango" ? `rango:${parseInt(rangoDesde) || 0}-${parseInt(rangoHasta) || 999999}` : (filtro || "todos")) + (soloMostrador ? " +mostrador" : "") + (soloActivos ? ` +activos${parseInt(activosDias) || 30}d` : "");
     const isScheduled = !!programada && !enviarAhora;
 
-    // Daily limit: max 300 messages per day
-    const DAILY_LIMIT = 300;
-    const todayStart = new Date();
-    todayStart.setHours(todayStart.getHours() - 3); // Argentina
-    todayStart.setUTCHours(3, 0, 0, 0); // midnight ARG = 03:00 UTC
-    const sentToday = await prisma.notificationLog.count({
-      where: { tipo: "difusion", ok: true, createdAt: { gte: todayStart } },
-    });
-    const remaining = Math.max(0, DAILY_LIMIT - sentToday);
-    if (totalRecipients > remaining && remaining < DAILY_LIMIT) {
-      return NextResponse.json({
-        ok: false,
-        error: `Limite diario: ya se enviaron ${sentToday} hoy, quedan ${remaining} de ${DAILY_LIMIT}. Reduce la cantidad o programa para mañana.`,
-        sentToday,
-        remaining,
-        dailyLimit: DAILY_LIMIT,
-        totalRecipients,
-      }, { status: 400 });
-    }
+    // Daily limit is enforced in the cron — if over 300/day it pauses and continues next day
 
     // Create campaign + recipients in one transaction
     const difusion = await prisma.difusion.create({
