@@ -11,7 +11,11 @@ const MODEL = "claude-haiku-4-5-20251001";
 const SYSTEM_PROMPT = `Soy Mily, asistente virtual de Distrialma (mayorista alimentos, Merlo, Buenos Aires). WhatsApp, español argentino, breve (1-3 oraciones), texto plano sin markdown. Personalidad amable y servicial, trato cercano.
 
 IDENTIDAD: Me llamo Mily. Si me preguntan quien soy digo "Soy Mily, la asistente virtual de Distrialma". No digo que soy IA ni robot.
-PRODUCTOS: Usa search_products. SIEMPRE mostrar TODOS los resultados que devuelve la herramienta, no omitir ninguno. Mostra precio Mayorista + Caja Cerrada si hay. Precios con IVA. "Stock sujeto a disponibilidad." NO mostrar cantidad de stock exacta. Link: distrialma.com.ar/productos/{sku}
+PRODUCTOS: Usa search_products. SIEMPRE mostrar TODOS los resultados que devuelve la herramienta, no omitir ninguno.
+- Si el producto tiene stock (disponible=true): mostrar precio Mayorista + Caja Cerrada. "Stock sujeto a disponibilidad."
+- Si el producto NO tiene stock (disponible=false): NO mostrar precio. Solo decir que lo trabajamos pero está sin stock. Ejemplo: "La Muzzarella Castelar la trabajamos pero está sin stock en este momento."
+- NO repetir "sin stock" si ya se dijo antes en el mismo mensaje.
+- NO mostrar cantidad de stock exacta. Link: distrialma.com.ar/productos/{sku}
 COMBOS: Usa search_combos.
 MARCA: Incluir link de marca.
 LISTA PRECIOS: Preguntar rubro/marca primero, luego send_price_list con filtro. Nunca completa.
@@ -158,7 +162,12 @@ export async function callClaude(chatId, userMessage, clientInfo, phoneNumber, {
             const products = await searchProducts(tu.input.query);
             result = products.length === 0 ? { found: 0, message: "No se encontraron productos." } : {
               found: products.length,
-              products: products.map((p) => ({ sku: p.sku, nombre: p.name, marca: p.marca, rubro: p.rubro, precio_mayorista: formatPrice(p.mayorista), precio_caja_cerrada: p.cajaCerrada > 0 ? formatPrice(p.cajaCerrada) : null, stock: p.stock, disponible: p.disponible, link: p.url })),
+              products: products.map((p) => ({
+                sku: p.sku, nombre: p.name, marca: p.marca, rubro: p.rubro,
+                ...(p.disponible ? { precio_mayorista: formatPrice(p.mayorista), precio_caja_cerrada: p.cajaCerrada > 0 ? formatPrice(p.cajaCerrada) : null } : {}),
+                disponible: p.disponible,
+                link: p.url,
+              })),
             };
           } else if (tu.name === "search_by_brand") {
             const data = await searchByBrand(tu.input.brand, tu.input.product_keywords || "");

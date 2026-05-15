@@ -745,7 +745,7 @@ model Difusion {
   id          Int       @id @default(autoincrement())
   mensaje     String    @db.Text
   imagenUrl   String?   @db.VarChar(500)
-  filtro      String    @db.VarChar(30)  // "todos" | "zona:LUNES" | "reparto" etc.
+  filtro      String    @db.VarChar(100) // "todos" | "zona:LUNES" | "reparto" | "rango:X-Y +flags"
   programada  DateTime?                  // null = send immediately
   estado      String    @default("pendiente") @db.VarChar(20) // pendiente | enviando | completada | cancelada
   enviados    Int       @default(0)
