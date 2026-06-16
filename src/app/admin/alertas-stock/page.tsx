@@ -162,10 +162,11 @@ export default function AlertasStockPage() {
             </div>
 
             <div className="mb-4">
-              <label className="text-xs text-gray-600 font-medium">Telefono destinatario</label>
+              <label className="text-xs text-gray-600 font-medium">Telefono(s) destinatario(s)</label>
               <input type="text" value={phone} onChange={(e) => setPhone(e.target.value)}
-                placeholder="5491122254949"
+                placeholder="5491122254949, 5491134207773"
                 className="w-full mt-1 px-3 py-2 border rounded-xl text-sm focus:outline-none focus:border-brand-500" />
+              <p className="text-xs text-gray-400 mt-1">Separá con coma para enviar a varios números.</p>
             </div>
 
             <button onClick={saveConfig} disabled={savingConfig}

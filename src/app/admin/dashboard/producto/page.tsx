@@ -11,7 +11,7 @@ import { PageTransition, Stagger, staggerStyle, springBtn, hoverRow, LoadingCent
 const fmt = (n: number) => formatPrice(n);
 const fmtK = (n: number) => n >= 1000000 ? `${(n / 1000000).toFixed(1)}M` : n >= 1000 ? `${(n / 1000).toFixed(0)}K` : String(Math.round(n));
 const LISTA_LABELS: Record<number, string> = { 1: "Minorista", 2: "Mayorista", 3: "Especial", 4: "Caja Cerrada", 5: "PedidosYa" };
-const SUC_NAMES: Record<string, string> = { "1": "Minorista 435", "2": "Mayorista 387", "6": "May. Pontevedra", "7": "Distribuidora", "10": "Reventas" };
+const SUC_NAMES: Record<string, string> = { "1": "Minorista 435", "2": "Mayorista 387", "6": "May. Pontevedra", "7": "Distribuidora", "10": "Reventas", "11": "PedidosYa" };
 
 interface ProductData {
   producto: { sku: string; nombre: string; marca: string; rubro: string; unidad: string; stockActual: number; costoUnit: number; precios: Record<string, number> };

@@ -186,13 +186,17 @@ export default function LiquidacionPage() {
     }
 
     // Descuentos
-    if (liqData.resumen.totalDescuentos > 0) {
+    const hasBalance = liqData.balanceTotals.recibos > 0 || liqData.balanceTotals.aportes > 0 || liqData.balanceTotals.creditos > 0;
+    if (liqData.resumen.totalDescuentos > 0 || hasBalance) {
       doc.setFont("helvetica", "bold"); doc.setFontSize(10);
       doc.text("Descuentos", 14, y); y += 6;
       doc.setFont("helvetica", "normal"); doc.setFontSize(9);
       if (liqData.descuentos.mercaderia > 0) { doc.text("Mercaderia", 18, y); doc.text("-" + fmt(liqData.descuentos.mercaderia), w - 18, y, { align: "right" }); y += 5; }
       if (liqData.descuentos.faltantes > 0) { doc.text("Faltantes caja", 18, y); doc.text("-" + fmt(liqData.descuentos.faltantes), w - 18, y, { align: "right" }); y += 5; }
       if (liqData.descuentos.suspensiones > 0) { doc.text("Suspension (" + liqData.descuentos.diasSuspension + " dias)", 18, y); doc.text("-" + fmt(liqData.descuentos.suspensiones), w - 18, y, { align: "right" }); y += 5; }
+      if (liqData.balanceTotals.recibos > 0) { doc.text("Recibos", 18, y); doc.text("-" + fmt(liqData.balanceTotals.recibos), w - 18, y, { align: "right" }); y += 5; }
+      if (liqData.balanceTotals.aportes > 0) { doc.text("Aportes", 18, y); doc.text("-" + fmt(liqData.balanceTotals.aportes), w - 18, y, { align: "right" }); y += 5; }
+      if (liqData.balanceTotals.creditos > 0) { doc.text("Credito", 18, y); doc.text("-" + fmt(liqData.balanceTotals.creditos), w - 18, y, { align: "right" }); y += 5; }
       y += 3;
     }
 
@@ -201,7 +205,7 @@ export default function LiquidacionPage() {
     doc.roundedRect(14, y - 2, w - 28, 10, 2, 2, "F");
     doc.setFontSize(12); doc.setFont("helvetica", "bold");
     doc.text("TOTAL A COBRAR", 18, y + 5);
-    doc.text(fmt(liqData.resumen.totalACobrar), w - 18, y + 5, { align: "right" });
+    doc.text(fmt(liqData.saldoReal), w - 18, y + 5, { align: "right" });
     y += 15;
 
     // Previous month reference

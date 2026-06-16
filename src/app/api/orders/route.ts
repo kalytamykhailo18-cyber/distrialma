@@ -389,6 +389,52 @@ export async function POST(req: NextRequest) {
       console.error("Error saving instant PedidoBackup:", backupErr);
     }
 
+    // Auto-send WhatsApp confirmation for reparto clients (fire-and-forget, doesn't block response).
+    // Sent via Mily (3099) because Skynet sessions are unstable; Mily's onSend hook adds to inboxReplying
+    // for 30s so the message_create takeover detector does not silence the bot.
+    if (isReparto && client.telefono?.trim()) {
+      const nombreCorto = client.nombre.split(/\s+/)[0] || client.nombre;
+      const totalFmt = totalImpo.toLocaleString("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 });
+      const msg = `Hola ${nombreCorto}! Recibimos tu pedido N° ${nextNroped.replace(/^0+/, "") || nextNroped} por ${totalFmt}. Lo preparamos y te llega el dia de tu reparto. Gracias!\n\nEste es un mensaje automatico. Por cualquier duda comunicate con la distribuidora al +54 9 11 5413-7677.`;
+      fetch("http://127.0.0.1:3099/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: client.telefono.trim(), message: msg, sender: "bot" }),
+      })
+        .then(async (res) => {
+          const ok = res.ok;
+          const errBody = ok ? null : await res.text().catch(() => null);
+          try {
+            await prisma.notificationLog.create({
+              data: {
+                clientId: client.cod.trim(),
+                tipo: "pedido_confirmacion",
+                mensaje: msg,
+                telefono: client.telefono.trim(),
+                enviadoPor: "auto",
+                ok,
+                error: errBody,
+              },
+            });
+          } catch { /* ignore log errors */ }
+        })
+        .catch(async (e) => {
+          try {
+            await prisma.notificationLog.create({
+              data: {
+                clientId: client.cod.trim(),
+                tipo: "pedido_confirmacion",
+                mensaje: msg,
+                telefono: client.telefono.trim(),
+                enviadoPor: "auto",
+                ok: false,
+                error: e instanceof Error ? e.message : "fetch error",
+              },
+            });
+          } catch { /* ignore log errors */ }
+        });
+    }
+
     return NextResponse.json({
       ok: true,
       nroped: nextNroped,

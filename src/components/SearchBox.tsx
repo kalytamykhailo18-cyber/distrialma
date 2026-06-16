@@ -45,7 +45,7 @@ export default function SearchBox({ initialValue, onSearch }: Props) {
         value={value}
         onChange={(e) => setValue(e.target.value)}
         placeholder="Buscar productos..."
-        className="w-full pl-10 pr-4 py-2.5 border border-brand-600 rounded-xl text-sm font-medium focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-700"
+        className="w-full pl-10 pr-4 py-2.5 border border-brand-600 rounded-xl text-base font-semibold text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-700"
       />
     </div>
   );

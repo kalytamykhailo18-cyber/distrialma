@@ -28,11 +28,15 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ orders });
 }
 
-// POST — archive orders from PunTouch and delete them
+// POST — archive orders from PunTouch and delete them.
+// Optional `boleta`: if provided, only that single boleta is processed
+// (lets staff dry-run on one row to validate the stock-restore math).
 export async function POST(req: NextRequest) {
-  const { clienteCod, cronSecret } = (await req.json()) as {
+  const { clienteCod, clienteName, cronSecret, boleta } = (await req.json()) as {
     clienteCod: string;
+    clienteName?: string;
     cronSecret?: string;
+    boleta?: string;
   };
 
   // Allow access from admin/staff session OR cron secret
@@ -50,12 +54,26 @@ export async function POST(req: NextRequest) {
     const pool = await getPool();
     const dbPedidos = getDbName("pedidos");
     const dbProductos = getDbName("productos");
+    const clienteTrim = clienteCod.trim();
+    const nombreTrim = (clienteName || "").trim().toUpperCase();
+    const boletaTrim = (boleta || "").trim();
+
+    // Match by cliente cod OR by nombre (mostrador sales may have varying cliente codes
+    // but consistently use the cliente name like LOCAL1)
+    const matchClause = nombreTrim
+      ? `(LTRIM(RTRIM(p.Cliente)) = @cliente OR UPPER(LTRIM(RTRIM(ISNULL(p.Nombre,'')))) = @nombre)`
+      : `LTRIM(RTRIM(p.Cliente)) = @cliente`;
+    const boletaClause = boletaTrim
+      ? ` AND LTRIM(RTRIM(p.Boleta)) = @boleta`
+      : "";
 
     // Get order headers
-    const headers = await pool
+    const headersReq = pool
       .request()
-      .input("cliente", clienteCod.padStart(7, " "))
-      .query(`
+      .input("cliente", clienteTrim)
+      .input("nombre", nombreTrim);
+    if (boletaTrim) headersReq.input("boleta", boletaTrim);
+    const headers = await headersReq.query(`
         SELECT
           LTRIM(RTRIM(p.Boleta)) AS boleta,
           LTRIM(RTRIM(p.Nroped)) AS nroped,
@@ -66,7 +84,7 @@ export async function POST(req: NextRequest) {
           p.Total AS total,
           LTRIM(RTRIM(ISNULL(p.Observaciones,''))) AS notas
         FROM [${dbPedidos}].dbo.Pedidos p
-        WHERE p.Tipo = 'V' AND p.Cliente = @cliente
+        WHERE p.Tipo = 'V' AND ${matchClause}${boletaClause}
           AND (p.Anulado IS NULL OR LTRIM(RTRIM(p.Anulado)) = '' OR p.Anulado = ' ')
         ORDER BY p.Fechora DESC
       `);
@@ -75,10 +93,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ archived: 0, deleted: 0, message: "No hay pedidos pendientes" });
     }
 
-    // Get items
+    // Get items — filter by the boletas we just found (avoids any cliente/nombre divergence between header and item rows)
+    const boletaList = headers.recordset.map((h: { boleta: string }) => `'${h.boleta.replace(/'/g, "''")}'`).join(",");
     const items = await pool
       .request()
-      .input("cliente", clienteCod.padStart(7, " "))
       .query(`
         SELECT
           LTRIM(RTRIM(p.Boleta)) AS boleta,
@@ -90,8 +108,7 @@ export async function POST(req: NextRequest) {
           p.ListaPrecio AS listaPrecio
         FROM [${dbPedidos}].dbo.Pedidos p
         LEFT JOIN [${dbProductos}].dbo.Productos pr ON pr.Cod = p.Producto
-        WHERE p.Tipo = 'I' AND p.Cliente = @cliente
-          AND (p.Anulado IS NULL OR LTRIM(RTRIM(p.Anulado)) = '' OR p.Anulado = ' ')
+        WHERE p.Tipo = 'I' AND LTRIM(RTRIM(p.Boleta)) IN (${boletaList})
       `);
 
     // Group items by boleta
@@ -130,20 +147,104 @@ export async function POST(req: NextRequest) {
       archived++;
     }
 
-    // Delete from PunTouch
+    // Restore Stock for each archived item — PunTouch reserves (decrements)
+    // stock when a Pedido is loaded as pendiente.  Without this step, the
+    // archive would leave the stock permanently reduced.  Aggregate by sku
+    // to do one UPDATE per product instead of one per item line.
+    const cantBySku = new Map<string, number>();
+    const nameBySku = new Map<string, string>();
+    for (const it of items.recordset as Array<{ sku: string; cant: number; productName: string }>) {
+      const sku = String(it.sku).trim();
+      if (!sku) continue;
+      const cant = Number(it.cant) || 0;
+      if (cant <= 0) continue;
+      cantBySku.set(sku, (cantBySku.get(sku) || 0) + cant);
+      if (!nameBySku.has(sku) && it.productName) nameBySku.set(sku, it.productName);
+    }
+
+    // Snapshot Stk BEFORE so we can return per-sku stkBefore -> stkAfter for verification
+    const stkBefore = new Map<string, number>();
+    const stkAfter = new Map<string, number>();
+    if (cantBySku.size > 0) {
+      const skuPaddedQuoted = Array.from(cantBySku.keys())
+        .map((s) => `'${s.padStart(7, " ").replace(/'/g, "''")}'`)
+        .join(",");
+      const beforeRes = await pool.request().query(`
+        SELECT LTRIM(RTRIM(CodProducto)) AS sku, ISNULL(Stk, 0) AS stk
+        FROM [${dbProductos}].dbo.Stock
+        WHERE CodProducto IN (${skuPaddedQuoted})
+          AND LTRIM(RTRIM(Deposito)) = '0'
+          AND (TalleColor IS NULL OR LTRIM(RTRIM(TalleColor)) = '')
+      `);
+      for (const row of beforeRes.recordset as Array<{ sku: string; stk: number }>) {
+        stkBefore.set(row.sku, Number(row.stk));
+      }
+
+      // Apply restores
+      let stockRestoredCount = 0;
+      for (const [sku, cant] of Array.from(cantBySku.entries())) {
+        const codPadded = sku.padStart(7, " ");
+        const r = await pool
+          .request()
+          .input("cod", codPadded)
+          .input("cant", cant)
+          .query(`
+            UPDATE [${dbProductos}].dbo.Stock
+            SET Stk = ISNULL(Stk, 0) + @cant
+            WHERE LTRIM(RTRIM(CodProducto)) = LTRIM(RTRIM(@cod))
+              AND LTRIM(RTRIM(Deposito)) = '0'
+              AND (TalleColor IS NULL OR LTRIM(RTRIM(TalleColor)) = '')
+          `);
+        if (r.rowsAffected[0] > 0) stockRestoredCount++;
+      }
+
+      // Snapshot AFTER
+      const afterRes = await pool.request().query(`
+        SELECT LTRIM(RTRIM(CodProducto)) AS sku, ISNULL(Stk, 0) AS stk
+        FROM [${dbProductos}].dbo.Stock
+        WHERE CodProducto IN (${skuPaddedQuoted})
+          AND LTRIM(RTRIM(Deposito)) = '0'
+          AND (TalleColor IS NULL OR LTRIM(RTRIM(TalleColor)) = '')
+      `);
+      for (const row of afterRes.recordset as Array<{ sku: string; stk: number }>) {
+        stkAfter.set(row.sku, Number(row.stk));
+      }
+
+      // Log so it's visible in server logs too
+      console.log(`[ARCHIVE-ORDERS] boleta=${boletaTrim || "(all)"} archived=${archived} skusRestituidos=${stockRestoredCount}`);
+      for (const [sku, cant] of Array.from(cantBySku.entries())) {
+        console.log(`  ${sku.padStart(7, " ")}  +${cant}  ${stkBefore.get(sku) ?? "(no-row)"} -> ${stkAfter.get(sku) ?? "(no-row)"}`);
+      }
+    }
+
+    const stockChanges = Array.from(cantBySku.entries()).map(([sku, cant]) => ({
+      sku,
+      productName: nameBySku.get(sku) || "",
+      cant,
+      stkBefore: stkBefore.has(sku) ? stkBefore.get(sku) : null,
+      stkAfter: stkAfter.has(sku) ? stkAfter.get(sku) : null,
+      delta: stkBefore.has(sku) && stkAfter.has(sku)
+        ? Number(stkAfter.get(sku)) - Number(stkBefore.get(sku))
+        : null,
+    }));
+    const stockRestored = stockChanges.filter((c) => c.delta !== null && c.delta > 0).length;
+
+    // Delete from PunTouch — delete the exact boletas we archived (both header and items)
     const del = await pool
       .request()
-      .input("cliente", clienteCod.padStart(7, " "))
       .query(`
         DELETE FROM [${dbPedidos}].dbo.Pedidos
-        WHERE Cliente = @cliente
-          AND (Anulado IS NULL OR LTRIM(RTRIM(Anulado)) = '' OR Anulado = ' ')
+        WHERE LTRIM(RTRIM(Boleta)) IN (${boletaList})
       `);
 
     return NextResponse.json({
       archived,
       deleted: del.rowsAffected[0],
-      message: `${archived} pedidos archivados y eliminados de PunTouch`,
+      stockRestored,
+      stockSkus: cantBySku.size,
+      stockChanges,
+      boleta: boletaTrim || null,
+      message: `${archived} pedidos archivados, ${stockRestored} productos con stock restituido, ${del.rowsAffected[0]} filas eliminadas de PunTouch`,
     });
   } catch (error) {
     console.error("Archive error:", error);

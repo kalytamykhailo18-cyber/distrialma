@@ -16,6 +16,7 @@ export const ALL_PERMISSIONS = [
   { key: "picking", label: "Picking" },
   { key: "compras", label: "Compras" },
   { key: "costeo", label: "Costeo" },
+  { key: "recibos", label: "Recibos a Proveedores" },
   { key: "movimientos", label: "Movimientos Internos" },
   { key: "vendedores", label: "Vendedores (admin)" },
   { key: "vendedor", label: "Vendedor (toma pedidos)" },
@@ -27,6 +28,8 @@ export const ALL_PERMISSIONS = [
   { key: "liquidacion", label: "Liquidacion sueldos" },
   { key: "mi-liquidacion", label: "Mi Liquidacion (ver propia)" },
   { key: "mis-descuentos", label: "Mis Descuentos (ver propios)" },
+  { key: "traslados-stock", label: "Traslados entre sucursales (sin ver stock origen)" },
+  { key: "stock-sucursales", label: "Stock por sucursal (ver y ajustar Stk)" },
 ] as const;
 
 // Special flags (not page permissions, but user config options)
@@ -53,9 +56,12 @@ export const PAGE_PERMISSION_MAP: Record<string, Permission> = {
   "/admin/informes": "informes",
   "/admin/dashboard": "dashboard",
   "/admin/resumen-productos": "dashboard",
+  "/admin/resumen-rubros": "dashboard",
   "/admin/etiquetas": "etiquetas",
   "/admin/compras": "compras",
   "/admin/precios": "costeo",
+  "/admin/vinculaciones-stock": "costeo",
+  "/admin/precios-masivos": "costeo",
   "/admin/proveedores": "compras",
   "/admin/movimientos": "movimientos",
   "/admin/vendedores": "vendedores",
@@ -77,6 +83,7 @@ export const PAGE_PERMISSION_MAP: Record<string, Permission> = {
   "/admin/liquidacion": "liquidacion",
   "/admin/mi-liquidacion": "mi-liquidacion",
   "/admin/mis-descuentos": "mis-descuentos",
+  "/admin/traslados": "traslados-stock",
 };
 
 export function hasPermission(

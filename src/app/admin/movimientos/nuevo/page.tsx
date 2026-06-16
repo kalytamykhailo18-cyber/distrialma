@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { HiOutlineSearch, HiOutlineX, HiOutlineArrowLeft, HiOutlineCamera } from "react-icons/hi";
 import { PageTransition, Stagger, springBtn } from "@/components/AnimateIn";
 
@@ -31,6 +32,7 @@ const SUCURSALES = [
   "Local 2 Vimar",
   "Local 3 Mayorista Merlo",
   "Local 4 Mayorista Pontevedra",
+  "Local 5 PedidosYa",
 ];
 
 const MOTIVOS = [
@@ -42,9 +44,23 @@ const MOTIVOS = [
   "Descuento global",
 ];
 
+const DEPOSITO_OPTIONS = [
+  { cod: "0", label: "[0] Distribuidora / Mayorista" },
+  { cod: "1", label: "[1] Pontevedra" },
+  { cod: "2", label: "[2] Minorista" },
+  { cod: "3", label: "[3] Cervantes" },
+];
+
 export default function NuevoMovimiento() {
   const router = useRouter();
+  const { data: session } = useSession();
+  const user = session?.user as { defaultDeposito?: string } | undefined;
   const [sucursal, setSucursal] = useState("");
+  const [deposito, setDeposito] = useState("0");
+  useEffect(() => {
+    if (user?.defaultDeposito && deposito === "0") setDeposito(user.defaultDeposito);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.defaultDeposito]);
   const [motivo, setMotivo] = useState("");
   const [notas, setNotas] = useState("");
   const [imageUrl, setImageUrl] = useState("");
@@ -273,6 +289,7 @@ export default function NuevoMovimiento() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           sucursal,
+          deposito,
           destino: motivo,
           notas,
           imageUrl: imageUrl || null,
@@ -332,6 +349,16 @@ export default function NuevoMovimiento() {
               </button>
             ))}
           </div>
+          <label className="block text-sm font-medium text-gray-700 mt-4 mb-2">Depósito (de dónde descontar)</label>
+          <select
+            value={deposito}
+            onChange={(e) => setDeposito(e.target.value)}
+            className="w-full px-3 py-2 border border-brand-300 rounded-xl text-sm bg-white focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
+          >
+            {DEPOSITO_OPTIONS.map((d) => (
+              <option key={d.cod} value={d.cod}>{d.label}</option>
+            ))}
+          </select>
         </div>
       </Stagger>
 

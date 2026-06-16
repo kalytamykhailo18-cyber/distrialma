@@ -254,7 +254,11 @@ export default function ComboDetailPage() {
                 className="max-h-full max-w-full object-contain"
               />
             ) : (
-              <span className="text-gray-400">Sin imagen</span>
+              <img
+                src="/logo-alma-placeholder-v3.png"
+                alt="Sin imagen"
+                className="max-h-full max-w-full object-contain opacity-70"
+              />
             )}
           </div>
           {displayImages.length > 1 && (

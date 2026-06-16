@@ -103,7 +103,11 @@ export default function Home() {
                           className="max-h-full max-w-full object-contain"
                         />
                       ) : (
-                        <span className="text-gray-400 text-xs">Sin imagen</span>
+                        <img
+                          src="/logo-alma-placeholder-v3.png"
+                          alt="Sin imagen"
+                          className="max-h-full max-w-full object-contain opacity-70"
+                        />
                       )}
                     </div>
                     <h3 className="text-xs font-medium text-gray-900 mb-2 line-clamp-2">

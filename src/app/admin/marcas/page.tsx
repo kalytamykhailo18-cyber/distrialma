@@ -95,7 +95,18 @@ export default function MarcasPage() {
   return (
     <PageTransition className="max-w-3xl mx-auto px-4 py-6">
       <Stagger delay={0} y={-8}>
-        <h1 className="text-2xl font-bold text-gray-900 mb-6">Marcas en Landing</h1>
+        <div className="flex items-center justify-between mb-6 flex-wrap gap-2">
+          <h1 className="text-2xl font-bold text-gray-900">Marcas en Landing</h1>
+          <button
+            type="button"
+            onClick={() => { setLoading(true); loadData(); }}
+            disabled={loading}
+            className={`px-3 py-1.5 text-sm text-brand-600 border border-brand-300 rounded-lg hover:bg-brand-50 disabled:opacity-50 ${springBtn}`}
+            title="Volver a leer las marcas desde PunTouch (si agregaste una nueva)"
+          >
+            {loading ? "Refrescando…" : "Refrescar"}
+          </button>
+        </div>
       </Stagger>
 
       <Stagger delay={50} y={-6}>

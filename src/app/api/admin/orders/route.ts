@@ -134,6 +134,7 @@ export async function GET() {
       const factura = invoicedByClientDate.get(`${h.clienteCod}|${h.fechora}`) || null;
       return {
         boleta: h.boleta,
+        boletas: [h.boleta] as string[],
         nroped: h.nroped,
         date: h.fechora,
         totalCant: h.totalCant,
@@ -193,13 +194,14 @@ export async function GET() {
         existing.total += o.total;
         existing.totalCant += o.totalCant;
         existing.nroped += `, ${o.nroped}`;
+        if (!existing.boletas.includes(o.boleta)) existing.boletas.push(o.boleta);
         if (o.notas && !existing.notas.includes(o.notas)) {
           existing.notas = existing.notas ? `${existing.notas} | ${o.notas}` : o.notas;
         }
         // Keep earliest date
         if (o.date < existing.date) existing.date = o.date;
       } else {
-        merged.set(key, { ...o, items: [...o.items] });
+        merged.set(key, { ...o, items: [...o.items], boletas: [...o.boletas] });
       }
     }
 

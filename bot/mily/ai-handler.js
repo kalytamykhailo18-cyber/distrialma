@@ -3,7 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import pkg from "whatsapp-web.js";
 import fs from "fs";
 import { prisma, formatPrice } from "../shared/utils.js";
-import { searchProducts, searchByBrand, searchCombos, findClientByPhone, registerClient, generatePriceListPDF } from "../shared/products.js";
+import { searchProducts, searchByBrand, searchCombos, findClientByPhone, registerClient, generatePriceListPDF, saveClientEmail } from "../shared/products.js";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const MODEL = "claude-haiku-4-5-20251001";
@@ -19,16 +19,16 @@ PRODUCTOS: Usa search_products. SIEMPRE mostrar TODOS los resultados que devuelv
 COMBOS: Usa search_combos.
 MARCA: Incluir link de marca.
 LISTA PRECIOS: Preguntar rubro/marca primero, luego send_price_list con filtro. Nunca completa.
-PEDIDOS: Si el cliente esta registrado, puede armar el pedido por chat. Usa search_products para buscar, add_to_cart para agregar, view_cart para mostrar, confirm_order para confirmar. Siempre mostrar el carrito actualizado despues de agregar. Antes de confirmar, mostrar resumen y preguntar:
-1. ¿Es para retirar o envío? Si es para retirar, preguntar en qué sucursal (Merlo o Pontevedra).
-2. Pasar sucursal y retiro=true/false en confirm_order.
+PEDIDOS: Si el cliente esta registrado, puede armar el pedido por chat. Usa search_products para buscar, add_to_cart para agregar, view_cart para mostrar, confirm_order para confirmar. Siempre mostrar el carrito actualizado despues de agregar. Antes de confirmar, mostrar resumen y preguntar en que sucursal va a retirar (Merlo o Pontevedra). Pasar sucursal y retiro=true en confirm_order.
+ENTREGAS / ENVIOS A DOMICILIO: NO armar entregas por chat ni cotizar costo de envio. Los precios de la web y del chat son SIEMPRE retirando por sucursal. Si el cliente pide envio a domicilio, NO inventes precios ni decis que se puede: derivalo a la distribuidora al +54 9 11 5413-7677 (https://wa.me/5491154137677) para que coordine pedido minimo, zona y costo de envio con un asesor. Decirle textual: "Para entregas a domicilio coordinas directo con la distribuidora al +54 9 11 5413-7677, ahi te pasan pedido minimo y costo de envio segun la zona. Los precios que ves son retirando por sucursal."
 Si no esta registrado, decirle que haga el pedido en distrialma.com.ar.
 SALDO: Si registrado, dar saldo. Detalle en distrialma.com.ar/mis-pedidos.
 PAGOS/ALIAS/TRANSFERENCIA: NO dar el alias bancario. Decir "el alias para transferencia te lo indican en el comercio a la hora de abonar."
 NO SABE: "Un asesor te contacta." No inventar.
 RECLAMOS: "Tomamos nota, nuestra encargada te contacta." Se deriva automatico.
 PERSONA: "Te paso con un asesor."
-NO REGISTRADO: Pedir nombre completo, telefono, direccion y CUIT/CUIL/DNI ANTES de registrar. NUNCA registrar si falta el CUIT, CUIL o DNI — es OBLIGATORIO para que puedan entrar a la web después. Despues de registrar, las credenciales se envian automaticamente.
+NO REGISTRADO: Pedir nombre completo, telefono, direccion y CUIT/CUIL/DNI ANTES de registrar. NUNCA registrar si falta el CUIT, CUIL o DNI — es OBLIGATORIO para que puedan entrar a la web después. Tambien podes preguntar el email de forma opcional (no obligatorio) para mandarle ofertas. Despues de registrar, las credenciales se envian automaticamente.
+EMAIL CLIENTES REGISTRADOS: Si el cliente esta registrado y NO tiene email cargado (clientInfo.email vacio), podes pedirselo amablemente al final de la conversacion: "¿Me querés dejar un email para que te avise cuando lleguen promos? Es opcional." Si te lo pasa, usar save_client_email. Solo pedirlo 1 vez por conversacion y no insistir si no quiere.
 STICKER: send_sticker al cerrar bien una conversacion.
 COMUNIDAD: Al cerrar una buena conversacion (despues del sticker o la despedida), invitar al cliente a unirse a la comunidad de WhatsApp: "Unite a nuestra comunidad para enterarte de cambios de precios y novedades: https://chat.whatsapp.com/LpfhYKk33eIFAdeshNWAYI". Solo invitar 1 vez por conversacion, no repetir si ya lo invitaste.
 PRIVACIDAD: No dar datos de otros clientes.
@@ -36,11 +36,11 @@ PRIVACIDAD: No dar datos de otros clientes.
 Horarios y direcciones (SIEMPRE mencionar los 3 locales cuando pregunten por horarios):
 1. Minorista Merlo — Calle Real 435 — Lun-Dom 7 a 22:30
 2. Mayorista Merlo — Av. Calle Real 387 — Lun-Sab 8 a 18 (NO cierra a las 14, cierra a las 18)
-3. Mayorista Pontevedra — Av. San Martín 868 (esquina Av. Patricios 7399) — Lun-Sab 9 a 17
+3. Mayorista Pontevedra — Av. Patricios 7399 esquina (frente a la plaza de Barrio Rivadavia) — Lun-Sab 9 a 17
 Web: 24hs. PedidosYa disponible.
 DOMINGOS: Solo abre el local minorista de Calle Real 435. Los mayoristas NO abren los domingos.
 IMPORTANTE: NUNCA decir que cerramos a las 14. El mayorista cierra a las 18. NUNCA inventar direcciones. Si el cliente dice que viene en camino, decirle que lo esperamos.
-DIRECCIONES ALTERNATIVAS: Si el cliente pregunta por "Av. Patricios", "Patricios", o alguna calle cercana a alguno de los locales, NO decir que no tenemos local ahí. Responder con el local más cercano. Pontevedra (Av. San Martín 868) está cerca de Av. Patricios. Siempre ofrecer las 3 direcciones reales.`;
+DIRECCIONES ALTERNATIVAS: Si el cliente pregunta por barrios o calles cercanas a alguno de los locales, NO decir que no tenemos local ahí. Responder con el local más cercano. La sucursal de Pontevedra (Av. Patricios 7399, esquina, frente a la plaza de Barrio Rivadavia) está en Barrio Rivadavia. Las sucursales de Merlo (Calle Real 435 y Av. Calle Real 387) están en el centro de Merlo. Siempre ofrecer las 3 direcciones reales y NUNCA decir "no tenemos sucursal" en ningún barrio o zona — siempre ofrecer la más cercana.`;
 
 export const NEW_CLIENT_MESSAGE = `Hola! Gracias por escribirnos.
 
@@ -64,10 +64,11 @@ const TOOLS = [
   { name: "search_combos", description: "Busca combos/promociones disponibles en Distrialma.", input_schema: { type: "object", properties: { query: { type: "string", description: "Palabras clave del combo" } }, required: ["query"] } },
   { name: "send_price_list", description: "Genera y envia una lista de precios en PDF al cliente por WhatsApp, filtrada por rubro o marca. SIEMPRE usar con filtro.", input_schema: { type: "object", properties: { filter: { type: "string", description: "Filtro OBLIGATORIO por rubro o marca" } }, required: ["filter"] } },
   { name: "send_sticker", description: "Envia el sticker de Alma al cliente. Solo al final de una buena conversacion.", input_schema: { type: "object", properties: {}, required: [] } },
-  { name: "register_client", description: "Registra un cliente nuevo. Necesitas TODOS los datos: nombre completo, telefono, direccion y CUIT/CUIL/DNI. NUNCA registrar sin CUIT/CUIL/DNI.", input_schema: { type: "object", properties: { nombre: { type: "string", description: "Nombre completo" }, direccion: { type: "string", description: "Direccion del local o domicilio" }, telefono: { type: "string", description: "Numero de telefono" }, cuit: { type: "string", description: "CUIT, CUIL o DNI (OBLIGATORIO)" } }, required: ["nombre", "telefono", "direccion", "cuit"] } },
+  { name: "register_client", description: "Registra un cliente nuevo. Necesitas TODOS los datos: nombre completo, telefono, direccion y CUIT/CUIL/DNI. NUNCA registrar sin CUIT/CUIL/DNI. El email es opcional pero pedilo amablemente.", input_schema: { type: "object", properties: { nombre: { type: "string", description: "Nombre completo" }, direccion: { type: "string", description: "Direccion del local o domicilio" }, telefono: { type: "string", description: "Numero de telefono" }, cuit: { type: "string", description: "CUIT, CUIL o DNI (OBLIGATORIO)" }, email: { type: "string", description: "Email opcional para recibir ofertas" } }, required: ["nombre", "telefono", "direccion", "cuit"] } },
+  { name: "save_client_email", description: "Guarda el email de un cliente que ya esta registrado. Usalo si el cliente te lo pasa espontaneamente o si se lo pediste antes.", input_schema: { type: "object", properties: { email: { type: "string", description: "Email valido del cliente" } }, required: ["email"] } },
   { name: "add_to_cart", description: "Agrega un producto al carrito del cliente. Necesitas el SKU del producto (obtenido de search_products) y la cantidad. Solo para clientes REGISTRADOS.", input_schema: { type: "object", properties: { sku: { type: "string", description: "SKU del producto" }, nombre: { type: "string", description: "Nombre del producto" }, cantidad: { type: "number", description: "Cantidad a agregar" }, precio: { type: "number", description: "Precio unitario mayorista" } }, required: ["sku", "nombre", "cantidad", "precio"] } },
   { name: "view_cart", description: "Muestra el carrito actual del cliente con todos los productos, cantidades y total.", input_schema: { type: "object", properties: {}, required: [] } },
-  { name: "confirm_order", description: "Confirma el pedido del carrito. ANTES de confirmar preguntar: 1) si es para retirar o envío, 2) si retira, en qué sucursal (Merlo o Pontevedra). Si es Pontevedra avisa al encargado para que lo prepare.", input_schema: { type: "object", properties: { notas: { type: "string", description: "Notas opcionales del pedido" }, sucursal: { type: "string", enum: ["merlo", "pontevedra"], description: "Sucursal donde retira" }, retiro: { type: "boolean", description: "true si retira en sucursal, false si es envío" } }, required: ["sucursal", "retiro"] } },
+  { name: "confirm_order", description: "Confirma el pedido del carrito. SOLO para retiro en sucursal. Antes de confirmar preguntar en que sucursal retira (Merlo o Pontevedra). Si es Pontevedra avisa al encargado para que lo prepare. Para entregas a domicilio NO usar esta herramienta — derivar al +54 9 11 5413-7677.", input_schema: { type: "object", properties: { notas: { type: "string", description: "Notas opcionales del pedido" }, sucursal: { type: "string", enum: ["merlo", "pontevedra"], description: "Sucursal donde retira" }, retiro: { type: "boolean", description: "Siempre true. Las entregas a domicilio se derivan al numero de la distribuidora." } }, required: ["sucursal", "retiro"] } },
 ];
 
 // In-memory cart per chat (expires after 24h)
@@ -120,7 +121,7 @@ export async function callClaude(chatId, userMessage, clientInfo, phoneNumber, {
       for (const a of clientInfo.accounts) systemWithContext += `\n- ${a.nombre} (Cod: ${a.cod}): Saldo ${formatPrice(a.saldo)}`;
       systemWithContext += `\n- CUIT: ${clientInfo.cuit || "(no cargado)"}\nMostrá el saldo de todas las cuentas cuando pregunte.`;
     } else {
-      systemWithContext += `\n\nESTÁS HABLANDO CON UN CLIENTE REGISTRADO:\n- Nombre: ${clientInfo.nombre}\n- CUIT: ${clientInfo.cuit || "(no cargado)"}\n- Saldo cuenta corriente: ${formatPrice(clientInfo.saldo)}`;
+      systemWithContext += `\n\nESTÁS HABLANDO CON UN CLIENTE REGISTRADO:\n- Nombre: ${clientInfo.nombre}\n- CUIT: ${clientInfo.cuit || "(no cargado)"}\n- Saldo cuenta corriente: ${formatPrice(clientInfo.saldo)}\n- Email: ${clientInfo.email || "(SIN EMAIL — podes pedirselo al final de la conversacion)"}`;
     }
   } else {
     systemWithContext += `\n\nESTÁS HABLANDO CON UN CLIENTE NO REGISTRADO.\nSu número de teléfono es: ${phoneNumber}\nYa le pedimos sus datos para registrarse. Si te los pasa, usá register_client. Usá el teléfono ${phoneNumber} como teléfono si no te da otro.`;
@@ -213,14 +214,27 @@ export async function callClaude(chatId, userMessage, clientInfo, phoneNumber, {
             if (telFormatted.startsWith("549")) telFormatted = telFormatted.slice(3); // remove country code
             if (telFormatted.startsWith("54")) telFormatted = telFormatted.slice(2);
             if (telFormatted.length === 10) telFormatted = telFormatted.slice(0, 2) + "-" + telFormatted.slice(2, 6) + "-" + telFormatted.slice(6);
-            const reg = await registerClient({ nombre: tu.input.nombre, direccion: tu.input.direccion || "", telefono: telFormatted, cuit: tu.input.cuit || "" });
-            console.log(`[REGISTER] ${chatId}: registered ${reg.nombre} as client ${reg.cod}`);
-            // Send credentials to client
+            const reg = await registerClient({ nombre: tu.input.nombre, direccion: tu.input.direccion || "", telefono: telFormatted, cuit: tu.input.cuit || "", email: tu.input.email || "" });
             const cuitUser = (tu.input.cuit || "").replace(/[^0-9]/g, "");
             const usuario = cuitUser || reg.cod;
-            await client.sendMessage(chatId, `Ya estas registrado! Podes entrar a nuestra web:\n\nwww.distrialma.com.ar\nUsuario: ${usuario}\nClave: ALMA2026\n\nAhi ves todos los productos con precios y podes hacer pedidos.`);
-            storeMessage(chatId, "out", `[Credenciales enviadas] Usuario: ${usuario}`, "bot");
-            result = { success: true, clienteCod: reg.cod, nombre: reg.nombre, message: "Cliente registrado y credenciales enviadas." };
+            if (reg.alreadyExists) {
+              console.log(`[REGISTER] ${chatId}: dedup hit, existing client ${reg.cod} (${reg.nombre})`);
+              await client.sendMessage(chatId, `Ya tenes una cuenta con nosotros, ${reg.nombre}! Podes entrar a:\n\nwww.distrialma.com.ar\nUsuario: ${usuario}\nClave: ALMA2026\n\nSi no recordas la clave o necesitas ayuda con tu cuenta, un asesor te contacta.`);
+              storeMessage(chatId, "out", `[Cliente ya existia] ${reg.cod} ${reg.nombre}`, "bot");
+              result = { alreadyExists: true, clienteCod: reg.cod, nombre: reg.nombre, message: "El cliente ya estaba registrado, se le indicaron las credenciales de su cuenta existente. No volver a pedir datos." };
+            } else {
+              console.log(`[REGISTER] ${chatId}: registered ${reg.nombre} as client ${reg.cod}`);
+              await client.sendMessage(chatId, `Ya estas registrado! Podes entrar a nuestra web:\n\nwww.distrialma.com.ar\nUsuario: ${usuario}\nClave: ALMA2026\n\nAhi ves todos los productos con precios y podes hacer pedidos.`);
+              storeMessage(chatId, "out", `[Credenciales enviadas] Usuario: ${usuario}`, "bot");
+              result = { success: true, clienteCod: reg.cod, nombre: reg.nombre, message: "Cliente registrado y credenciales enviadas." };
+            }
+          } else if (tu.name === "save_client_email") {
+            if (!clientInfo) { result = { error: "Cliente no registrado." }; }
+            else {
+              const r = await saveClientEmail(clientInfo.cod, tu.input.email || "");
+              if (r.ok) console.log(`[EMAIL] ${chatId}: saved ${r.email} for client ${clientInfo.cod}`);
+              result = r.ok ? { success: true, message: "Email guardado correctamente." } : { error: r.error };
+            }
           } else if (tu.name === "add_to_cart") {
             if (!clientInfo) { result = { error: "Cliente no registrado. No puede armar pedido por chat." }; }
             else {

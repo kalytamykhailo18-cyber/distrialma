@@ -40,7 +40,7 @@ export default function AdminLandingPage() {
       icon: HiOutlineCash,
       color: "bg-green-50 border-green-200 text-green-700",
       iconColor: "text-green-500",
-      href: "/admin/dashboard",
+      href: "/admin/resumen-rubros",
     },
     {
       label: "Pedidos web",

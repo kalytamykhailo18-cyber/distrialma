@@ -42,6 +42,36 @@ model HiddenCategory {
   @@map("hidden_categories")
 }
 
+model StockAuditEntry {
+  id           Int      @id @default(autoincrement())
+  sku          String   @db.VarChar(7)
+  productName  String?  @db.VarChar(120)
+  deposito     String   @db.VarChar(3)
+  stkAnterior  Decimal  @db.Decimal(14, 3)
+  stkNuevo     Decimal  @db.Decimal(14, 3)
+  motivo       String   @db.VarChar(200)
+  usuario      String   @db.VarChar(60)
+  origen       String   @db.VarChar(20) // "manual" | "bulk-habilitar" | "traslado" | "eod-compensa"
+  createdAt    DateTime @default(now())
+
+  @@index([sku])
+  @@index([deposito])
+  @@index([createdAt])
+  @@map("stock_audit_entries")
+}
+
+model ProveedorMarca {
+  id           Int      @id @default(autoincrement())
+  proveedorCod String   @db.VarChar(7)
+  marcaCod     String   @db.VarChar(7)
+  position     Int      @default(0)
+  createdAt    DateTime @default(now())
+
+  @@unique([proveedorCod, marcaCod])
+  @@index([proveedorCod])
+  @@map("proveedor_marcas")
+}
+
 model FeaturedBrand {
   id      Int    @id @default(autoincrement())
   brandId String @unique @db.VarChar(4)
@@ -160,14 +190,15 @@ model DeliveryStatus {
 }
 
 model User {
-  id           Int      @id @default(autoincrement())
-  username     String   @unique @db.VarChar(50)
-  passwordHash String   @db.VarChar(255)
-  role         String   @default("staff") @db.VarChar(20)
-  permissions  String   @default("[]") @db.Text
-  empleadoCod  String?  @db.VarChar(7)
-  email        String?  @db.VarChar(100)
-  createdAt    DateTime @default(now())
+  id              Int      @id @default(autoincrement())
+  username        String   @unique @db.VarChar(50)
+  passwordHash    String   @db.VarChar(255)
+  role            String   @default("staff") @db.VarChar(20)
+  permissions     String   @default("[]") @db.Text
+  empleadoCod     String?  @db.VarChar(7)
+  email           String?  @db.VarChar(100)
+  defaultDeposito String?  @db.VarChar(3)
+  createdAt       DateTime @default(now())
 
   @@map("users")
 }
@@ -175,9 +206,12 @@ model User {
 model StockEntry {
   id            Int      @id @default(autoincrement())
   tipo          String   @default("ingreso") @db.VarChar(20)
+  deposito      String?  @db.VarChar(3)
   proveedorCod  String   @db.VarChar(7)
   proveedorName String   @db.VarChar(60)
   usuario       String   @db.VarChar(50)
+  costeadoPor   String?  @db.VarChar(50)
+  costeadoAt    DateTime?
   estado        String   @default("pendiente") @db.VarChar(20)
   subtotal      Decimal  @default(0) @db.Decimal(12, 2)
   iva           Decimal  @default(0) @db.Decimal(12, 2)
@@ -214,13 +248,26 @@ model StockEntryItem {
 }
 
 model SupplierPayment {
-  id            Int      @id @default(autoincrement())
-  proveedorCod  String   @db.VarChar(7)
-  proveedorName String   @db.VarChar(60)
-  monto         Decimal  @db.Decimal(12, 2)
-  concepto      String?  @db.VarChar(100)
-  usuario       String   @db.VarChar(50)
-  createdAt     DateTime @default(now())
+  id               Int      @id @default(autoincrement())
+  proveedorCod     String   @db.VarChar(7)
+  proveedorName    String   @db.VarChar(60)
+  monto            Decimal  @db.Decimal(12, 2)
+  concepto         String?  @db.VarChar(100)
+  usuario          String   @db.VarChar(50)
+  createdAt        DateTime @default(now())
+  efectivoImagenes String?  @db.Text // JSON array of Cloudinary URLs
+  tipoPago         String?  @default("legacy") @db.VarChar(20) // legacy | cheques | efectivo | transferencia | mixto
+  montoCheques     Decimal  @default(0) @db.Decimal(12, 2)
+  montoEfectivo    Decimal  @default(0) @db.Decimal(12, 2)
+  montoTransferencia Decimal @default(0) @db.Decimal(12, 2)
+  montoAjuste      Decimal  @default(0) @db.Decimal(12, 2)
+  ajusteMotivo     String?  @db.VarChar(200)
+  transferenciaRef String?  @db.VarChar(100)
+  pdfUrl           String?  @db.VarChar(500)
+  driveUrl         String?  @db.VarChar(500)
+  anuladoAt        DateTime?
+  anuladoBy        String?  @db.VarChar(60)
+  cheques          Cheque[] @relation("PaymentCheques")
 
   @@index([proveedorCod])
   @@index([createdAt])
@@ -299,6 +346,7 @@ model VendedorOrderItem {
 model InternalMovement {
   id          Int      @id @default(autoincrement())
   sucursal    String   @db.VarChar(50)
+  deposito    String?  @db.VarChar(3)
   destino     String   @db.VarChar(50)
   subtipo     String?  @db.VarChar(30)
   empleados   String?  @db.Text
@@ -308,6 +356,9 @@ model InternalMovement {
   imageUrl    String?  @db.VarChar(500)
   aprobadoPor String?  @db.VarChar(50)
   aprobadoAt  DateTime?
+  anuladoPor  String?  @db.VarChar(50)
+  anuladoAt   DateTime?
+  motivoAnulado String? @db.VarChar(200)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   items       InternalMovementItem[]
@@ -689,6 +740,11 @@ model Cheque {
   reemplaza      Cheque?  @relation("ChequeReemplazo", fields: [reemplazaId], references: [id])
   reemplazadoPor Cheque?  @relation("ChequeReemplazo")
 
+  // Linked to a SupplierPayment / recibo (cheque emitido a proveedor)
+  supplierPaymentId Int?
+  supplierPayment   SupplierPayment? @relation("PaymentCheques", fields: [supplierPaymentId], references: [id])
+  fotoUrls          String?  @db.Text // JSON array of Cloudinary URLs
+
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -697,6 +753,7 @@ model Cheque {
   @@index([fechaCobro])
   @@index([proveedorCod])
   @@index([clienteCod])
+  @@index([supplierPaymentId])
   @@map("cheques")
 }
 
@@ -775,4 +832,100 @@ model DifusionRecipient {
 
   @@index([difusionId, estado])
   @@map("difusion_recipients")
+}
+
+model ClientePreference {
+  id                Int      @id @default(autoincrement())
+  clienteCod        String   @unique @db.VarChar(10)
+  boletaPdfEnabled  Boolean  @default(true)
+  updatedAt         DateTime @updatedAt
+  updatedBy         String?  @db.VarChar(60)
+
+  @@map("cliente_preferences")
+}
+
+model ClienteUnifyBackup {
+  id           Int      @id @default(autoincrement())
+  keeperCod    String   @db.VarChar(10)
+  dupCods      String   @db.VarChar(200)
+  snapshot     String   @db.Text          // JSON snapshot of dup Clientes + keeper (saldo, compras, etc)
+  affectedTransas  Int  @default(0)
+  affectedPedidos  Int  @default(0)
+  createdAt    DateTime @default(now())
+  createdBy    String   @db.VarChar(60)
+  reverted     Boolean  @default(false)
+  revertedAt   DateTime?
+
+  @@index([keeperCod])
+  @@index([createdAt])
+  @@map("cliente_unify_backups")
+}
+
+model StockTransfer {
+  id            Int                  @id @default(autoincrement())
+  depositoOrigen  String  @db.VarChar(3)
+  depositoDestino String  @db.VarChar(3)
+  usuario       String   @db.VarChar(60)
+  notas         String?  @db.VarChar(300)
+  estado        String   @default("realizado") @db.VarChar(20) // realizado | anulado
+  pdfUrl        String?  @db.VarChar(500)
+  createdAt     DateTime @default(now())
+  anuladoAt     DateTime?
+  anuladoPor    String?  @db.VarChar(60)
+  motivoAnulado String?  @db.VarChar(200)
+  items         StockTransferItem[]
+
+  @@index([createdAt])
+  @@index([depositoOrigen])
+  @@index([depositoDestino])
+  @@map("stock_transfers")
+}
+
+model DisabledStockBackup {
+  id          Int      @id @default(autoincrement())
+  sku         String   @db.VarChar(7)
+  deposito    String   @db.VarChar(3)
+  // JSON snapshot of the deleted Stock row (Costo, Moneda, Precio*, PorceGan*,
+  // StkMin/Max, Proveedor*, FechaVto, FillerNum*, Filler*, FillerBit*, prevStk).
+  // Used to restore prices etc. when the (sku, deposito) is re-habilitated.
+  snapshot    String   @db.Text
+  motivo      String?  @db.VarChar(200)
+  usuario     String   @db.VarChar(60)
+  createdAt   DateTime @default(now())
+
+  @@unique([sku, deposito])
+  @@index([sku])
+  @@map("disabled_stock_backups")
+}
+
+model VirtualStockMapping {
+  id           Int      @id @default(autoincrement())
+  skuHijo      String   @db.VarChar(7)
+  skuPadre     String   @db.VarChar(7)
+  // How many units of padre are deducted per 1 unit of hijo sold.
+  // Example: 1 unit of "ESTUCHE 250 g" (hijo) → 0.25 kg of "QUESO BARRA" (padre) → ratio = 0.25
+  ratio        Decimal  @default(1) @db.Decimal(14, 4)
+  // What hijo stock is reset to each night (per sucursal).
+  targetStock  Decimal  @default(1000) @db.Decimal(14, 3)
+  active       Boolean  @default(true)
+  notas        String?  @db.VarChar(200)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([skuHijo])
+  @@index([skuPadre])
+  @@map("virtual_stock_mappings")
+}
+
+model StockTransferItem {
+  id          Int     @id @default(autoincrement())
+  transferId  Int
+  sku         String  @db.VarChar(7)
+  productName String  @db.VarChar(120)
+  cantidad    Decimal @db.Decimal(14, 3)
+  transfer    StockTransfer @relation(fields: [transferId], references: [id], onDelete: Cascade)
+
+  @@index([transferId])
+  @@index([sku])
+  @@map("stock_transfer_items")
 }

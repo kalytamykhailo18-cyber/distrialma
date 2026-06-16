@@ -47,3 +47,6 @@ bot/.wwebjs_cache/
 
 # certificates
 certs/
+
+# service-account credentials and other secrets
+secrets/

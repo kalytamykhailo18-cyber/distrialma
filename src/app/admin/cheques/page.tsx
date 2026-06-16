@@ -26,6 +26,7 @@ interface Cheque {
   estado: string;
   observaciones: string | null;
   usuario: string | null;
+  fotoUrls: string | null;
   createdAt: string;
   reemplaza?: { id: number; numero: string } | null;
   reemplazadoPor?: { id: number; numero: string } | null;
@@ -87,7 +88,10 @@ export default function ChequesPage() {
   const [search, setSearch] = useState("");
   const [cuentaFiltro, setCuentaFiltro] = useState("");
   const [showForm, setShowForm] = useState(false);
-  const [showCuentas, setShowCuentas] = useState(false);
+  const [showCuentas, setShowCuentas] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return new URLSearchParams(window.location.search).get("showCuentas") === "1";
+  });
   const [editingId, setEditingId] = useState<number | null>(null);
   const [replacingId, setReplacingId] = useState<number | null>(null);
   const [replacingInfo, setReplacingInfo] = useState<{ numero: string; monto: number } | null>(null);
@@ -549,6 +553,28 @@ export default function ChequesPage() {
                   {c.observaciones && (
                     <div className="text-xs text-gray-400 italic mt-1">{c.observaciones}</div>
                   )}
+                  {c.usuario && (
+                    <div className="text-xs text-gray-400 mt-1">Cargado por: <span className="font-medium text-gray-600">{c.usuario}</span></div>
+                  )}
+                  {c.fotoUrls && (() => {
+                    let urls: string[] = [];
+                    try {
+                      const parsed = JSON.parse(c.fotoUrls);
+                      if (Array.isArray(parsed)) urls = parsed.filter((s) => typeof s === "string");
+                    } catch {
+                      urls = [c.fotoUrls];
+                    }
+                    if (urls.length === 0) return null;
+                    return (
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {urls.map((u, i) => (
+                          <a key={i} href={u} target="_blank" rel="noopener noreferrer" title={`Foto ${i + 1}`}>
+                            <img src={u} alt={`cheque foto ${i + 1}`} className="w-12 h-12 object-cover rounded border" />
+                          </a>
+                        ))}
+                      </div>
+                    );
+                  })()}
 
                   {/* Actions */}
                   <div className="mt-3 pt-3 border-t flex flex-wrap gap-1.5">

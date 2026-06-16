@@ -136,6 +136,37 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ proveedores: [] });
     }
 
+    // 1b. Per-sucursal stock for the same SKUs (deposits 1, 2, 3 — Pontevedra,
+    // Minorista, Cervantes). The order/buy decision stays anchored to dep 0 but
+    // these columns surface "who needs a traslado".
+    const stockPorSucursal = new Map<string, { dep1: number; dep2: number; dep3: number }>();
+    const sucSkus = stockResult.recordset.map((r: { sku: string }) => r.sku);
+    for (let i = 0; i < sucSkus.length; i += 500) {
+      const batch = sucSkus.slice(i, i + 500);
+      const sucReq = pool.request();
+      const placeholders = batch.map((sku: string, j: number) => {
+        sucReq.input(`x${j}`, sku.padStart(7, " "));
+        return `@x${j}`;
+      });
+      const sucRes = await sucReq.query(`
+        SELECT
+          LTRIM(RTRIM(CodProducto)) AS sku,
+          LTRIM(RTRIM(Deposito)) AS dep,
+          ISNULL(Stk, 0) AS stk
+        FROM [${dbProd}].dbo.Stock
+        WHERE CodProducto IN (${placeholders.join(",")})
+          AND LTRIM(RTRIM(Deposito)) IN ('1', '2', '3')
+          AND (TalleColor IS NULL OR LTRIM(RTRIM(TalleColor)) = '')
+      `);
+      for (const r of sucRes.recordset) {
+        const entry = stockPorSucursal.get(r.sku) || { dep1: 0, dep2: 0, dep3: 0 };
+        if (r.dep === "1") entry.dep1 = Number(r.stk);
+        else if (r.dep === "2") entry.dep2 = Number(r.stk);
+        else if (r.dep === "3") entry.dep3 = Number(r.stk);
+        stockPorSucursal.set(r.sku, entry);
+      }
+    }
+
     // 2. Get proveedor names
     const provNamesResult = await pool.request().query(`
       SELECT LTRIM(RTRIM(Cod)) AS cod, LTRIM(RTRIM(Nombre)) AS nombre
@@ -162,7 +193,7 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    // 4. Query weekly sales for all SKUs in one batch
+    // 4. Query weekly sales for all SKUs in one batch — total and Pontevedra-only
     const allSkus = stockResult.recordset.map((r: { sku: string }) => r.sku);
     const since = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Argentina/Buenos_Aires" }));
     since.setDate(since.getDate() - semanas * 7);
@@ -170,6 +201,7 @@ export async function GET(req: NextRequest) {
 
     // Build SKU list for IN clause (batch in groups of 500 to avoid param limits)
     const salesMap = new Map<string, number>();
+    const salesPontevedraMap = new Map<string, number>();
     for (let i = 0; i < allSkus.length; i += 500) {
       const batch = allSkus.slice(i, i + 500);
       const salesReq = pool.request().input("desde", sinceStr).input("semanas", semanas);
@@ -181,18 +213,19 @@ export async function GET(req: NextRequest) {
       const salesResult = await salesReq.query(`
         SELECT
           LTRIM(RTRIM(t.Producto)) AS sku,
-          SUM(t.Cant) / @semanas AS ventaSemanal
+          SUM(CASE WHEN t.Cant > 0 THEN t.Cant ELSE 0 END) / @semanas AS ventaSemanal,
+          SUM(CASE WHEN t.Cant > 0 AND LTRIM(RTRIM(t.Deposito)) = '1' THEN t.Cant ELSE 0 END) / @semanas AS ventaSemanalPontevedra
         FROM [${dbTransas}].dbo.Transas t
         WHERE t.Tipo = 'I'
           AND t.Fechora >= @desde
           ${ANULADO_FILTER}
-          AND t.Cant > 0
           AND t.Producto IN (${placeholders.join(",")})
         GROUP BY LTRIM(RTRIM(t.Producto))
       `);
 
       for (const r of salesResult.recordset) {
         salesMap.set(r.sku, Number(r.ventaSemanal));
+        salesPontevedraMap.set(r.sku, Number(r.ventaSemanalPontevedra));
       }
     }
 
@@ -200,11 +233,17 @@ export async function GET(req: NextRequest) {
     const proveedores = Array.from(proveedorMap.entries()).map(([provCod, productos]) => {
       const items = productos.map((p) => {
         const ventaSemanal = salesMap.get(p.sku) || 0;
+        const ventaSemanalPontevedra = salesPontevedraMap.get(p.sku) || 0;
+        const suc = stockPorSucursal.get(p.sku) || { dep1: 0, dep2: 0, dep3: 0 };
         const sugerido = Math.max(0, Math.ceil(ventaSemanal * 1.2 - p.stockActual));
         const costoTotal = sugerido * p.costoUnit;
         return {
           ...p,
           ventaSemanal: Math.round(ventaSemanal * 100) / 100,
+          ventaSemanalPontevedra: Math.round(ventaSemanalPontevedra * 100) / 100,
+          stockPontevedra: suc.dep1,
+          stockMinorista: suc.dep2,
+          stockCervantes: suc.dep3,
           sugerido,
           costoTotal: Math.round(costoTotal * 100) / 100,
         };

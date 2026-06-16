@@ -5,7 +5,7 @@ import { execSync } from "child_process";
 import { writeFileSync, existsSync } from "fs";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 120; // 2 min timeout for large MDB imports
+export const maxDuration = 300; // 5 min: covers slow Drive download + large MDB import
 
 const MDB_PATH = "/tmp/fichador-base.mdb";
 
@@ -66,13 +66,15 @@ export async function POST(req: NextRequest) {
   if (action === "sync") {
     try {
       const dlDir = "/tmp/fichador-sync-api";
-      execSync(`rm -rf ${dlDir} && gdown --folder "https://drive.google.com/drive/folders/1Om0-kOGnCMB4Lr0KzR9OdZPRqk0864KD" -O ${dlDir} --no-cookies 2>&1`, { timeout: 60000, maxBuffer: 10 * 1024 * 1024 });
-      const mdbFile = execSync(`find ${dlDir} -name "*.mdb" -type f | head -1`).toString().trim();
+      execSync(`rm -rf ${dlDir} && gdown --folder "https://drive.google.com/drive/folders/1Om0-kOGnCMB4Lr0KzR9OdZPRqk0864KD" -O ${dlDir} --no-cookies 2>&1`, { timeout: 240000, maxBuffer: 10 * 1024 * 1024 });
+      const mdbFile = execSync(`find ${dlDir} -maxdepth 1 -name "*.mdb" -type f | head -1`).toString().trim();
       if (!mdbFile) return NextResponse.json({ error: "No se encontro archivo MDB en Drive" }, { status: 500 });
       execSync(`cp "${mdbFile}" "${MDB_PATH}"`);
       execSync(`rm -rf ${dlDir}`);
-    } catch {
-      return NextResponse.json({ error: "Error al sincronizar desde Drive" }, { status: 500 });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("Fichador Drive sync error:", msg);
+      return NextResponse.json({ error: `Error al sincronizar desde Drive: ${msg.slice(0, 200)}` }, { status: 500 });
     }
   }
 
@@ -114,19 +116,24 @@ export async function POST(req: NextRequest) {
       const legajoId = parseInt(leg.ID);
       if (!legajoId || !leg.NOMBRE) continue;
 
+      const nombre = leg.NOMBRE.trim();
+      const area = leg.AREA?.trim() || null;
+      const turno = leg.TURNO?.trim() || null;
+
       const existing = await prisma.fichadorEmpleado.findUnique({ where: { legajoId } });
       if (existing) {
+        if (existing.nombre !== nombre || existing.area !== area || existing.turno !== turno) {
+          await prisma.fichadorEmpleado.update({
+            where: { legajoId },
+            data: { nombre, area, turno },
+          });
+        }
         legajoToEmpId.set(leg.ID, existing.id);
         continue;
       }
 
       const emp = await prisma.fichadorEmpleado.create({
-        data: {
-          legajoId,
-          nombre: leg.NOMBRE.trim(),
-          area: leg.AREA?.trim() || null,
-          turno: leg.TURNO?.trim() || null,
-        },
+        data: { legajoId, nombre, area, turno },
       });
       legajoToEmpId.set(leg.ID, emp.id);
       empImported++;

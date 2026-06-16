@@ -10,6 +10,21 @@ export function createHttpServer({ client, getStatus, port, name, onSend }) {
       return;
     }
 
+    if (req.method === "GET" && req.url === "/groups") {
+      try {
+        const chats = await client.getChats();
+        const groups = chats
+          .filter((c) => c.isGroup)
+          .map((c) => ({ id: c.id._serialized, name: c.name || "" }));
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ groups }));
+      } catch (e) {
+        res.writeHead(500, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: e.message }));
+      }
+      return;
+    }
+
     if (req.method === "POST" && req.url === "/send") {
       let body = "";
       req.on("data", (c) => body += c);

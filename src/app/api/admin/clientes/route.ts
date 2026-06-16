@@ -102,6 +102,7 @@ export async function GET(req: NextRequest) {
         boleta: p.boleta,
         nroped: p.nroped,
         total: Number(p.total),
+        fechora: p.fechora,
         fecha: p.fechora.length >= 8 ? `${p.fechora.slice(6, 8)}/${p.fechora.slice(4, 6)}/${p.fechora.slice(0, 4)}` : p.fechora,
         hora: p.fechora.length >= 12 ? `${p.fechora.slice(8, 10)}:${p.fechora.slice(10, 12)}` : "",
         notas: p.notas,
@@ -130,7 +131,7 @@ export async function GET(req: NextRequest) {
 
       // Merge both sources, deduplicate by boleta
       const seenBoletas = new Set<string>();
-      const pedidosArchivados: Array<{ boleta: string; nroped: string; total: number; fecha: string; hora: string; items: unknown[]; active: boolean }> = [];
+      const pedidosArchivados: Array<{ boleta: string; nroped: string; total: number; fechora: string; fecha: string; hora: string; items: unknown[]; active: boolean }> = [];
 
       for (const a of backups) {
         if (seenBoletas.has(a.boleta)) continue;
@@ -139,6 +140,7 @@ export async function GET(req: NextRequest) {
           boleta: a.boleta,
           nroped: a.nroped || "",
           total: Number(a.total),
+          fechora: a.fechora,
           fecha: a.fechora.length >= 8 ? `${a.fechora.slice(6, 8)}/${a.fechora.slice(4, 6)}/${a.fechora.slice(0, 4)}` : a.fechora,
           hora: a.fechora.length >= 12 ? `${a.fechora.slice(8, 10)}:${a.fechora.slice(10, 12)}` : "",
           items: JSON.parse(a.items || "[]"),
@@ -154,6 +156,7 @@ export async function GET(req: NextRequest) {
           boleta,
           nroped: a.nroped || "",
           total: Number(a.total),
+          fechora: a.fechora,
           fecha: a.fechora.length >= 8 ? `${a.fechora.slice(6, 8)}/${a.fechora.slice(4, 6)}/${a.fechora.slice(0, 4)}` : a.fechora,
           hora: a.fechora.length >= 12 ? `${a.fechora.slice(8, 10)}:${a.fechora.slice(10, 12)}` : "",
           items: a.items.map((i) => ({ sku: i.sku.trim(), name: i.productName, cant: Number(i.cant), price: Number(i.precio), listaPrecio: i.listaPrecio })),

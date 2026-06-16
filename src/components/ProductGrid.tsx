@@ -21,6 +21,8 @@ interface Props {
   onPaginationReady?: (state: PaginationState) => void;
 }
 
+const HIDE_OOS_KEY = "hideOutOfStock";
+
 export default function ProductGrid({
   initialProducts,
   categoryId,
@@ -28,6 +30,21 @@ export default function ProductGrid({
   search,
   onPaginationReady,
 }: Props) {
+  const [hideOutOfStock, setHideOutOfStock] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setHideOutOfStock(localStorage.getItem(HIDE_OOS_KEY) === "1");
+    }
+  }, []);
+
+  function toggleHideOutOfStock() {
+    const next = !hideOutOfStock;
+    setHideOutOfStock(next);
+    if (typeof window !== "undefined") {
+      localStorage.setItem(HIDE_OOS_KEY, next ? "1" : "0");
+    }
+  }
   const [products, setProducts] = useState<Product[]>(initialProducts || []);
   const [page, setPage] = useState(() => {
     if (typeof window !== "undefined") {
@@ -40,7 +57,7 @@ export default function ProductGrid({
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(!initialProducts);
   const [stockThreshold, setStockThreshold] = useState(0);
-  const prevFilters = useRef({ categoryId, brandId, search });
+  const prevFilters = useRef({ categoryId, brandId, search, hideOutOfStock });
   const scrollRestored = useRef(false);
 
   useEffect(() => {
@@ -53,9 +70,10 @@ export default function ProductGrid({
     const filtersChanged =
       prevFilters.current.categoryId !== categoryId ||
       prevFilters.current.brandId !== brandId ||
-      prevFilters.current.search !== search;
+      prevFilters.current.search !== search ||
+      prevFilters.current.hideOutOfStock !== hideOutOfStock;
 
-    prevFilters.current = { categoryId, brandId, search };
+    prevFilters.current = { categoryId, brandId, search, hideOutOfStock };
 
     if (filtersChanged && page !== 1) {
       setPage(1);
@@ -64,7 +82,7 @@ export default function ProductGrid({
 
     sessionStorage.setItem("productListPage", String(page));
     fetchProducts();
-  }, [page, categoryId, brandId, search]);
+  }, [page, categoryId, brandId, search, hideOutOfStock]);
 
   async function fetchProducts() {
     setLoading(true);
@@ -72,6 +90,7 @@ export default function ProductGrid({
     if (categoryId) params.set("category", categoryId);
     if (brandId) params.set("brand", brandId);
     if (search) params.set("search", search);
+    if (hideOutOfStock) params.set("hideOutOfStock", "1");
 
     try {
       const res = await fetch(`/api/products?${params}`);
@@ -115,6 +134,28 @@ export default function ProductGrid({
 
   return (
     <div style={{ minHeight: "80vh" }}>
+      <div className="flex items-center justify-end mb-3">
+        <button
+          type="button"
+          role="switch"
+          aria-checked={hideOutOfStock}
+          onClick={toggleHideOutOfStock}
+          className="flex items-center gap-2 text-sm text-gray-700 select-none"
+        >
+          <span>Ocultar sin stock</span>
+          <span
+            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+              hideOutOfStock ? "bg-brand-400" : "bg-gray-300"
+            }`}
+          >
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                hideOutOfStock ? "translate-x-4" : "translate-x-0.5"
+              }`}
+            />
+          </span>
+        </button>
+      </div>
       {loading ? (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {Array.from({ length: 8 }).map((_, i) => (

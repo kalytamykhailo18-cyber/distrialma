@@ -34,8 +34,15 @@ interface CartItem {
 export default function NuevoIngresoPage() {
   const router = useRouter();
   const { data: session } = useSession();
-  const user = session?.user as { role?: string; permissions?: string[] } | undefined;
+  const user = session?.user as { role?: string; permissions?: string[]; defaultDeposito?: string } | undefined;
   const hasCosteo = user?.role === "admin" || (user?.permissions?.includes("costeo") ?? false);
+
+  const [deposito, setDeposito] = useState<string>("0");
+  // Once the session loads, default the deposito to the user's preference (only if it wasn't set already)
+  useEffect(() => {
+    if (user?.defaultDeposito && deposito === "0") setDeposito(user.defaultDeposito);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.defaultDeposito]);
 
   // Check if this is a devolucion
   const isDevolucion = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("tipo") === "devolucion";
@@ -73,6 +80,26 @@ export default function NuevoIngresoPage() {
     }
     return "";
   });
+  const [neto, setNeto] = useState(() => {
+    if (typeof window !== "undefined") {
+      try { const d = JSON.parse(sessionStorage.getItem(STORAGE_KEY) || "{}"); return d.neto || ""; } catch { return ""; }
+    }
+    return "";
+  });
+  const [iva, setIva] = useState(() => {
+    if (typeof window !== "undefined") {
+      try { const d = JSON.parse(sessionStorage.getItem(STORAGE_KEY) || "{}"); return d.iva || ""; } catch { return ""; }
+    }
+    return "";
+  });
+  const [percepciones, setPercepciones] = useState(() => {
+    if (typeof window !== "undefined") {
+      try { const d = JSON.parse(sessionStorage.getItem(STORAGE_KEY) || "{}"); return d.percepciones || ""; } catch { return ""; }
+    }
+    return "";
+  });
+  const [totalManual, setTotalManual] = useState(false);
+  const [totalAmt, setTotalAmt] = useState("");
   const [facturaFiles, setFacturaFiles] = useState<File[]>([]);
   const [facturaPreviews, setFacturaPreviews] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
@@ -83,10 +110,26 @@ export default function NuevoIngresoPage() {
   useEffect(() => {
     if (typeof window !== "undefined") {
       sessionStorage.setItem(STORAGE_KEY, JSON.stringify({
-        selectedProv, selectedProvName, items, notas, nroFactura,
+        selectedProv, selectedProvName, items, notas, nroFactura, neto, iva, percepciones,
       }));
     }
-  }, [selectedProv, selectedProvName, items, notas, nroFactura, STORAGE_KEY]);
+  }, [selectedProv, selectedProvName, items, notas, nroFactura, neto, iva, percepciones, STORAGE_KEY]);
+
+  // Parse "1.234,56" (AR) or "1234.56" decimal strings
+  function parseAmt(s: string): number {
+    if (!s) return 0;
+    let v = s.trim();
+    if (v.includes(",")) v = v.replace(/\./g, "").replace(",", ".");
+    const n = parseFloat(v);
+    return isNaN(n) ? 0 : n;
+  }
+
+  // Auto-recompute total from neto + iva + percepciones unless user edited it manually
+  useEffect(() => {
+    if (totalManual) return;
+    const sum = parseAmt(neto) + parseAmt(iva) + parseAmt(percepciones);
+    setTotalAmt(sum > 0 ? sum.toFixed(2) : "");
+  }, [neto, iva, percepciones, totalManual]);
 
   // Warn before leaving with unsaved data
   useEffect(() => {
@@ -110,6 +153,13 @@ export default function NuevoIngresoPage() {
   const searchRef = useRef<HTMLDivElement>(null);
   const searchTimeout = useRef<NodeJS.Timeout | null>(null);
 
+  // Proveedor combobox state
+  const [provSearch, setProvSearch] = useState("");
+  const [showProvDropdown, setShowProvDropdown] = useState(false);
+  const provBoxRef = useRef<HTMLDivElement>(null);
+  // Sync visible text with stored selection name when it loads / changes externally
+  useEffect(() => { setProvSearch(selectedProvName); }, [selectedProvName]);
+
   // Scanner state
   const [scanning, setScanning] = useState(false);
   const [scanError, setScanError] = useState("");
@@ -132,6 +182,9 @@ export default function NuevoIngresoPage() {
     function handleClick(e: MouseEvent) {
       if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
         setShowResults(false);
+      }
+      if (provBoxRef.current && !provBoxRef.current.contains(e.target as Node)) {
+        setShowProvDropdown(false);
       }
     }
     document.addEventListener("mousedown", handleClick);
@@ -352,6 +405,11 @@ export default function NuevoIngresoPage() {
           proveedorName: selectedProvName,
           notas: notas.trim() || null,
           nroFactura: nroFactura.trim() || null,
+          deposito,
+          subtotal: parseAmt(neto),
+          iva: parseAmt(iva),
+          percepciones: parseAmt(percepciones),
+          total: parseAmt(totalAmt),
           items: items.map((i) => ({
             sku: i.isNewProduct ? undefined : i.sku,
             productName: i.productName,
@@ -386,6 +444,7 @@ export default function NuevoIngresoPage() {
         setItems([]);
         setNotas("");
         setNroFactura("");
+        setNeto(""); setIva(""); setPercepciones(""); setTotalAmt(""); setTotalManual(false);
         setFacturaFiles([]);
         setFacturaPreviews([]);
         setSelectedProv("");
@@ -417,27 +476,72 @@ export default function NuevoIngresoPage() {
       </Stagger>
 
       {/* Supplier selector */}
-      <Stagger delay={50}>
-      <div className="mb-4">
+      <Stagger delay={50} zIndex={showProvDropdown ? 50 : undefined}>
+      <div className="mb-4" ref={provBoxRef}>
         <label className="block text-sm font-medium text-gray-700 mb-1">
           Proveedor
         </label>
-        <select
-          value={selectedProv}
-          onChange={(e) => {
-            setSelectedProv(e.target.value);
-            const prov = proveedores.find((p) => p.cod === e.target.value);
-            setSelectedProvName(prov?.nombre || "");
-          }}
-          className="w-full px-4 py-2 border border-brand-400 rounded-xl text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
-        >
-          <option value="">Seleccionar proveedor...</option>
-          {proveedores.map((p) => (
-            <option key={p.cod} value={p.cod}>
-              {p.nombre}
-            </option>
-          ))}
-        </select>
+        <div className="relative">
+          <HiOutlineSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4 pointer-events-none" />
+          <input
+            type="text"
+            value={provSearch}
+            onChange={(e) => {
+              setProvSearch(e.target.value);
+              setShowProvDropdown(true);
+              // Clear stored selection while user is typing — must re-pick from list
+              if (selectedProv) { setSelectedProv(""); setSelectedProvName(""); }
+            }}
+            onFocus={() => setShowProvDropdown(true)}
+            placeholder="Buscar proveedor por nombre o codigo..."
+            className="w-full pl-9 pr-9 py-2 border border-brand-400 rounded-xl text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
+          />
+          {provSearch && (
+            <button
+              type="button"
+              onClick={() => { setProvSearch(""); setSelectedProv(""); setSelectedProvName(""); setShowProvDropdown(true); }}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              aria-label="Limpiar"
+            >
+              <HiOutlineX className="w-4 h-4" />
+            </button>
+          )}
+          {showProvDropdown && (() => {
+            const q = provSearch.trim().toLowerCase();
+            const filtered = q
+              ? proveedores.filter((p) => p.nombre.toLowerCase().includes(q) || p.cod.includes(q))
+              : proveedores;
+            const shown = filtered.slice(0, 50);
+            return (
+              <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-lg max-h-80 overflow-y-auto">
+                {shown.length === 0 ? (
+                  <div className="px-4 py-3 text-sm text-gray-400">Sin resultados</div>
+                ) : shown.map((p) => (
+                  <button
+                    key={p.cod}
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => {
+                      setSelectedProv(p.cod);
+                      setSelectedProvName(p.nombre);
+                      setProvSearch(p.nombre);
+                      setShowProvDropdown(false);
+                    }}
+                    className={`w-full text-left px-4 py-2 text-sm hover:bg-brand-50 flex items-center justify-between ${selectedProv === p.cod ? "bg-brand-50 font-medium" : ""}`}
+                  >
+                    <span>{p.nombre}</span>
+                    <span className="text-xs text-gray-400 font-mono ml-2">#{p.cod}</span>
+                  </button>
+                ))}
+                {filtered.length > shown.length && (
+                  <div className="px-4 py-2 text-xs text-gray-400 border-t">
+                    Mostrando {shown.length} de {filtered.length} — segui escribiendo para filtrar
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+        </div>
       </div>
       </Stagger>
 
@@ -760,6 +864,89 @@ export default function NuevoIngresoPage() {
             placeholder="Ej: 0001-00012345"
             className="w-full px-4 py-2 border border-brand-400 rounded-xl text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
           />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Depósito de ingreso
+          </label>
+          <select
+            value={deposito}
+            onChange={(e) => setDeposito(e.target.value)}
+            className="w-full px-4 py-2 border border-brand-400 rounded-xl text-sm bg-white focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
+          >
+            <option value="0">[0] Distribuidora / Mayorista</option>
+            <option value="1">[1] Pontevedra</option>
+            <option value="2">[2] Minorista</option>
+            <option value="3">[3] Cervantes</option>
+          </select>
+        </div>
+      </div>
+      </Stagger>
+
+      {/* Importes — Neto + IVA + Percepciones + Total */}
+      <Stagger delay={325}>
+      <div className="mb-6 bg-white border border-brand-200 rounded-xl p-4">
+        <div className="flex items-baseline justify-between mb-3">
+          <h3 className="text-sm font-medium text-gray-700">Importes de la factura</h3>
+          <span className="text-xs text-gray-400">Total = Neto + IVA + Percepciones (editable)</span>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Neto</label>
+            <input
+              type="text"
+              inputMode="decimal"
+              value={neto}
+              onChange={(e) => setNeto(e.target.value.replace(/[^0-9.,]/g, ""))}
+              placeholder="0,00"
+              className="w-full px-3 py-2 border border-brand-300 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">IVA</label>
+            <input
+              type="text"
+              inputMode="decimal"
+              value={iva}
+              onChange={(e) => setIva(e.target.value.replace(/[^0-9.,]/g, ""))}
+              placeholder="0,00"
+              className="w-full px-3 py-2 border border-brand-300 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Percepciones</label>
+            <input
+              type="text"
+              inputMode="decimal"
+              value={percepciones}
+              onChange={(e) => setPercepciones(e.target.value.replace(/[^0-9.,]/g, ""))}
+              placeholder="0,00"
+              className="w-full px-3 py-2 border border-brand-300 rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Total {totalManual ? "(manual)" : "(auto)"}</label>
+            <div className="flex gap-1">
+              <input
+                type="text"
+                inputMode="decimal"
+                value={totalAmt}
+                onChange={(e) => { setTotalAmt(e.target.value.replace(/[^0-9.,]/g, "")); setTotalManual(true); }}
+                placeholder="0,00"
+                className={`flex-1 px-3 py-2 border rounded-lg text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 ${totalManual ? "border-amber-400 bg-amber-50 font-semibold" : "border-brand-300"}`}
+              />
+              {totalManual && (
+                <button
+                  type="button"
+                  onClick={() => setTotalManual(false)}
+                  className="px-2 text-xs text-amber-700 hover:underline"
+                  title="Volver a calcular automaticamente"
+                >
+                  Auto
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       </div>
       </Stagger>

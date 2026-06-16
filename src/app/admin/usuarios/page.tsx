@@ -12,8 +12,17 @@ interface UserRecord {
   permissions: string[];
   empleadoCod?: string | null;
   email?: string | null;
+  defaultDeposito?: string | null;
   createdAt: string;
 }
+
+const DEPOSITO_OPTIONS = [
+  { cod: "", label: "— sin default (usa 0) —" },
+  { cod: "0", label: "0 — Distribuidora / Mayorista" },
+  { cod: "1", label: "1 — Pontevedra" },
+  { cod: "2", label: "2 — Minorista" },
+  { cod: "3", label: "3 — Cervantes" },
+];
 
 export default function UsuariosPage() {
   const [users, setUsers] = useState<UserRecord[]>([]);
@@ -27,6 +36,7 @@ export default function UsuariosPage() {
   const [formPerms, setFormPerms] = useState<string[]>([]);
   const [formEmpleadoCod, setFormEmpleadoCod] = useState("");
   const [formEmail, setFormEmail] = useState("");
+  const [formDefaultDeposito, setFormDefaultDeposito] = useState("");
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [confirmUser, setConfirmUser] = useState<UserRecord | null>(null);
 
@@ -67,6 +77,7 @@ export default function UsuariosPage() {
     setFormPerms([]);
     setFormEmpleadoCod("");
     setFormEmail("");
+    setFormDefaultDeposito("");
     setError("");
     setShowForm(true);
   }
@@ -78,6 +89,7 @@ export default function UsuariosPage() {
     setFormPerms(user.role === "admin" && user.permissions.length === 0 ? [...allPermKeys] : [...user.permissions]);
     setFormEmpleadoCod(user.empleadoCod || "");
     setFormEmail(user.email || "");
+    setFormDefaultDeposito(user.defaultDeposito || "");
     setError("");
     setShowForm(true);
   }
@@ -113,6 +125,7 @@ export default function UsuariosPage() {
           permissions: formPerms,
           empleadoCod: formEmpleadoCod,
           email: formEmail,
+          defaultDeposito: formDefaultDeposito,
         };
         if (formUsername !== editingUser.username) body.username = formUsername;
         if (formPassword) body.password = formPassword;
@@ -137,6 +150,7 @@ export default function UsuariosPage() {
             permissions: formPerms,
             empleadoCod: formEmpleadoCod,
             email: formEmail,
+            defaultDeposito: formDefaultDeposito,
           }),
         });
         const data = await res.json();
@@ -270,6 +284,22 @@ export default function UsuariosPage() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:border-brand-600 disabled:opacity-50"
                   />
                 </div>
+              </div>
+
+              {/* Default deposito for stock entries */}
+              <div className="mb-3">
+                <label className="block text-xs text-gray-500 mb-1">Depósito por defecto (al cargar boletas)</label>
+                <select
+                  value={formDefaultDeposito}
+                  onChange={(e) => setFormDefaultDeposito(e.target.value)}
+                  disabled={saving}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:border-brand-600 disabled:opacity-50"
+                >
+                  {DEPOSITO_OPTIONS.map((d) => (
+                    <option key={d.cod} value={d.cod}>{d.label}</option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-400 mt-1">El usuario podra cambiarlo dentro del formulario si tiene que ingresar a otra sucursal.</p>
               </div>
 
               {/* Permissions checkboxes */}

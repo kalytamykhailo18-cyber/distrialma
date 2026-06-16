@@ -42,21 +42,31 @@ export default function InformesPage() {
   const [archiving, setArchiving] = useState(false);
   const [searchFilter, setSearchFilter] = useState("");
   const [archiveResult, setArchiveResult] = useState("");
+  const [testBoleta, setTestBoleta] = useState("");
+  const [stockChanges, setStockChanges] = useState<Array<{ sku: string; productName: string; cant: number; stkBefore: number | null; stkAfter: number | null; delta: number | null }>>([]);
   const [tab, setTab] = useState<"summary" | "daily" | "archive">("summary");
 
   const dataReady = useDataReady(tab === "summary" ? periodSummary.length : tab === "daily" ? report.length : orders.length);
 
-  async function archiveLocal1() {
+  async function archiveLocal1(opts?: { boleta?: string }) {
+    const boleta = opts?.boleta?.trim();
     setArchiving(true);
     setArchiveResult("");
+    setStockChanges([]);
     try {
+      const body: { clienteCod: string; clienteName: string; boleta?: string } = {
+        clienteCod: "9411",
+        clienteName: "LOCAL1",
+      };
+      if (boleta) body.boleta = boleta;
       const res = await fetch("/api/admin/archive-orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ clienteCod: "9411", clienteName: "LOCAL1" }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
       setArchiveResult(data.message || data.error || "Error");
+      if (Array.isArray(data.stockChanges)) setStockChanges(data.stockChanges);
       loadOrders();
     } catch {
       setArchiveResult("Error al archivar");
@@ -286,23 +296,94 @@ export default function InformesPage() {
         {/* Archive action */}
         <Stagger delay={50}>
           <div className="bg-white rounded-lg border shadow-sm p-4 mb-4">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-3">
               <div>
                 <h2 className="text-sm font-medium text-gray-700">Archivar pedidos de Local 1</h2>
                 <p className="text-xs text-gray-400 mt-0.5">
-                  Lee los pendientes de PunTouch, los guarda en el VPS y los elimina de PunTouch.
+                  Lee los pendientes de PunTouch, restituye el stock que PunTouch reservaba y los elimina de PunTouch.
                 </p>
               </div>
               <button
-                onClick={archiveLocal1}
+                onClick={() => archiveLocal1()}
                 disabled={archiving}
                 className={`px-4 py-2 bg-brand-400 text-white rounded-lg text-sm font-medium hover:bg-brand-500 disabled:opacity-50 ${springBtn}`}
               >
                 {archiving ? "Archivando..." : "Archivar y limpiar"}
               </button>
             </div>
+
+            <div className="mt-3 pt-3 border-t border-gray-100">
+              <p className="text-xs text-gray-500 mb-2">
+                Probar con una boleta especifica antes (recomendado la primera vez para verificar el stock):
+              </p>
+              <div className="flex items-center gap-2 flex-wrap">
+                <input
+                  type="text"
+                  value={testBoleta}
+                  onChange={(e) => setTestBoleta(e.target.value)}
+                  placeholder="N° de boleta (ej: 000123456)"
+                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-brand-500 min-w-[200px]"
+                />
+                <button
+                  onClick={() => archiveLocal1({ boleta: testBoleta })}
+                  disabled={archiving || !testBoleta.trim()}
+                  className={`px-3 py-1.5 bg-amber-500 text-white rounded-lg text-sm font-medium hover:bg-amber-600 disabled:opacity-50 ${springBtn}`}
+                >
+                  Probar con esa boleta
+                </button>
+              </div>
+            </div>
+
             {archiveResult && (
-              <p className="text-sm text-green-600 mt-2">{archiveResult}</p>
+              <p className="text-sm text-green-700 mt-3 font-medium">{archiveResult}</p>
+            )}
+
+            {stockChanges.length > 0 && (
+              <div className="mt-3 border border-gray-200 rounded-lg overflow-hidden">
+                <div className="px-3 py-2 bg-gray-50 text-xs font-medium text-gray-700">
+                  Verificacion de stock ({stockChanges.length} productos)
+                </div>
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="bg-gray-50 text-gray-500 border-t">
+                      <th className="px-3 py-1.5 text-left">SKU</th>
+                      <th className="px-3 py-1.5 text-left">Producto</th>
+                      <th className="px-3 py-1.5 text-right">Cant. restituida</th>
+                      <th className="px-3 py-1.5 text-right">Stock antes</th>
+                      <th className="px-3 py-1.5 text-right">Stock despues</th>
+                      <th className="px-3 py-1.5 text-right">Delta real</th>
+                      <th className="px-3 py-1.5 text-center">OK?</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {stockChanges.map((c) => {
+                      const expectsDelta = c.cant;
+                      const ok = c.delta !== null && Math.abs(c.delta - expectsDelta) < 0.001;
+                      return (
+                        <tr key={c.sku} className="border-t">
+                          <td className="px-3 py-1.5 font-mono text-gray-700">{c.sku}</td>
+                          <td className="px-3 py-1.5 text-gray-700 truncate max-w-[260px]">{c.productName || "—"}</td>
+                          <td className="px-3 py-1.5 text-right font-medium">+{c.cant}</td>
+                          <td className="px-3 py-1.5 text-right text-gray-500">{c.stkBefore ?? "—"}</td>
+                          <td className="px-3 py-1.5 text-right font-medium text-gray-800">{c.stkAfter ?? "—"}</td>
+                          <td className={`px-3 py-1.5 text-right font-medium ${c.delta !== null ? (c.delta > 0 ? "text-green-700" : "text-gray-400") : "text-gray-400"}`}>
+                            {c.delta !== null ? (c.delta >= 0 ? `+${c.delta}` : c.delta) : "—"}
+                          </td>
+                          <td className="px-3 py-1.5 text-center">
+                            {c.stkBefore === null ? (
+                              <span title="No existe fila en Stock para este sku/Deposito='0'" className="text-amber-600">⚠</span>
+                            ) : ok ? (
+                              <span className="text-green-600">✓</span>
+                            ) : (
+                              <span className="text-red-600" title={`Esperado +${expectsDelta}, real ${c.delta ?? "?"}`}>✗</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
         </Stagger>

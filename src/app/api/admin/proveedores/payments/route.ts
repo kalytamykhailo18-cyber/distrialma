@@ -25,6 +25,25 @@ export async function GET(req: NextRequest) {
       concepto: p.concepto,
       usuario: p.usuario,
       createdAt: p.createdAt.toISOString(),
+      efectivoImagenes: (() => {
+        if (!p.efectivoImagenes) return [];
+        try {
+          const parsed = JSON.parse(p.efectivoImagenes);
+          return Array.isArray(parsed) ? parsed.filter((x) => typeof x === "string") : [];
+        } catch {
+          return [p.efectivoImagenes];
+        }
+      })(),
+      tipoPago: p.tipoPago || "legacy",
+      pdfUrl: p.pdfUrl || null,
+      driveUrl: p.driveUrl || null,
+      montoCheques: Number(p.montoCheques),
+      montoEfectivo: Number(p.montoEfectivo),
+      montoTransferencia: Number(p.montoTransferencia),
+      montoAjuste: Number(p.montoAjuste),
+      ajusteMotivo: p.ajusteMotivo || null,
+      anuladoAt: p.anuladoAt ? p.anuladoAt.toISOString() : null,
+      anuladoBy: p.anuladoBy || null,
     })),
   });
 }

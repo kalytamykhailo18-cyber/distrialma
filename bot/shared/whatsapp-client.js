@@ -75,10 +75,13 @@ export function createWhatsAppClient({ sessionPath, name, onDisconnect }) {
   });
 
   // Heartbeat: check every 5 minutes if WhatsApp is still alive
-  // If the session silently dies (no "disconnected" event), force restart
+  // Require multiple consecutive failures before restart, so transient WA hiccups
+  // don't trigger session-losing restarts.
   let lastPong = Date.now();
-  const HEARTBEAT_INTERVAL = 5 * 60 * 1000; // 5 min
-  const HEARTBEAT_TIMEOUT = 2 * 60 * 1000;  // 2 min grace
+  let consecutiveFailures = 0;
+  const HEARTBEAT_INTERVAL = 5 * 60 * 1000;
+  const MAX_CONSECUTIVE_FAILURES = 3;
+  const HEARTBEAT_TIMEOUT = 15 * 60 * 1000;
 
   setInterval(async () => {
     if (botStatus !== "conectado" && botStatus !== "autenticado") return;
@@ -86,22 +89,39 @@ export function createWhatsAppClient({ sessionPath, name, onDisconnect }) {
       const state = await client.getState();
       if (state === "CONNECTED") {
         lastPong = Date.now();
+        consecutiveFailures = 0;
       } else {
-        console.log(`[${name}] Heartbeat: state=${state}, restarting...`);
-        sendRestartAlert(name, `state=${state}`);
-        setTimeout(() => process.exit(1), 2000);
-        return;
+        consecutiveFailures++;
+        console.log(`[${name}] Heartbeat: state=${state}, failures=${consecutiveFailures}/${MAX_CONSECUTIVE_FAILURES}`);
+        if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+          console.log(`[${name}] ${MAX_CONSECUTIVE_FAILURES} consecutive bad states, restarting...`);
+          sendRestartAlert(name, `state=${state}`);
+          try { await client.destroy(); } catch {}
+          setTimeout(() => process.exit(1), 2000);
+          return;
+        }
       }
     } catch (err) {
-      console.log(`[${name}] Heartbeat failed: ${err.message}`);
-      if (Date.now() - lastPong > HEARTBEAT_TIMEOUT) {
+      consecutiveFailures++;
+      console.log(`[${name}] Heartbeat failed (${consecutiveFailures}/${MAX_CONSECUTIVE_FAILURES}): ${err.message}`);
+      if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES && Date.now() - lastPong > HEARTBEAT_TIMEOUT) {
         console.log(`[${name}] No heartbeat for ${Math.round((Date.now() - lastPong) / 1000)}s, restarting...`);
         sendRestartAlert(name, err.message);
+        try { await client.destroy(); } catch {}
         setTimeout(() => process.exit(1), 2000);
         return;
       }
     }
   }, HEARTBEAT_INTERVAL);
+
+  // Graceful shutdown: let puppeteer flush session state on SIGTERM/SIGINT
+  for (const sig of ["SIGTERM", "SIGINT"]) {
+    process.on(sig, async () => {
+      console.log(`[${name}] ${sig} received, destroying client...`);
+      try { await client.destroy(); } catch {}
+      process.exit(0);
+    });
+  }
 
   return {
     client,

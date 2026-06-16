@@ -8,7 +8,7 @@ import { PageTransition, Stagger, staggerStyle, springBtn, hoverRow, LoadingCent
 
 interface Proveedor { cod: string; nombre: string }
 interface Mapping { id: number; sku: string; productName: string; proveedorCod: string; proveedorName: string }
-interface RepoProduct { sku: string; nombre: string; unidad: string; stockActual: number; ventaSemanal: number; sugerido: number; costoUnit: number; costoTotal: number }
+interface RepoProduct { sku: string; nombre: string; unidad: string; stockActual: number; stockPontevedra?: number; stockMinorista?: number; stockCervantes?: number; ventaSemanal: number; ventaSemanalPontevedra?: number; sugerido: number; costoUnit: number; costoTotal: number }
 interface RepoProveedor { cod: string; nombre: string; totalSugerido: number; productos: RepoProduct[] }
 interface ProvSummary { cod: string; nombre: string; cantProductos: number }
 interface SugProduct { sku: string; nombre: string; unidad: string; stock: number; costo: number; ventaSemanal: number; coberturaDias: number; sugerido: number; proveedor: string }
@@ -478,8 +478,12 @@ export default function ProveedoresProductosPage() {
                                 <tr className="bg-gray-100 text-xs text-gray-500">
                                   <th className="text-left p-2 pl-4">Producto</th>
                                   {[
-                                    { key: "stockActual", label: "Stock" },
-                                    { key: "ventaSemanal", label: "Venta/sem" },
+                                    { key: "stockActual", label: "Stock dep 0" },
+                                    { key: "stockPontevedra", label: "Stk Pontev" },
+                                    { key: "stockMinorista", label: "Stk Minor" },
+                                    { key: "stockCervantes", label: "Stk Cerv" },
+                                    { key: "ventaSemanal", label: "Vta/sem" },
+                                    { key: "ventaSemanalPontevedra", label: "Vta/sem Pontev" },
                                     { key: "sugerido", label: "Sugerido" },
                                     { key: "costoTotal", label: "Costo est." },
                                   ].map((col) => (
@@ -509,7 +513,11 @@ export default function ProveedoresProductosPage() {
                                       <span className="text-gray-900">{p.nombre}</span>
                                     </td>
                                     <td className={`text-right p-2 ${p.stockActual <= 0 ? "text-red-600 font-bold" : "text-gray-600"}`}>{p.stockActual.toLocaleString("es-AR", { maximumFractionDigits: 1 })} {p.unidad === "KG" ? "kg" : "u"}</td>
+                                    <td className={`text-right p-2 ${(p.stockPontevedra || 0) <= 0 ? "text-red-600 font-medium" : "text-gray-500"}`}>{(p.stockPontevedra || 0).toLocaleString("es-AR", { maximumFractionDigits: 1 })}</td>
+                                    <td className={`text-right p-2 ${(p.stockMinorista || 0) <= 0 ? "text-red-600 font-medium" : "text-gray-500"}`}>{(p.stockMinorista || 0).toLocaleString("es-AR", { maximumFractionDigits: 1 })}</td>
+                                    <td className={`text-right p-2 ${(p.stockCervantes || 0) <= 0 ? "text-red-600 font-medium" : "text-gray-500"}`}>{(p.stockCervantes || 0).toLocaleString("es-AR", { maximumFractionDigits: 1 })}</td>
                                     <td className="text-right p-2 text-blue-600 font-medium">{p.ventaSemanal.toLocaleString("es-AR", { maximumFractionDigits: 1 })}</td>
+                                    <td className="text-right p-2 text-blue-500">{(p.ventaSemanalPontevedra || 0).toLocaleString("es-AR", { maximumFractionDigits: 1 })}</td>
                                     <td className="text-right p-2">
                                       <input
                                         type="number"

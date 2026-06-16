@@ -53,7 +53,7 @@ interface FacturaItem {
   listaLabel: string;
 }
 
-const SUC_NAMES: Record<string, string> = { "1": "Minorista", "2": "Mayorista", "6": "Pontevedra", "7": "Distribuidora", "10": "Reventas" };
+const SUC_NAMES: Record<string, string> = { "1": "Minorista", "2": "Mayorista", "6": "Pontevedra", "7": "Distribuidora", "10": "Reventas", "11": "PedidosYa" };
 
 export default function ClientesPage() {
   const [search, setSearch] = useState("");
@@ -69,12 +69,14 @@ export default function ClientesPage() {
   const [facturas, setFacturas] = useState<Factura[]>([]);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [registro, setRegistro] = useState<{ whatsapp?: string; fotoLocal?: string; fotoCuit?: string; lat?: number; lng?: number; registradoPor?: string } | null>(null);
+  const [boletaPdfEnabled, setBoletaPdfEnabled] = useState(true);
+  const [savingPref, setSavingPref] = useState(false);
 
   // Factura items
   const [expandedBoleta, setExpandedBoleta] = useState<string | null>(null);
   const [facturaItems, setFacturaItems] = useState<FacturaItem[]>([]);
   const [loadingItems, setLoadingItems] = useState(false);
-  const [pedidosWeb, setPedidosWeb] = useState<Array<{ boleta: string; nroped: string; total: number; fecha: string; hora: string; notas: string; archived?: boolean; archivedItems?: Array<{ sku: string; name: string; cant: number; price: number; listaPrecio: number }> }>>([]);
+  const [pedidosWeb, setPedidosWeb] = useState<Array<{ boleta: string; nroped: string; total: number; fechora?: string; fecha: string; hora: string; notas: string; archived?: boolean; archivedItems?: Array<{ sku: string; name: string; cant: number; price: number; listaPrecio: number }> }>>([]);
   const [clientTab, setClientTab] = useState<"facturas" | "pedidos">("facturas");
 
   // Pedido web items
@@ -104,17 +106,26 @@ export default function ClientesPage() {
     setExpandedPedido(null);
     setClientTab("facturas");
     try {
-      const res = await fetch(`/api/admin/clientes?cod=${cod}`);
+      const [res, prefRes] = await Promise.all([
+        fetch(`/api/admin/clientes?cod=${cod}`),
+        fetch(`/api/admin/cliente-preferences?cliente=${cod}`),
+      ]);
       const d = await res.json();
       setCliente(d.cliente || null);
       setFacturas(d.facturas || []);
       setRegistro(d.registro || null);
+      try {
+        const pref = await prefRes.json();
+        setBoletaPdfEnabled(pref?.boletaPdfEnabled !== false);
+      } catch {
+        setBoletaPdfEnabled(true);
+      }
       const live = (d.pedidosWeb || []).map((p: Record<string, unknown>) => ({ ...p, archived: false }));
       const archived = (d.pedidosArchivados || []).map((p: Record<string, unknown>) => ({ ...p, notas: "", archived: true, archivedItems: p.items }));
       // Merge, deduplicate by boleta (live takes priority), sort by fecha desc
       const seen = new Set(live.map((p: { boleta: string }) => p.boleta));
       const merged = [...live, ...archived.filter((p: { boleta: string }) => !seen.has(p.boleta))];
-      merged.sort((a: { fecha: string; hora: string }, b: { fecha: string; hora: string }) => (b.fecha + b.hora).localeCompare(a.fecha + a.hora));
+      merged.sort((a: { fechora?: string }, b: { fechora?: string }) => (b.fechora || "").localeCompare(a.fechora || ""));
       setPedidosWeb(merged);
     } catch {}
     setLoadingDetail(false);
@@ -317,6 +328,33 @@ export default function ClientesPage() {
                   {cliente.fechaAlta && <span>Alta: {cliente.fechaAlta.slice(6, 8)}/{cliente.fechaAlta.slice(4, 6)}/{cliente.fechaAlta.slice(0, 4)}</span>}
                   {registro?.whatsapp && <span>WA: {registro.whatsapp}</span>}
                   {registro?.registradoPor && <span>Registrado por: {registro.registradoPor}</span>}
+                </div>
+                <div className="mt-3 pt-3 border-t flex items-center gap-3">
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={boletaPdfEnabled}
+                      disabled={savingPref}
+                      onChange={async (e) => {
+                        const next = e.target.checked;
+                        setBoletaPdfEnabled(next);
+                        setSavingPref(true);
+                        try {
+                          await fetch("/api/admin/cliente-preferences", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ clienteCod: cliente.cod, boletaPdfEnabled: next }),
+                          });
+                        } catch {
+                          setBoletaPdfEnabled(!next);
+                        }
+                        setSavingPref(false);
+                      }}
+                      className="w-4 h-4 accent-brand-500"
+                    />
+                    <span className="text-sm text-gray-700">Recibe boleta por WhatsApp al cerrar la venta</span>
+                    {savingPref && <span className="text-xs text-gray-400">Guardando…</span>}
+                  </label>
                 </div>
                 {(registro?.fotoLocal || registro?.fotoCuit || registro?.lat) && (
                   <div className="flex flex-wrap gap-3 mt-3">

@@ -156,18 +156,29 @@ export async function POST(req: NextRequest) {
       msg += `\n\n... y ${alerts.length - 20} productos mas.`;
     }
 
-    const chatId = phone.replace(/\D/g, "") + "@c.us";
-    const res = await fetch("http://127.0.0.1:3099/send", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chatId, message: msg }),
-    });
-
-    if (res.ok) {
-      console.log(`[STOCK-ALERT] Sent ${alerts.length} alerts to ${phone}`);
-      return NextResponse.json({ ok: true, sent: true, total: alerts.length });
+    // Support multiple phones separated by comma
+    const phones = phone.split(",").map((p) => p.trim()).filter(Boolean);
+    let sentCount = 0;
+    const failed: string[] = [];
+    for (const p of phones) {
+      const chatId = p.replace(/\D/g, "") + "@c.us";
+      try {
+        const res = await fetch("http://127.0.0.1:3099/send", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ chatId, message: msg }),
+        });
+        if (res.ok) sentCount++;
+        else failed.push(p);
+      } catch {
+        failed.push(p);
+      }
+    }
+    if (sentCount > 0) {
+      console.log(`[STOCK-ALERT] Sent ${alerts.length} alerts to ${sentCount}/${phones.length} phones`);
+      return NextResponse.json({ ok: true, sent: true, total: alerts.length, sentTo: sentCount, failed: failed.length ? failed : undefined });
     } else {
-      return NextResponse.json({ ok: false, error: "Error enviando WhatsApp" }, { status: 500 });
+      return NextResponse.json({ ok: false, error: "Error enviando WhatsApp a todos los números" }, { status: 500 });
     }
   } catch (error) {
     console.error("Stock alert error:", error);

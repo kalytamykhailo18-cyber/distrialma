@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import sql from "mssql";
 import { getPool, getDbName } from "@/lib/mssql";
-import { requireStaff } from "@/lib/api-auth";
+import { requireStaff, requirePermission } from "@/lib/api-auth";
 import { prisma } from "@/lib/prisma";
 
 export async function GET(
@@ -130,9 +130,12 @@ export async function GET(
       entry: {
         id: entry.id,
         tipo: entry.tipo || "ingreso",
+        deposito: entry.deposito,
         proveedorCod: entry.proveedorCod,
         proveedorName: entry.proveedorName,
         usuario: entry.usuario,
+        costeadoPor: entry.costeadoPor,
+        costeadoAt: entry.costeadoAt ? entry.costeadoAt.toISOString() : null,
         estado: entry.estado,
         subtotal: Number(entry.subtotal),
         iva: Number(entry.iva),
@@ -165,9 +168,9 @@ export async function PUT(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const session = await requireStaff();
+  const session = await requirePermission("costeo");
   if (!session) {
-    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    return NextResponse.json({ error: "No tenés permiso para costear" }, { status: 403 });
   }
   const userName = (session.user as { name?: string })?.name || "admin";
 
@@ -220,7 +223,7 @@ export async function PUT(
         }
         await prisma.stockEntry.update({
           where: { id },
-          data: { estado: "costeado" },
+          data: { estado: "costeado", costeadoPor: userName, costeadoAt: new Date() },
         });
         await tx.commit();
       } catch (e) {
@@ -375,10 +378,12 @@ export async function PUT(
           descuento,
           descuentoBase,
           total: invoiceTotal > 0 ? invoiceTotal : clamp(totalCosto),
+          ...(allCosteado ? { costeadoPor: userName, costeadoAt: new Date() } : {}),
         },
       });
 
-      // Update supplier saldo if invoice total > 0 and all costeado
+      // Update supplier saldo if invoice total > 0 and all costeado.
+      // Proveedores.Saldo is DECIMAL(12,2) — plenty of headroom.
       if (allCosteado && invoiceTotal > 0) {
         const provPadded = entry.proveedorCod.padStart(7, " ");
         await new sql.Request(tx)
@@ -402,6 +407,63 @@ export async function PUT(
     if (allCosteado) {
       const cronSecret = process.env.CRON_SECRET || (process.env.RESEND_API_KEY || "").substring(0, 16);
       fetch(`http://127.0.0.1:3000/api/admin/margin-alert?secret=${cronSecret}`, { method: "POST" }).catch(() => {});
+    }
+
+    // Auto-send group notification when entire entry becomes costeado (fire and forget)
+    if (allCosteado) {
+      (async () => {
+        try {
+          const [g1, g2] = await Promise.all([
+            prisma.setting.findUnique({ where: { key: "costeo_group_id" } }),
+            prisma.setting.findUnique({ where: { key: "costeo_group_id_2" } }),
+          ]);
+          const groupIds = [g1?.value?.trim(), g2?.value?.trim()].filter(Boolean) as string[];
+          if (groupIds.length === 0) return;
+
+          const items = await prisma.stockEntryItem.findMany({
+            where: { entryId: id, costeado: true },
+            select: { sku: true, productName: true, cantidad: true },
+          });
+          // Pull Unidad (KG / UN / ...) for each SKU from PunTouch Productos.
+          const unidadBySku = new Map<string, string>();
+          if (items.length > 0) {
+            try {
+              const codList = items.map((it) => `'${it.sku.padStart(7, " ")}'`).join(",");
+              const unitsRes = await pool.request().query(`
+                SELECT LTRIM(RTRIM(Cod)) AS sku, UPPER(LTRIM(RTRIM(ISNULL(Unidad,'')))) AS unidad
+                FROM [${dbProd}].dbo.Productos
+                WHERE Cod IN (${codList})
+              `);
+              for (const r of unitsRes.recordset) unidadBySku.set(r.sku, r.unidad || "");
+            } catch { /* ignore lookup failure, just omit units */ }
+          }
+          const lines = items.map((it) => {
+            const cant = Number(it.cantidad || 0);
+            const cantStr = cant > 0 ? (cant % 1 === 0 ? cant.toFixed(0) : String(cant)) : "";
+            const unidad = unidadBySku.get(it.sku.trim()) || "";
+            const unitStr = unidad === "KG" ? " KG" : unidad ? " UN" : "";
+            const prefix = cantStr ? `${cantStr}${unitStr} ` : "";
+            return `- ${prefix}${it.productName || it.sku}`;
+          });
+          if (lines.length === 0) return;
+
+          const DEPOSITO_NAMES: Record<string, string> = { "0": "Distribuidora / Mayorista", "1": "Pontevedra", "2": "Minorista", "3": "Cervantes" };
+          const depCod = entry.deposito || "0";
+          const depName = DEPOSITO_NAMES[depCod] || `Depósito ${depCod}`;
+          const msg = `Compras costeadas — ${entry.proveedorName || entry.proveedorCod}\nDepósito: [${depCod}] ${depName}\n\n${lines.join("\n")}\n\nCosteado por: ${userName}`;
+          await Promise.all(
+            groupIds.map((chatId) =>
+              fetch("http://127.0.0.1:3099/send", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ chatId, message: msg }),
+              })
+            )
+          );
+        } catch (e) {
+          console.error("Costeo group notification error:", e);
+        }
+      })();
     }
 
     return NextResponse.json({ success: true, allCosteado });

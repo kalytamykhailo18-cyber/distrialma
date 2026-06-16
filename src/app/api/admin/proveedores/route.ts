@@ -16,6 +16,9 @@ export async function GET() {
       SELECT
         LTRIM(RTRIM(Cod)) AS cod,
         LTRIM(RTRIM(Nombre)) AS nombre,
+        LTRIM(RTRIM(ISNULL(CUIT, ''))) AS cuit,
+        LTRIM(RTRIM(ISNULL(Filler1, ''))) AS alias,
+        LTRIM(RTRIM(ISNULL(Filler2, ''))) AS cbu,
         ISNULL(Saldo, 0) AS saldo
       FROM [${dbProd}].dbo.Proveedores
       ORDER BY Nombre
@@ -37,13 +40,16 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { nombre } = await req.json();
+    const { nombre, cuit, alias, cbu } = await req.json();
     if (!nombre?.trim()) {
       return NextResponse.json(
         { error: "Nombre requerido" },
         { status: 400 }
       );
     }
+    const cuitTrim = (cuit || "").trim();
+    const aliasTrim = (alias || "").trim();
+    const cbuTrim = (cbu || "").trim();
 
     const pool = await getPool();
     const dbProd = getDbName("productos");
@@ -60,15 +66,21 @@ export async function POST(req: NextRequest) {
       .request()
       .input("cod", codPadded)
       .input("nombre", nombre.trim().substring(0, 60))
+      .input("cuit", cuitTrim.substring(0, 14))
+      .input("alias", aliasTrim.substring(0, 40))
+      .input("cbu", cbuTrim.substring(0, 40))
       .query(`
-        INSERT INTO [${dbProd}].dbo.Proveedores (Cod, Nombre, Saldo)
-        VALUES (@cod, @nombre, 0)
+        INSERT INTO [${dbProd}].dbo.Proveedores (Cod, Nombre, CUIT, Filler1, Filler2, Saldo)
+        VALUES (@cod, @nombre, @cuit, @alias, @cbu, 0)
       `);
 
     return NextResponse.json({
       proveedor: {
         cod: String(nextCod),
         nombre: nombre.trim(),
+        cuit: cuitTrim,
+        alias: aliasTrim,
+        cbu: cbuTrim,
         saldo: 0,
       },
     });
@@ -94,10 +106,25 @@ export async function PUT(req: NextRequest) {
   }
 
   try {
-    const { cod, monto, concepto } = await req.json();
+    const { cod, monto, concepto, efectivoImagenes, efectivoImagen } = await req.json();
+    // Accept either an array (new) or a single URL (legacy). Normalize to array.
+    let imagenesArr: string[] | null = null;
+    if (Array.isArray(efectivoImagenes)) {
+      imagenesArr = efectivoImagenes.filter((x: unknown) => typeof x === "string" && x);
+    } else if (typeof efectivoImagen === "string" && efectivoImagen) {
+      imagenesArr = [efectivoImagen];
+    }
+    const efectivoImagenesJson = imagenesArr && imagenesArr.length > 0 ? JSON.stringify(imagenesArr) : null;
     if (!cod || !monto || monto <= 0) {
       return NextResponse.json(
         { error: "Proveedor y monto requeridos" },
+        { status: 400 }
+      );
+    }
+    const conceptoTrim = (concepto || "").trim();
+    if (!conceptoTrim) {
+      return NextResponse.json(
+        { error: "Forma de pago requerida (Efectivo, Transferencia o Cheque)" },
         { status: 400 }
       );
     }
@@ -134,8 +161,9 @@ export async function PUT(req: NextRequest) {
         proveedorCod: String(cod),
         proveedorName: result.recordset[0]?.nombre || "",
         monto: Math.round(parseFloat(monto) * 100) / 100,
-        concepto: (concepto || "Pago").substring(0, 100),
+        concepto: conceptoTrim.substring(0, 100),
         usuario: userName,
+        efectivoImagenes: efectivoImagenesJson,
       },
     });
 
@@ -150,5 +178,59 @@ export async function PUT(req: NextRequest) {
       { error: "Error al registrar pago" },
       { status: 500 }
     );
+  }
+}
+
+// PATCH — update editable fields (cuit, nombre) on an existing proveedor.
+export async function PATCH(req: NextRequest) {
+  const session = await requireStaff();
+  if (!session) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  }
+  const user = session.user as { role?: string; permissions?: string[] };
+  const hasCosteo = user.role === "admin" || (user.permissions?.includes("costeo") ?? false);
+  if (!hasCosteo) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+  }
+
+  try {
+    const { cod, cuit, alias, cbu, nombre } = await req.json();
+    if (!cod) {
+      return NextResponse.json({ error: "Cod requerido" }, { status: 400 });
+    }
+    const pool = await getPool();
+    const dbProd = getDbName("productos");
+    const codPadded = String(cod).padStart(7, " ");
+
+    const sets: string[] = [];
+    const reqq = pool.request().input("cod", codPadded);
+    if (typeof cuit === "string") {
+      reqq.input("cuit", cuit.trim().substring(0, 14));
+      sets.push("CUIT = @cuit");
+    }
+    if (typeof alias === "string") {
+      reqq.input("alias", alias.trim().substring(0, 40));
+      sets.push("Filler1 = @alias");
+    }
+    if (typeof cbu === "string") {
+      reqq.input("cbu", cbu.trim().substring(0, 40));
+      sets.push("Filler2 = @cbu");
+    }
+    if (typeof nombre === "string" && nombre.trim()) {
+      reqq.input("nombre", nombre.trim().substring(0, 60));
+      sets.push("Nombre = @nombre");
+    }
+    if (sets.length === 0) {
+      return NextResponse.json({ error: "Nada que actualizar" }, { status: 400 });
+    }
+    await reqq.query(`
+      UPDATE [${dbProd}].dbo.Proveedores
+      SET ${sets.join(", ")}
+      WHERE Cod = @cod
+    `);
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    console.error("Error updating proveedor:", error);
+    return NextResponse.json({ error: "Error al actualizar proveedor" }, { status: 500 });
   }
 }

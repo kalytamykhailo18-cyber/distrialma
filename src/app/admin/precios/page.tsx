@@ -111,13 +111,16 @@ export default function PreciosPage() {
       const data = await res.json();
       if (data.product) {
         setProduct(data.product);
+        // Use 0 as a real value (was falling through `|| ""`, which made 0
+        // look empty and made saved zeros invisible to the user)
+        const fmt = (n: number | null | undefined) => (n === null || n === undefined) ? "" : String(n);
         setForm({
-          costo: String(data.product.costo || ""),
-          precio: String(data.product.precio || ""),
-          precio2: String(data.product.precio2 || ""),
-          precio3: String(data.product.precio3 || ""),
-          precio4: String(data.product.precio4 || ""),
-          precio5: String(data.product.precio5 || ""),
+          costo: fmt(data.product.costo),
+          precio: fmt(data.product.precio),
+          precio2: fmt(data.product.precio2),
+          precio3: fmt(data.product.precio3),
+          precio4: fmt(data.product.precio4),
+          precio5: fmt(data.product.precio5),
         });
         setTimeout(() => { const el = document.getElementById("price-precio") as HTMLInputElement; if (el) { el.focus(); el.select(); } }, 300);
       } else {
@@ -224,26 +227,27 @@ export default function PreciosPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           sku: product.sku,
-          costo: form.costo ? parseFloat(form.costo) : undefined,
-          precio: form.precio ? parseFloat(form.precio) : undefined,
-          precio2: form.precio2 ? parseFloat(form.precio2) : undefined,
-          precio3: form.precio3 ? parseFloat(form.precio3) : undefined,
-          precio4: form.precio4 ? parseFloat(form.precio4) : undefined,
-          precio5: form.precio5 ? parseFloat(form.precio5) : undefined,
+          costo: form.costo !== "" ? parseFloat(form.costo) : undefined,
+          precio: form.precio !== "" ? parseFloat(form.precio) : undefined,
+          precio2: form.precio2 !== "" ? parseFloat(form.precio2) : undefined,
+          precio3: form.precio3 !== "" ? parseFloat(form.precio3) : undefined,
+          precio4: form.precio4 !== "" ? parseFloat(form.precio4) : undefined,
+          precio5: form.precio5 !== "" ? parseFloat(form.precio5) : undefined,
         }),
       });
       const data = await res.json();
       if (res.ok) {
         setSuccess("Precios actualizados");
-        // Update product in place without re-focusing Minorista
+        // Update product in place — empty stays previous, 0 stays 0
+        const pickNum = (v: string, fallback: number) => v === "" ? fallback : parseFloat(v);
         setProduct((prev) => prev ? {
           ...prev,
-          costo: parseFloat(form.costo) || prev.costo,
-          precio: parseFloat(form.precio) || prev.precio,
-          precio2: parseFloat(form.precio2) || prev.precio2,
-          precio3: parseFloat(form.precio3) || prev.precio3,
-          precio4: parseFloat(form.precio4) || prev.precio4,
-          precio5: parseFloat(form.precio5) || prev.precio5,
+          costo: pickNum(form.costo, prev.costo),
+          precio: pickNum(form.precio, prev.precio),
+          precio2: pickNum(form.precio2, prev.precio2),
+          precio3: pickNum(form.precio3, prev.precio3),
+          precio4: pickNum(form.precio4, prev.precio4),
+          precio5: pickNum(form.precio5, prev.precio5),
         } : prev);
         searchInputRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
         setTimeout(() => { searchInputRef.current?.focus(); }, 400);

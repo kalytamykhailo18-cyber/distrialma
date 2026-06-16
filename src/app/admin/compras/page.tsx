@@ -10,6 +10,7 @@ import { PageTransition, Stagger, staggerStyle, springBtn, hoverRow, LoadingCent
 interface StockEntry {
   id: number;
   tipo: string;
+  deposito: string | null;
   proveedorCod: string;
   proveedorName: string;
   usuario: string;
@@ -24,6 +25,13 @@ interface StockEntry {
   createdAt: string;
   itemCount: number;
 }
+
+const DEP_SHORT: Record<string, string> = {
+  "0": "Mayorista",
+  "1": "Pontevedra",
+  "2": "Minorista",
+  "3": "Cervantes",
+};
 
 type Tab = "pendiente" | "costeado" | "all";
 
@@ -423,6 +431,9 @@ export default function ComprasPage() {
                         }`}
                       >
                         {entry.estado === "costeado" ? (entry.tipo === "devolucion" ? "Aprobada" : "Costeado") : "Pendiente"}
+                      </span>
+                      <span className="text-xs px-2 py-0.5 rounded-full font-bold bg-brand-100 text-brand-700">
+                        [{entry.deposito || "0"}] {DEP_SHORT[entry.deposito || "0"] || `Depo ${entry.deposito || "0"}`}
                       </span>
                     </div>
                     <div className="text-xs text-gray-400 mt-0.5">

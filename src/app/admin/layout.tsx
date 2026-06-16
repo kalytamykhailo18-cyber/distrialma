@@ -39,12 +39,15 @@ const MENU_CATEGORIES: MenuCategory[] = [
       { href: "/admin/proveedores", label: "Proveedores", perm: "compras" },
       { href: "/admin/movimientos", label: "Movimientos", perm: "movimientos" },
       { href: "/admin/proveedores-productos", label: "Reposicion", perm: "compras" },
+      { href: "/admin/stock-sucursales", label: "Stock por sucursal", perm: "stock-sucursales" },
+      { href: "/admin/traslados", label: "Traslados sucursales", perm: "traslados-stock" },
     ],
   },
   {
     label: "Precios", icon: HiOutlineCurrencyDollar, items: [
       { href: "/admin/precios", label: "Actualizar", perm: "costeo" },
       { href: "/admin/precios-masivos", label: "Masivos", perm: "costeo" },
+      { href: "/admin/vinculaciones-stock", label: "Vinculaciones stock", perm: "costeo" },
       { href: "/admin/pedidosya", label: "PedidosYa", perm: "costeo" },
     ],
   },
@@ -54,12 +57,14 @@ const MENU_CATEGORIES: MenuCategory[] = [
       { href: "/admin/resumen-empleado", label: "Descuentos Empleados", perm: "informes" },
       { href: "/admin/cheques", label: "Cheques", perm: "cheques" },
       { href: "/admin/informes", label: "Informes", perm: "informes" },
+      { href: "/admin/conectar-drive", label: "Conectar Drive", perm: "conectar-drive" },
     ],
   },
   {
     label: "Reportes", icon: HiOutlineChartBar, items: [
       { href: "/admin/dashboard", label: "Dashboard", perm: "dashboard" },
       { href: "/admin/resumen-productos", label: "Resumen Prod.", perm: "dashboard" },
+      { href: "/admin/resumen-rubros", label: "Resumen x Rubro", perm: "dashboard" },
       { href: "/admin/ventas-perdidas", label: "Ventas Perdidas", perm: "dashboard" },
     ],
   },
@@ -68,6 +73,7 @@ const MENU_CATEGORIES: MenuCategory[] = [
       { href: "/admin/inbox", label: "Inbox", perm: "informes" },
       { href: "/admin/notificaciones", label: "Deudas", perm: "notificaciones" },
       { href: "/admin/notificaciones/reactivar", label: "Reactivar clientes", perm: "notificaciones" },
+      { href: "/admin/email-difusion", label: "Difusión por mail", perm: "notificaciones" },
       { href: "/admin/notificaciones/deuda-auto", label: "Deuda automatica", perm: "notificaciones" },
       { href: "/admin/alertas-stock", label: "Alertas stock", perm: "notificaciones" },
       { href: "/admin/bot-qr", label: "Bot QR", perm: "clientes" },
@@ -128,6 +134,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [expandedCat, setExpandedCat] = useState<string | null>(null);
+  const [kioskMode, setKioskMode] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      setKioskMode(params.get("kiosk") === "1");
+    }
+  }, [pathname]);
 
   const user = session?.user as { role?: string; permissions?: string[]; empleadoCod?: string | null } | undefined;
   const role = user?.role;
@@ -191,6 +205,26 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     ...cat,
     items: cat.items.filter((item) => hasPermission(role, permissions, item.perm as Parameters<typeof hasPermission>[2])),
   })).filter((cat) => cat.items.length > 0);
+
+  if (kioskMode) {
+    return (
+      <main className="relative flex-1 overflow-y-auto h-screen">
+        <button
+          onClick={() => {
+            if (confirm("¿Cerrar el modo kiosko?")) {
+              window.close();
+              window.location.href = "about:blank";
+            }
+          }}
+          className="fixed top-2 right-2 z-50 w-8 h-8 rounded-full bg-red-500 hover:bg-red-600 text-white text-sm font-bold shadow-lg opacity-30 hover:opacity-100 transition-opacity"
+          title="Cerrar"
+        >
+          ×
+        </button>
+        {children}
+      </main>
+    );
+  }
 
   return (
     <div className="flex h-[calc(100vh-57px)] overflow-hidden">

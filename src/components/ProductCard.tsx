@@ -28,7 +28,11 @@ export default function ProductCard({ product, index = 0, stockThreshold = 0 }: 
             className="max-h-full max-w-full object-contain"
           />
         ) : (
-          <span className="text-gray-400 text-sm">Sin imagen</span>
+          <img
+            src="/logo-alma-placeholder-v3.png"
+            alt="Sin imagen"
+            className="max-h-full max-w-full object-contain opacity-70"
+          />
         )}
         {outOfStock ? (
           <div className="absolute top-2 right-2 bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full shadow">

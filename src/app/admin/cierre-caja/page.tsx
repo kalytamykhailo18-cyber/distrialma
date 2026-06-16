@@ -429,23 +429,32 @@ export default function CierreCajaPage() {
       <Stagger show={pageReady} delay={100}>
         <div className="flex items-center gap-3 mb-4">
           <span className="text-sm text-gray-600">Sucursal:</span>
-          {sucursalLocked ? (
-            <span className="px-3 py-2 border border-brand-400 bg-brand-50 rounded-lg text-sm font-semibold text-brand-700">
-              Sucursal {sucursal}
-            </span>
-          ) : (
-            <select
-              value={sucursal}
-              onChange={(e) => { setSucursal(e.target.value); setData(null); }}
-              className="px-3 py-2 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600 transition-colors duration-200"
-            >
-              <option value="1">Minorista 435</option>
-              <option value="2">Mayorista 387</option>
-              <option value="6">Mayorista Pontevedra</option>
-              <option value="7">Distribuidora 387</option>
-              <option value="10">Reventas</option>
-            </select>
-          )}
+          {(() => {
+            const sucLabels: Record<string, string> = {
+              "1": "Minorista 435",
+              "2": "Mayorista 387",
+              "6": "Mayorista Pontevedra",
+              "7": "Distribuidora 387",
+              "10": "Reventas",
+              "11": "PedidosYa Local1",
+            };
+            const label = sucLabels[sucursal] || `Sucursal ${sucursal}`;
+            return sucursalLocked ? (
+              <span className="px-3 py-2 border border-brand-400 bg-brand-50 rounded-lg text-sm font-semibold text-brand-700">
+                {label}
+              </span>
+            ) : (
+              <select
+                value={sucursal}
+                onChange={(e) => { setSucursal(e.target.value); setData(null); }}
+                className="px-3 py-2 border border-brand-400 rounded-lg text-sm focus:outline-none focus:border-brand-600 transition-colors duration-200"
+              >
+                {Object.entries(sucLabels).map(([val, l]) => (
+                  <option key={val} value={val}>{l}</option>
+                ))}
+              </select>
+            );
+          })()}
         </div>
       </Stagger>
 
@@ -526,7 +535,7 @@ export default function CierreCajaPage() {
       {data && (
         <div>
           <Stagger show={dataReady} delay={0} y={6}>
-            <p className="text-sm text-gray-500 mb-4">Desde: {data.desde} — Sucursal {data.sucursal} — Caja {data.nroCaja}</p>
+            <p className="text-sm text-gray-500 mb-4">Desde: {data.desde} — {({"1":"Minorista 435","2":"Mayorista 387","6":"Mayorista Pontevedra","7":"Distribuidora 387","10":"Reventas","11":"PedidosYa Local1"} as Record<string,string>)[data.sucursal] || `Sucursal ${data.sucursal}`} — Caja {data.nroCaja}</p>
           </Stagger>
 
           {/* Admin view: full details */}

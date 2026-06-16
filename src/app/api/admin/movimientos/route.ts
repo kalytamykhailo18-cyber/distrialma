@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getTestPool, getDbName } from "@/lib/mssql";
+import { getPool, getDbName } from "@/lib/mssql";
 import { requireStaff } from "@/lib/api-auth";
 import { prisma } from "@/lib/prisma";
 
@@ -58,6 +58,7 @@ export async function GET(req: NextRequest) {
     const result = movements.map((m) => ({
       id: m.id,
       sucursal: m.sucursal,
+      deposito: m.deposito,
       destino: m.destino,
       subtipo: m.subtipo,
       empleados: m.empleados ? JSON.parse(m.empleados) : null,
@@ -67,6 +68,9 @@ export async function GET(req: NextRequest) {
       imageUrl: m.imageUrl,
       aprobadoPor: m.aprobadoPor,
       aprobadoAt: m.aprobadoAt?.toISOString() || null,
+      anuladoPor: m.anuladoPor,
+      anuladoAt: m.anuladoAt?.toISOString() || null,
+      motivoAnulado: m.motivoAnulado,
       createdAt: m.createdAt.toISOString(),
       itemCount: m.items.length,
       items: m.items.map((i) => ({
@@ -103,6 +107,18 @@ export async function POST(req: NextRequest) {
     const { sucursal, destino, items, notas, empleados } = body;
     const usuario = session.user?.name || "usuario";
 
+    // Determine deposito: explicit body > user's defaultDeposito > "0"
+    let depRaw = "0";
+    if (body.deposito && String(body.deposito).trim()) {
+      depRaw = String(body.deposito).trim();
+    } else {
+      const userId = (session.user as { id?: number }).id;
+      if (userId) {
+        const dbUser = await prisma.user.findUnique({ where: { id: userId }, select: { defaultDeposito: true } });
+        if (dbUser?.defaultDeposito) depRaw = dbUser.defaultDeposito;
+      }
+    }
+
     if (!sucursal || !destino || !items?.length) {
       return NextResponse.json(
         { error: "Sucursal, motivo e items requeridos" },
@@ -121,7 +137,7 @@ export async function POST(req: NextRequest) {
     // Pricing rule per motivo:
     //   - Empleado/global motives: charge at Mayorista (Precio2), fallback to Minorista (Precio)
     //   - Other motives: use Costo (warehouse value)
-    const pool = await getTestPool();
+    const pool = await getPool();
     const dbProd = getDbName("productos");
     const isEmpleadoMotivo = ["Descuento empleados", "Rotura de empleado", "Descuento global"].includes(destino);
 
@@ -131,9 +147,9 @@ export async function POST(req: NextRequest) {
         let valor = 0;
         try {
           const codPadded = padLeft(item.sku, 7);
-          const result = await pool.request().input("cod", codPadded).query(
+          const result = await pool.request().input("cod", codPadded).input("dep", depRaw).query(
             `SELECT ISNULL(Costo, 0) AS costo, ISNULL(Precio2, 0) AS mayorista, ISNULL(Precio, 0) AS minorista
-             FROM [${dbProd}].dbo.Stock WHERE CodProducto = @cod AND LTRIM(RTRIM(Deposito)) = '0'`
+             FROM [${dbProd}].dbo.Stock WHERE CodProducto = @cod AND LTRIM(RTRIM(Deposito)) = LTRIM(RTRIM(@dep))`
           );
           const row = result.recordset[0];
           if (row) {
@@ -151,6 +167,7 @@ export async function POST(req: NextRequest) {
     const movement = await prisma.internalMovement.create({
       data: {
         sucursal,
+        deposito: depRaw,
         destino,
         empleados: empleados ? JSON.stringify(empleados) : null,
         usuario,
@@ -194,7 +211,8 @@ export async function PATCH(req: NextRequest) {
   }
 
   try {
-    const { id, action } = await req.json();
+    const body = await req.json();
+    const { id, action } = body;
     if (!id)
       return NextResponse.json({ error: "ID requerido" }, { status: 400 });
 
@@ -209,14 +227,9 @@ export async function PATCH(req: NextRequest) {
         { status: 404 }
       );
 
-    if (movement.estado !== "pendiente")
-      return NextResponse.json(
-        { error: "El movimiento ya fue procesado" },
-        { status: 400 }
-      );
-
     if (action === "rechazar") {
-      // Reject — keep record but mark as rechazado
+      if (movement.estado !== "pendiente")
+        return NextResponse.json({ error: "Solo se pueden rechazar pendientes" }, { status: 400 });
       await prisma.internalMovement.update({
         where: { id: parseInt(id) },
         data: {
@@ -228,20 +241,60 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ ok: true });
     }
 
-    // Approve — deduct stock
-    const pool = await getTestPool();
+    if (action === "anular") {
+      if (movement.estado !== "aprobado")
+        return NextResponse.json({ error: "Solo se pueden anular movimientos aprobados" }, { status: 400 });
+      const motivoAnulado = String(body.motivoAnulado || "").trim().substring(0, 200) || null;
+
+      // Reverse stock — add back the quantities to the same deposito they were taken from
+      const pool = await getPool();
+      const dbProd = getDbName("productos");
+      const dep = movement.deposito || "0";
+      for (const item of movement.items) {
+        const codPadded = padLeft(item.sku, 7);
+        await pool
+          .request()
+          .input("cod", codPadded)
+          .input("dep", dep)
+          .input("cant", Number(item.cantidad))
+          .query(
+            `UPDATE [${dbProd}].dbo.Stock
+             SET Stk = ISNULL(Stk, 0) + @cant
+             WHERE CodProducto = @cod AND LTRIM(RTRIM(Deposito)) = LTRIM(RTRIM(@dep))`
+          );
+      }
+
+      await prisma.internalMovement.update({
+        where: { id: parseInt(id) },
+        data: {
+          estado: "anulado",
+          anuladoPor: user.name || "admin",
+          anuladoAt: new Date(),
+          motivoAnulado,
+        },
+      });
+      return NextResponse.json({ ok: true });
+    }
+
+    // Approve — deduct stock from the deposito the movement was created against
+    // (legacy entries without a stored deposito fall back to "0").
+    if (movement.estado !== "pendiente")
+      return NextResponse.json({ error: "Solo se pueden aprobar pendientes" }, { status: 400 });
+    const pool = await getPool();
     const dbProd = getDbName("productos");
+    const dep = movement.deposito || "0";
 
     for (const item of movement.items) {
       const codPadded = padLeft(item.sku, 7);
       await pool
         .request()
         .input("cod", codPadded)
+        .input("dep", dep)
         .input("cant", Number(item.cantidad))
         .query(
           `UPDATE [${dbProd}].dbo.Stock
            SET Stk = ISNULL(Stk, 0) - @cant
-           WHERE CodProducto = @cod AND LTRIM(RTRIM(Deposito)) = '0'`
+           WHERE CodProducto = @cod AND LTRIM(RTRIM(Deposito)) = LTRIM(RTRIM(@dep))`
         );
     }
 

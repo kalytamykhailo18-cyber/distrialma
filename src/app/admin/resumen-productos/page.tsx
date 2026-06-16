@@ -7,7 +7,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recha
 import { HiChevronDown, HiSearch } from "react-icons/hi";
 import { PageTransition, Stagger, staggerStyle, springBtn, hoverRow, LoadingCenter, useDataReady, CollapsiblePanel } from "@/components/AnimateIn";
 
-const SUC_NAMES: Record<string, string> = { "1": "Minorista 435", "2": "Mayorista 387", "6": "May. Pontevedra", "7": "Distribuidora", "10": "Reventas" };
+const SUC_NAMES: Record<string, string> = { "1": "Minorista 435", "2": "Mayorista 387", "6": "May. Pontevedra", "7": "Distribuidora", "10": "Reventas", "11": "PedidosYa" };
 interface ListaData { lista: number; listaName: string; cantidad: number; totalVenta: number; ganancia: number }
 interface Product { sku: string; nombre: string; marca: string; rubro: string; unidad?: string; pesoPorPieza?: number; unidadesAprox?: number | null; totalVenta: number; totalCosto: number; ganancia: number; cantidad: number; margen: string; listas: ListaData[] }
 interface SucTotal { sucursal: string; cantVentas: number; totalVenta: number; totalCosto: number; ganancia: number; margen: string }
@@ -23,7 +23,7 @@ export default function ResumenProductosPage() {
   const [mes, setMes] = useState(() => new Date().toISOString().slice(0, 7));
   const [rangoDesde, setRangoDesde] = useState("");
   const [rangoHasta, setRangoHasta] = useState("");
-  const [sucursales, setSucursales] = useState(["1", "2", "6", "7", "10"]);
+  const [sucursales, setSucursales] = useState(["1", "2", "6", "7", "10", "11"]);
   const [search, setSearch] = useState("");
   const [expanded, setExpanded] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<"totalVenta" | "ganancia" | "cantidad" | "margen">("ganancia");
@@ -165,7 +165,7 @@ export default function ResumenProductosPage() {
             )}
           </div>
           <div className="flex flex-wrap gap-1 mb-6">
-            {["1", "2", "6", "7", "10"].map((s) => (
+            {["1", "2", "6", "7", "10", "11"].map((s) => (
               <button key={s} onClick={() => toggleSuc(s)}
                 className={`px-3 py-2 rounded-xl text-xs font-medium ${springBtn} ${sucursales.includes(s) ? "bg-brand-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
                 {SUC_NAMES[s] || `Suc ${s}`}

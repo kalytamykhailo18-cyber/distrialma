@@ -26,6 +26,10 @@ export async function GET(request: NextRequest) {
     const categoryId = searchParams.get("category") || undefined;
     const brandId = searchParams.get("brand") || undefined;
     const search = searchParams.get("search") || undefined;
+    const hideOutOfStock = searchParams.get("hideOutOfStock") === "1";
+
+    const thresholdSetting = await prisma.setting.findUnique({ where: { key: "stock_threshold" } });
+    const stockThreshold = parseInt(thresholdSetting?.value || "0") || 0;
 
     const { products, total } = await getProducts({
       page,
@@ -34,6 +38,8 @@ export async function GET(request: NextRequest) {
       brandId,
       search,
       includeEspecial: canSeeEspecial,
+      hideOutOfStock,
+      stockThreshold,
     });
 
     // Merge with local PostgreSQL data (images + descriptions)
@@ -68,10 +74,6 @@ export async function GET(request: NextRequest) {
         if (product.precioEspecial) product.precioEspecial = product.precioMayorista;
       }
     }
-
-    // Get stock threshold setting
-    const thresholdSetting = await prisma.setting.findUnique({ where: { key: "stock_threshold" } });
-    const stockThreshold = parseInt(thresholdSetting?.value || "0") || 0;
 
     return NextResponse.json({
       products,

@@ -39,6 +39,7 @@ export const authOptions: NextAuthOptions = {
             permissions,
             empleadoCod: user.empleadoCod || null,
             email: user.email || null,
+            defaultDeposito: user.defaultDeposito || null,
           };
         }
 
@@ -57,8 +58,11 @@ export const authOptions: NextAuthOptions = {
             );
 
           if (result.recordset.length > 0) {
-            const cliente = result.recordset[0];
-            if (cliente.observaciones.toLowerCase() === credentials.password.toLowerCase()) {
+            // Try all matches (multiple clients may share a CUIT) and find one with matching password
+            const cliente = result.recordset.find((c: { observaciones: string }) =>
+              c.observaciones.toLowerCase() === credentials.password.toLowerCase()
+            );
+            if (cliente) {
               // Check if this client is also an employee
               const empMapping = await prisma.setting.findUnique({ where: { key: `emp_client_${cliente.cod}` } });
               return {
@@ -81,36 +85,46 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
-        const u = user as unknown as { role: string; id: string; permissions?: string[]; empleadoCod?: string | null; email?: string | null };
+        const u = user as unknown as { role: string; id: string; permissions?: string[]; empleadoCod?: string | null; email?: string | null; defaultDeposito?: string | null };
         token.role = u.role;
         token.clientId = u.id;
         token.permissions = u.permissions || [];
         token.empleadoCod = u.empleadoCod || null;
         token.userEmail = u.email || null;
+        token.defaultDeposito = u.defaultDeposito || null;
       }
       // Refresh permissions from DB for staff users (so changes take effect without re-login)
       if ((token.role === "staff" || token.role === "admin") && token.clientId) {
         try {
           const uid = parseInt(token.clientId as string);
           if (!isNaN(uid)) {
-            const freshUser = await prisma.user.findUnique({ where: { id: uid }, select: { permissions: true, empleadoCod: true } });
+            const freshUser = await prisma.user.findUnique({ where: { id: uid }, select: { permissions: true, empleadoCod: true, defaultDeposito: true } });
             if (freshUser) {
               token.permissions = JSON.parse(freshUser.permissions || "[]");
               token.empleadoCod = freshUser.empleadoCod || null;
+              token.defaultDeposito = freshUser.defaultDeposito || null;
             }
           }
+        } catch { /* ignore */ }
+      }
+      // Refresh empleadoCod mapping for client users (mapping may change after login)
+      if (token.role && !["staff", "admin"].includes(token.role as string) && token.clientId) {
+        try {
+          const mapping = await prisma.setting.findUnique({ where: { key: `emp_client_${token.clientId}` } });
+          token.empleadoCod = mapping?.value || null;
         } catch { /* ignore */ }
       }
       return token;
     },
     async session({ session, token }) {
       if (session.user) {
-        const u = session.user as { role?: string; clientId?: string; permissions?: string[]; empleadoCod?: string | null; userEmail?: string | null };
+        const u = session.user as { role?: string; clientId?: string; permissions?: string[]; empleadoCod?: string | null; userEmail?: string | null; defaultDeposito?: string | null };
         u.role = token.role as string;
         u.clientId = token.clientId as string;
         u.permissions = (token.permissions as string[]) || [];
         u.empleadoCod = (token.empleadoCod as string) || null;
         u.userEmail = (token.userEmail as string) || null;
+        u.defaultDeposito = (token.defaultDeposito as string) || null;
       }
       return session;
     },

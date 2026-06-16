@@ -54,6 +54,7 @@ export async function GET(req: NextRequest) {
     const result = entries.map((e) => ({
       id: e.id,
       tipo: e.tipo || "ingreso",
+      deposito: e.deposito,
       proveedorCod: e.proveedorCod,
       proveedorName: e.proveedorName,
       usuario: e.usuario,
@@ -105,7 +106,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { proveedorCod, proveedorName, notas, nroFactura, items, subtotal: subIn, iva: ivaIn, iibb: iibbIn, percepciones: percIn, total: totalIn, tipo: tipoIn } = body;
+    const { proveedorCod, proveedorName, notas, nroFactura, items, subtotal: subIn, iva: ivaIn, iibb: iibbIn, percepciones: percIn, total: totalIn, tipo: tipoIn, deposito: depositoIn } = body;
     const tipo = tipoIn === "devolucion" ? "devolucion" : "ingreso";
     const isDevolucion = tipo === "devolucion";
 
@@ -121,6 +122,21 @@ export async function POST(req: NextRequest) {
     const dbCompras = getDbName("compras");
     const fechora = getArgentinaTime();
     const usuario = session.user?.name || "admin";
+
+    // Determine the deposito for the Stock update. Priority: explicit body field >
+    // user's defaultDeposito > "0" (Distribuidora/Mayorista).
+    let depRaw = "0";
+    if (depositoIn && String(depositoIn).trim()) {
+      depRaw = String(depositoIn).trim();
+    } else {
+      const userId = (session.user as { id?: number }).id;
+      if (userId) {
+        const dbUser = await prisma.user.findUnique({ where: { id: userId }, select: { defaultDeposito: true } });
+        if (dbUser?.defaultDeposito) depRaw = dbUser.defaultDeposito;
+      }
+    }
+    const depPadded = depRaw.padEnd(3, " ");
+    const depTrimmed = depRaw.trim().padStart(3, " ");
 
     const subtotal = parseFloat(subIn) || 0;
     const iva = parseFloat(ivaIn) || 0;
@@ -198,13 +214,16 @@ export async function POST(req: NextRequest) {
 
           // Create Stock row
           const itemCosto = parseFloat(String(item.costo || 0)) || 0;
+          const newStockCod = depTrimmed + codPadded + "    "; // char(14) PK
           await new sql.Request(transaction)
+            .input("cod", newStockCod)
             .input("codProd", codPadded)
+            .input("dep", depPadded)
             .input("stk", cantidad)
             .input("costo", Math.round(itemCosto * 100) / 100)
             .query(`
-              INSERT INTO [${dbProd}].dbo.Stock (CodProducto, Deposito, Stk, Costo)
-              VALUES (@codProd, '0  ', @stk, @costo)
+              INSERT INTO [${dbProd}].dbo.Stock (Cod, CodProducto, Deposito, TalleColor, Stk, Costo, DeBaja)
+              VALUES (@cod, @codProd, @dep, '', @stk, @costo, 0)
             `);
 
           pgItems.push({
@@ -219,11 +238,12 @@ export async function POST(req: NextRequest) {
             const codPadded = padLeft(sku, 7);
             await new sql.Request(transaction)
               .input("cod", codPadded)
+              .input("dep", depPadded)
               .input("cant", cantidad)
               .query(`
                 UPDATE [${dbProd}].dbo.Stock
                 SET Stk = ISNULL(Stk, 0) + @cant
-                WHERE LTRIM(RTRIM(CodProducto)) = LTRIM(RTRIM(@cod)) AND LTRIM(RTRIM(Deposito)) = '0' AND (TalleColor IS NULL OR LTRIM(RTRIM(TalleColor)) = '')
+                WHERE LTRIM(RTRIM(CodProducto)) = LTRIM(RTRIM(@cod)) AND LTRIM(RTRIM(Deposito)) = LTRIM(RTRIM(@dep)) AND (TalleColor IS NULL OR LTRIM(RTRIM(TalleColor)) = '')
               `);
           }
 
@@ -262,6 +282,7 @@ export async function POST(req: NextRequest) {
       entry = await prisma.stockEntry.create({
         data: {
           tipo,
+          deposito: depRaw,
           proveedorCod,
           proveedorName,
           usuario,
@@ -337,15 +358,18 @@ export async function DELETE(req: NextRequest) {
     if (!isDevolucion && items.length > 0) {
       const pool = await getPool();
       const dbProd = getDbName("productos");
+      // Use the deposito stored on the entry, fall back to "0" for legacy entries
+      const reverseDep = (entry.deposito || "0").padEnd(3, " ");
       for (const item of items) {
         const codPadded = item.sku.padStart(7, " ");
         await pool.request()
           .input("cod", codPadded)
+          .input("dep", reverseDep)
           .input("cant", Number(item.cantidad))
           .query(`
             UPDATE [${dbProd}].dbo.Stock
             SET Stk = ISNULL(Stk, 0) - @cant
-            WHERE LTRIM(RTRIM(CodProducto)) = LTRIM(RTRIM(@cod)) AND LTRIM(RTRIM(Deposito)) = '0' AND (TalleColor IS NULL OR LTRIM(RTRIM(TalleColor)) = '')
+            WHERE LTRIM(RTRIM(CodProducto)) = LTRIM(RTRIM(@cod)) AND LTRIM(RTRIM(Deposito)) = LTRIM(RTRIM(@dep)) AND (TalleColor IS NULL OR LTRIM(RTRIM(TalleColor)) = '')
           `);
       }
     }

@@ -45,6 +45,7 @@ export default function PosPage() {
   const [pendientes, setPendientes] = useState<Pendiente[]>([]);
   const [loadingPendientes, setLoadingPendientes] = useState(false);
   const [selectedPendiente, setSelectedPendiente] = useState<Pendiente | null>(null);
+  const [showPendientesList, setShowPendientesList] = useState(false);
 
   // PeYa
   const [peyaCode, setPeyaCode] = useState("");
@@ -273,9 +274,9 @@ export default function PosPage() {
     })));
   }
 
-  // Load pendientes for cajero terminals
+  // Load pendientes for cajero AND pendiente-flujo terminals
   useEffect(() => {
-    if (terminal?.esCajero) {
+    if (terminal?.esCajero || terminal?.flujo === "pendiente") {
       loadPendientes();
       const interval = setInterval(loadPendientes, 30000); // refresh every 30s
       return () => clearInterval(interval);
@@ -321,7 +322,7 @@ export default function PosPage() {
       });
       const d = await res.json();
       if (!res.ok) throw new Error(d.error || "Error al crear pendiente");
-      setPaySuccess(`Pedido pendiente #${d.nroped || d.boleta} creado${peyaCode ? ` — PeYa: ${peyaCode}` : ""}`);
+      setPaySuccess(`Pedido pendiente #${d.nroped || d.boleta} creado${d.turno ? ` — Turno ${d.turno}` : ""}${peyaCode ? ` — PeYa: ${peyaCode}` : ""}`);
       setCart([]);
       setSelectedProduct(null);
       setPeyaCode("");
@@ -511,10 +512,10 @@ export default function PosPage() {
           <span className="text-xs px-2 py-0.5 rounded-full bg-brand-100 text-brand-700 font-medium">
             {LISTA_LABELS[activeLista] || `Lista ${activeLista}`}
           </span>
-          {terminal.esCajero && (
-            <button onClick={() => { setSelectedPendiente(null); setCart([]); loadPendientes(); }}
-              className="text-xs px-2 py-0.5 rounded-full bg-cyan-100 text-cyan-700 font-medium hover:bg-cyan-200">
-              Pendientes ({pendientes.length})
+          {(terminal.esCajero || terminal.flujo === "pendiente") && (
+            <button onClick={() => { setSelectedPendiente(null); setCart([]); setShowPendientesList((v) => !v); loadPendientes(); }}
+              className={`text-xs px-2 py-1 rounded-lg font-medium transition-colors ${showPendientesList ? "bg-cyan-500 text-white" : "bg-cyan-100 text-cyan-700 hover:bg-cyan-200"}`}>
+              Pendientes {pendientes.length > 0 && `(${pendientes.length})`}
             </button>
           )}
         </div>
@@ -571,12 +572,12 @@ export default function PosPage() {
       <div className="flex-1 flex flex-col md:flex-row md:overflow-hidden">
         {/* LEFT: search (top) + cart (bottom) OR pending list for cajero */}
         <div className="md:w-1/2 flex flex-col md:border-r">
-          {terminal.esCajero && !selectedPendiente ? (
+          {((terminal.esCajero && !selectedPendiente) || showPendientesList) ? (
             <PosPendientes
               pendientes={pendientes}
               loadingPendientes={loadingPendientes}
               onRefresh={loadPendientes}
-              onSelect={loadPendienteToCart}
+              onSelect={(p) => { loadPendienteToCart(p); setShowPendientesList(false); }}
             />
           ) : (
           <>

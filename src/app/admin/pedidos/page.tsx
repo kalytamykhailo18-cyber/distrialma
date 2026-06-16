@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { formatPrice } from "@/lib/utils";
 import { HiChevronDown } from "react-icons/hi";
 import { PageTransition, Stagger, staggerStyle, hoverRow, LoadingCenter, CollapsiblePanel } from "@/components/AnimateIn";
+import ConfirmModal from "@/components/ConfirmModal";
 
 interface OrderItem {
   sku: string;
@@ -24,6 +25,7 @@ interface FacturaItem {
 
 interface Order {
   boleta: string;
+  boletas?: string[];
   nroped: string;
   date: string;
   totalCant: number;
@@ -58,14 +60,46 @@ export default function PedidosPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [confirmBoletas, setConfirmBoletas] = useState<string[] | null>(null);
+  const [anulando, setAnulando] = useState(false);
+  const [anularError, setAnularError] = useState<string | null>(null);
 
-  useEffect(() => {
+  function reload() {
+    setLoading(true);
     fetch("/api/admin/orders")
       .then((r) => r.json())
       .then((data) => setOrders(data.orders || []))
       .catch(() => setOrders([]))
       .finally(() => setLoading(false));
+  }
+
+  useEffect(() => {
+    reload();
   }, []);
+
+  async function doAnular() {
+    if (!confirmBoletas || confirmBoletas.length === 0) return;
+    setAnulando(true);
+    setAnularError(null);
+    try {
+      const res = await fetch("/api/admin/orders/anular", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ boletas: confirmBoletas }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setAnularError(data.error || "Error al anular");
+      } else {
+        setConfirmBoletas(null);
+        reload();
+      }
+    } catch {
+      setAnularError("Error de red al anular");
+    } finally {
+      setAnulando(false);
+    }
+  }
 
   function toggleExpand(boleta: string) {
     setExpanded((prev) => {
@@ -175,6 +209,14 @@ export default function PedidosPage() {
 
                       <CollapsiblePanel open={expanded.has(order.boleta)}>
                         <div className="border-t border-brand-200 bg-brand-50/50 px-2 sm:px-4 py-3">
+                          <div className="flex justify-end mb-2">
+                            <button
+                              onClick={() => { setAnularError(null); setConfirmBoletas(order.boletas && order.boletas.length > 0 ? order.boletas : [order.boleta]); }}
+                              className="text-xs px-3 py-1.5 rounded-lg bg-red-600 text-white hover:bg-red-700 font-medium"
+                            >
+                              Anular pedido{(order.boletas?.length || 1) > 1 ? `s (${order.boletas!.length})` : ""}
+                            </button>
+                          </div>
                           {order.notas && (
                             <div className="bg-amber-50 border border-amber-300 rounded-lg px-3 py-2 mb-3">
                               <span className="text-xs font-medium text-amber-700">Nota:</span>
@@ -314,6 +356,18 @@ export default function PedidosPage() {
         </div>
         </Stagger>
       )}
+
+      <ConfirmModal
+        open={confirmBoletas !== null}
+        message={anularError
+          ? `Error: ${anularError}`
+          : `Anular ${confirmBoletas && confirmBoletas.length > 1 ? `${confirmBoletas.length} pedidos (${confirmBoletas.join(", ")})` : `pedido ${confirmBoletas?.[0] || ""}`}? Se marcara como anulado en PunTouch sin tocar el stock.`}
+        onConfirm={doAnular}
+        onCancel={() => { setConfirmBoletas(null); setAnularError(null); }}
+        loading={anulando}
+        confirmLabel="Anular"
+        confirmColor="bg-red-600 hover:bg-red-700"
+      />
     </PageTransition>
   );
 }

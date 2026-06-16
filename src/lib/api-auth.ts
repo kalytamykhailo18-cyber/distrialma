@@ -1,6 +1,6 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { isStaffUser } from "@/lib/permissions";
+import { isStaffUser, hasPermission, type Permission } from "@/lib/permissions";
 
 /**
  * Require the user to be a staff member (admin or staff role).
@@ -11,5 +11,17 @@ export async function requireStaff() {
   if (!session?.user) return null;
   const role = (session.user as { role?: string }).role;
   if (!isStaffUser(role)) return null;
+  return session;
+}
+
+/**
+ * Require the user to have a specific permission. Admin always passes.
+ * Returns the session if authorized, null otherwise.
+ */
+export async function requirePermission(perm: Permission) {
+  const session = await requireStaff();
+  if (!session) return null;
+  const { role, permissions } = session.user as { role?: string; permissions?: string[] };
+  if (!hasPermission(role, permissions, perm)) return null;
   return session;
 }

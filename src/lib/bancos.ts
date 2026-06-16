@@ -42,10 +42,31 @@ export const BANCOS: BancoConfig[] = [
     text: "text-white",
     border: "border-blue-800",
   },
+  {
+    key: "NACION",
+    nombre: "Nación",
+    abrev: "N",
+    logo: "/nacion_logo.png",
+    bg: "bg-teal-700",
+    bgSoft: "bg-teal-50",
+    text: "text-white",
+    border: "border-teal-700",
+  },
+  {
+    key: "PROVINCIA",
+    nombre: "Provincia",
+    abrev: "P",
+    logo: "/provincia_logo.png",
+    bg: "bg-green-600",
+    bgSoft: "bg-green-50",
+    text: "text-white",
+    border: "border-green-600",
+  },
 ];
 
 export function getBanco(nombre: string): BancoConfig | null {
   if (!nombre) return null;
-  const upper = nombre.toUpperCase();
+  // Strip combining diacritical marks (U+0300–U+036F) without relying on the /u regex flag.
+  const upper = nombre.normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase();
   return BANCOS.find((b) => upper.includes(b.key)) || null;
 }

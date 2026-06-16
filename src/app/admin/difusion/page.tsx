@@ -197,7 +197,7 @@ export default function DifusionPage() {
           {/* Preview */}
           <div className="bg-green-50 border border-green-200 rounded-lg p-3">
             <div className="text-xs text-green-600 mb-1">Vista previa:</div>
-            <div className="text-sm text-gray-800">{mensaje.replace(/\{nombre\}/g, "Juan").replace(/\{nombre_completo\}/g, "Juan Perez")}</div>
+            <div className="text-sm text-gray-800 whitespace-pre-wrap">{mensaje.replace(/\{nombre\}/g, "Juan").replace(/\{nombre_completo\}/g, "Juan Perez")}</div>
           </div>
 
           {/* Filter */}

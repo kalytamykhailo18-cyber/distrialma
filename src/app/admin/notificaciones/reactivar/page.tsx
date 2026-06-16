@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { formatPrice } from "@/lib/utils";
 import { HiOutlinePaperAirplane, HiOutlineSearch, HiOutlineCheck, HiOutlineX, HiOutlineClock, HiOutlineExclamation } from "react-icons/hi";
 import { FaWhatsapp } from "react-icons/fa";
@@ -45,6 +45,7 @@ export default function ReactivarPage() {
   const [message, setMessage] = useState(TEMPLATES[0].body);
   const [sending, setSending] = useState(false);
   const [sendResult, setSendResult] = useState<{ sent: number; failed: number; results: Array<{ cod: string; ok: boolean; error?: string }> } | null>(null);
+  const [sendProgress, setSendProgress] = useState<{ done: number; total: number; ok: number; failed: number } | null>(null);
   const [confirmSend, setConfirmSend] = useState(false);
   const [page, setPage] = useState(0);
   const [lastContact, setLastContact] = useState<Record<string, { fecha: string; tipo: string; enviadoPor: string | null }>>({});
@@ -63,17 +64,23 @@ export default function ReactivarPage() {
   // Reset page when filters change
   useEffect(() => { setPage(0); }, [search, dias, minCompras, sinContactoDias]);
 
+  const loadGenRef = useRef(0);
   async function load() {
+    const myGen = ++loadGenRef.current;
     setLoading(true);
     try {
       const res = await fetch(`/api/admin/notificaciones/inactivos?dias=${dias || 20}&minCompras=${minCompras || 0}`);
       const d = await res.json();
+      if (myGen !== loadGenRef.current) return; // stale
       setInactivos(d.inactivos || []);
     } catch {}
-    setLoading(false);
+    if (myGen === loadGenRef.current) setLoading(false);
   }
 
-  useEffect(() => { load(); }, [dias, minCompras]); // eslint-disable-line
+  useEffect(() => {
+    const handle = setTimeout(() => { load(); }, 300);
+    return () => clearTimeout(handle);
+  }, [dias, minCompras]); // eslint-disable-line
 
   const minSinContacto = parseInt(sinContactoDias) || 0;
   const filtered = inactivos.filter((d) => {
@@ -121,6 +128,7 @@ export default function ReactivarPage() {
   async function doSend() {
     setSending(true);
     setSendResult(null);
+    setSendProgress({ done: 0, total: selected.size, ok: 0, failed: 0 });
     const recipients = inactivos.filter((d) => selected.has(d.cod)).map((d) => ({
       cod: d.cod,
       nombre: d.nombre,
@@ -128,18 +136,16 @@ export default function ReactivarPage() {
       saldo: d.saldo,
       dias: d.diasDesde,
     }));
-    try {
-      // Use same send endpoint but customize for dias variable
-      const personalized = recipients.map((r) => ({ ...r }));
-      // Replace {dias} in each message before sending (the main endpoint only handles {nombre} and {saldo})
-      const batchMessage = message; // contains {nombre} {dias}
-      // We build manually with {dias} per-recipient via the same send endpoint
-      const results: Array<{ cod: string; ok: boolean; error?: string }> = [];
-      for (const r of personalized) {
-        const body = batchMessage
-          .replace(/\{nombre\}/g, r.nombre || "")
-          .replace(/\{dias\}/g, String(r.dias))
-          .replace(/\{saldo\}/g, r.saldo != null ? formatPrice(r.saldo) : "");
+    const personalized = recipients.map((r) => ({ ...r }));
+    const batchMessage = message;
+    const results: Array<{ cod: string; ok: boolean; error?: string }> = [];
+    let ok = 0, failed = 0;
+    for (const r of personalized) {
+      const body = batchMessage
+        .replace(/\{nombre\}/g, r.nombre || "")
+        .replace(/\{dias\}/g, String(r.dias))
+        .replace(/\{saldo\}/g, r.saldo != null ? formatPrice(r.saldo) : "");
+      try {
         const res = await fetch("/api/admin/notificaciones/send", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -150,14 +156,23 @@ export default function ReactivarPage() {
           }),
         });
         const d = await res.json();
-        if (d.results && d.results[0]) results.push(d.results[0]);
+        if (d.results && d.results[0]) {
+          results.push(d.results[0]);
+          if (d.results[0].ok) ok++; else failed++;
+        } else {
+          results.push({ cod: r.cod, ok: false, error: d.error || "Sin respuesta" });
+          failed++;
+        }
+      } catch (e) {
+        results.push({ cod: r.cod, ok: false, error: e instanceof Error ? e.message : "Error de red" });
+        failed++;
       }
-      const sent = results.filter((r) => r.ok).length;
-      setSendResult({ sent, failed: results.length - sent, results });
-      setSelected(new Set());
-      setConfirmSend(false);
-      loadLastContact();
-    } catch {}
+      setSendProgress({ done: ok + failed, total: personalized.length, ok, failed });
+    }
+    setSendResult({ sent: ok, failed, results });
+    setSelected(new Set());
+    setConfirmSend(false);
+    loadLastContact();
     setSending(false);
   }
 
@@ -242,8 +257,15 @@ export default function ReactivarPage() {
               disabled={selected.size === 0 || !message.trim() || sending}
               className={`w-full mt-3 py-3 bg-green-500 text-white rounded-xl font-semibold disabled:opacity-50 flex items-center justify-center gap-2 ${springBtn}`}>
               <FaWhatsapp className="w-5 h-5" />
-              Enviar a {selected.size} cliente{selected.size === 1 ? "" : "s"}
+              {sending && sendProgress
+                ? `Enviando ${sendProgress.done}/${sendProgress.total} (ok ${sendProgress.ok}, fallaron ${sendProgress.failed})`
+                : `Enviar a ${selected.size} cliente${selected.size === 1 ? "" : "s"}`}
             </button>
+            {sending && sendProgress && sendProgress.total > 0 && (
+              <div className="mt-2 bg-gray-100 rounded-full h-2 overflow-hidden">
+                <div className="bg-green-500 h-full transition-all" style={{ width: `${Math.round((sendProgress.done / sendProgress.total) * 100)}%` }} />
+              </div>
+            )}
           </div>
         </div>
       </Stagger>

@@ -148,6 +148,7 @@ export async function findClientByPhone(phoneNumber) {
           LTRIM(RTRIM(Nombre)) AS nombre,
           LTRIM(RTRIM(ISNULL(CUIT, ''))) AS cuit,
           ISNULL(Saldo, 0) AS saldo,
+          LTRIM(RTRIM(ISNULL(Email, ''))) AS email,
           LTRIM(RTRIM(ISNULL(TelClave1, ''))) AS tel1,
           LTRIM(RTRIM(ISNULL(Telclave3, ''))) AS tel3
         FROM [${dbClientes()}].dbo.Clientes
@@ -170,6 +171,7 @@ export async function findClientByPhone(phoneNumber) {
       nombre: c.nombre,
       cuit: c.cuit,
       saldo: Number(c.saldo),
+      email: c.email || "",
       accounts: accounts.length > 1 ? accounts : undefined,
     };
   } catch (e) {
@@ -252,8 +254,55 @@ export async function searchByBrand(brandName, productKeywords = "", limit = 8) 
  * Register a new client in PunTouch Clientes table.
  * Returns the new client code.
  */
-export async function registerClient({ nombre, direccion, telefono, cuit }) {
+/**
+ * Save email on an existing cliente by Cod.
+ * Returns { ok: true } or { error }.
+ */
+export async function saveClientEmail(clienteCod, email) {
+  const clean = String(email || "").trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clean)) return { error: "Email invalido" };
+  try {
+    const pool = await getPool();
+    await pool.request()
+      .input("cod", String(clienteCod).trim())
+      .input("email", clean.substring(0, 100))
+      .query(`UPDATE [${dbClientes()}].dbo.Clientes SET Email = @email WHERE LTRIM(RTRIM(Cod)) = @cod`);
+    return { ok: true, email: clean };
+  } catch (e) {
+    console.error("saveClientEmail error:", e);
+    return { error: "Error al guardar email" };
+  }
+}
+
+export async function registerClient({ nombre, direccion, telefono, cuit, email }) {
   const pool = await getPool();
+
+  // Dedup: refuse to register if a client with the same phone (last 10 digits) or CUIT already exists.
+  const telDigits = (telefono || "").replace(/[^0-9]/g, "");
+  const telTail = telDigits.slice(-10);
+  const cuitDigits = (cuit || "").replace(/[^0-9]/g, "");
+
+  if (telTail.length >= 8 || cuitDigits.length >= 7) {
+    const dup = await pool.request()
+      .input("telTail", telTail)
+      .input("cuit", cuitDigits)
+      .query(`
+        SELECT TOP 1 LTRIM(RTRIM(Cod)) AS cod, LTRIM(RTRIM(Nombre)) AS nombre
+        FROM [${dbClientes()}].dbo.Clientes
+        WHERE (
+          (@telTail <> '' AND (
+            REPLACE(REPLACE(ISNULL(TelClave1,''),' ',''),'-','') LIKE '%' + @telTail
+            OR REPLACE(REPLACE(ISNULL(Telclave3,''),' ',''),'-','') LIKE '%' + @telTail
+          ))
+          OR (@cuit <> '' AND REPLACE(REPLACE(ISNULL(CUIT,''),' ',''),'-','') = @cuit)
+        )
+      `);
+    if (dup.recordset.length > 0) {
+      const existing = dup.recordset[0];
+      return { cod: String(existing.cod).trim(), nombre: existing.nombre, alreadyExists: true };
+    }
+  }
+
   // Get next Cod
   const maxResult = await pool.request().query(
     `SELECT MAX(CAST(LTRIM(RTRIM(Cod)) AS INT)) AS maxCod FROM [${dbClientes()}].dbo.Clientes`
@@ -266,7 +315,10 @@ export async function registerClient({ nombre, direccion, telefono, cuit }) {
   const fechaAlta = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
 
   // Clean phone: keep only digits
-  const telClean = (telefono || "").replace(/[^0-9]/g, "").slice(-14).padEnd(14, " ");
+  const telClean = telDigits.slice(-14).padEnd(14, " ");
+
+  const emailClean = String(email || "").trim().toLowerCase();
+  const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailClean) ? emailClean.substring(0, 100) : "";
 
   await pool.request()
     .input("cod", codPadded)
@@ -274,6 +326,7 @@ export async function registerClient({ nombre, direccion, telefono, cuit }) {
     .input("calle", (direccion || "").toUpperCase().substring(0, 40))
     .input("tel", telClean)
     .input("cuit", (cuit || "").replace(/[^0-9]/g, "").substring(0, 14))
+    .input("email", emailValid)
     .input("fecha", fechaAlta)
     .query(`
       INSERT INTO [${dbClientes()}].dbo.Clientes
@@ -286,7 +339,7 @@ export async function registerClient({ nombre, direccion, telefono, cuit }) {
          FillerBit1, FillerBit2, FillerBit3, FillerBit4, FillerBit5)
       VALUES
         (@cod, @nombre, @calle, '', '', '', '', '    ', '    ', '',
-         @tel, '              ', '              ', 'ALMA2026', '', @fecha, @fecha, '        ',
+         @tel, '              ', '              ', 'ALMA2026', @email, @fecha, @fecha, '        ',
          0, '', '         ', 0, ' ', @cuit, '    ', 0, '2',
          0, 0, 0, '       ',
          0, 0, 0, 0, 0,

@@ -45,9 +45,20 @@ export async function GET(req: NextRequest) {
     const all = await prisma.cheque.findMany({ where: { tipo: tipo || undefined } });
     const enCirculacion = all.filter((c) => c.estado === "en-circulacion");
     const enCartera = all.filter((c) => c.estado === "en-cartera");
+    // Normalize bank names: strip diacritics, uppercase, then try the
+    // canonical BANCOS mapping.  Without this, "Galicia" vs "GALICIA" vs
+    // "Banco Galicia" get registered as different banks in the summary.
+    const { getBanco } = await import("@/lib/bancos");
+    const canonicalBanco = (raw: string): string => {
+      if (!raw) return "Sin banco";
+      const upper = raw.normalize("NFD").replace(/[̀-ͯ]/g, "").trim().toUpperCase();
+      if (!upper) return "Sin banco";
+      const hit = getBanco(raw);
+      return hit ? hit.nombre : upper;
+    };
     const porBanco = new Map<string, { cantidad: number; total: number }>();
     for (const c of enCirculacion) {
-      const key = c.banco || "Sin banco";
+      const key = canonicalBanco(c.banco || "");
       const prev = porBanco.get(key) || { cantidad: 0, total: 0 };
       porBanco.set(key, { cantidad: prev.cantidad + 1, total: prev.total + Number(c.monto) });
     }

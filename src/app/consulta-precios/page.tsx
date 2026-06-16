@@ -190,7 +190,7 @@ export default function ConsultaPreciosPage() {
                   </div>
                 ) : (
                   <div className="w-full h-48 sm:h-56 md:w-80 md:h-80 bg-gray-800 rounded-2xl flex items-center justify-center">
-                    <span className="text-gray-600 text-lg">Sin imagen</span>
+                    <img src="/logo-alma-placeholder-v3.png" alt="Sin imagen" className="max-w-[70%] max-h-[70%] object-contain opacity-50" />
                   </div>
                 )}
                 <div className="text-center md:text-left">

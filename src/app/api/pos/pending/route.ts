@@ -19,17 +19,28 @@ export async function POST(req: NextRequest) {
     const pool = await getPool();
     const dbPedidos = getDbName("pedidos");
     const dbClientes = getDbName("clientes");
+    const dbTransas = getDbName("transas");
 
-    // Get next Cod and Nroped
+    // Get next Cod, Nroped, NroTransa from Pedidos (filter non-numeric)
     const maxResult = await pool.request().query(`
-      SELECT MAX(CAST(Cod AS BIGINT)) AS maxCod,
-             MAX(CAST(LTRIM(RTRIM(Nroped)) AS BIGINT)) AS maxNroped
+      SELECT ISNULL(MAX(CAST(LTRIM(RTRIM(Cod)) AS INT)), 0) AS maxCod,
+             ISNULL(MAX(CAST(LTRIM(RTRIM(Nroped)) AS INT)), 0) AS maxNroped,
+             ISNULL(MAX(CAST(LTRIM(RTRIM(NroTransa)) AS INT)), 0) AS maxNroTransa
       FROM [${dbPedidos}].dbo.Pedidos
+      WHERE LTRIM(RTRIM(Cod)) NOT LIKE '%[^0-9 ]%'
+        AND LTRIM(RTRIM(Nroped)) NOT LIKE '%[^0-9 ]%'
+        AND LTRIM(RTRIM(ISNULL(NroTransa,''))) NOT LIKE '%[^0-9 ]%'
+    `);
+    // NroMostra (turno) sequenced from Transas
+    const maxMostra = await pool.request().query(`
+      SELECT ISNULL(MAX(CAST(LTRIM(RTRIM(NroMostra)) AS INT)), 0) AS maxNroMostra
+      FROM [${dbTransas}].dbo.Transas
+      WHERE LTRIM(RTRIM(ISNULL(NroMostra,''))) NOT LIKE '%[^0-9 ]%'
     `);
     let nextCod = Number(maxResult.recordset[0].maxCod || 0) + 1;
-    const nextNroped = String(Number(maxResult.recordset[0].maxNroped || 0) + 1).padStart(8, " ");
-    const nextNroTransa = "";
-    const nextNroMostra = "";
+    const nextNroped = String(Number(maxResult.recordset[0].maxNroped || 0) + 1).padStart(8, "0");
+    const nextNroTransa = String(Number(maxResult.recordset[0].maxNroTransa || 0) + 1).padStart(8, "0");
+    const nextNroMostra = String(Number(maxMostra.recordset[0].maxNroMostra || 0) + 1).padStart(8, "0");
 
     const suc = sucursal.padEnd(3, " ");
     const empCod = empleadoCod.padStart(7, " ");
@@ -147,7 +158,12 @@ export async function POST(req: NextRequest) {
       nextCod++;
     }
 
-    return NextResponse.json({ ok: true, nroped: nextNroped.trim(), boleta: boletaCod.trim() });
+    return NextResponse.json({
+      ok: true,
+      nroped: nextNroped.trim(),
+      turno: nextNroMostra.trim(),
+      boleta: boletaCod.trim(),
+    });
   } catch (error) {
     console.error("POS pending error:", error);
     return NextResponse.json({ error: "Error al crear pedido pendiente" }, { status: 500 });

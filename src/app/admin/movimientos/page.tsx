@@ -9,6 +9,7 @@ import { PageTransition, Stagger, staggerStyle, springBtn, hoverRow, LoadingCent
 interface Movement {
   id: number;
   sucursal: string;
+  deposito: string | null;
   destino: string;
   subtipo: string | null;
   usuario: string;
@@ -20,6 +21,13 @@ interface Movement {
   itemCount: number;
   items: Array<{ sku: string; productName: string; cantidad: number }>;
 }
+
+const DEP_SHORT: Record<string, string> = {
+  "0": "Mayorista",
+  "1": "Pontevedra",
+  "2": "Minorista",
+  "3": "Cervantes",
+};
 
 type Tab = "pendiente" | "aprobado" | "rechazado" | "all";
 
@@ -359,12 +367,30 @@ export default function MovimientosPage() {
           <h1 className="text-2xl font-bold text-gray-900">
             Movimientos Internos
           </h1>
-          <Link
-            href="/admin/movimientos/nuevo"
-            className={`px-4 py-2 text-sm text-white bg-brand-400 rounded-xl hover:bg-brand-500 shadow-sm ${springBtn}`}
-          >
-            Nuevo movimiento
-          </Link>
+          <div className="flex gap-2 flex-wrap">
+            {isAdmin && (
+              <>
+                <Link
+                  href="/admin/stock-auditoria"
+                  className={`px-4 py-2 text-sm text-white bg-amber-600 rounded-xl hover:bg-amber-700 shadow-sm ${springBtn}`}
+                >
+                  Auditoría stock
+                </Link>
+                <Link
+                  href="/admin/movimientos/reconcile"
+                  className={`px-4 py-2 text-sm text-white bg-red-600 rounded-xl hover:bg-red-700 shadow-sm ${springBtn}`}
+                >
+                  Reconciliar stock
+                </Link>
+              </>
+            )}
+            <Link
+              href="/admin/movimientos/nuevo"
+              className={`px-4 py-2 text-sm text-white bg-brand-400 rounded-xl hover:bg-brand-500 shadow-sm ${springBtn}`}
+            >
+              Nuevo movimiento
+            </Link>
+          </div>
         </div>
       </Stagger>
 
@@ -448,6 +474,9 @@ export default function MovimientosPage() {
                         #{m.id}
                       </span>
                       <span className="text-sm text-gray-500">{m.sucursal}</span>
+                      <span className="text-xs px-2 py-0.5 rounded-full font-bold bg-brand-100 text-brand-700">
+                        [{m.deposito || "0"}] {DEP_SHORT[m.deposito || "0"] || `Depo ${m.deposito || "0"}`}
+                      </span>
                       <span className="text-xs text-gray-400">→</span>
                       <span className="text-sm text-gray-700">{m.destino}</span>
                       <span
@@ -456,10 +485,12 @@ export default function MovimientosPage() {
                             ? "bg-green-100 text-green-700"
                             : m.estado === "rechazado"
                             ? "bg-red-100 text-red-700"
+                            : m.estado === "anulado"
+                            ? "bg-gray-200 text-gray-600 line-through"
                             : "bg-amber-100 text-amber-700"
                         }`}
                       >
-                        {m.estado === "aprobado" ? "Aprobado" : m.estado === "rechazado" ? "Rechazado" : "Pendiente"}
+                        {m.estado === "aprobado" ? "Aprobado" : m.estado === "rechazado" ? "Rechazado" : m.estado === "anulado" ? "Anulado" : "Pendiente"}
                       </span>
                     </div>
                     <div className="text-xs text-gray-400 mt-0.5">

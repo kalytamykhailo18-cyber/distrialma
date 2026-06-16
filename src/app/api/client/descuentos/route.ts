@@ -80,7 +80,9 @@ export async function GET() {
     const faltantes = cierres
       .filter((c) => {
         const nombre = (c.responsable || "").trim().toUpperCase();
-        return nombre.includes(emp.nombre.split(" ")[0].toUpperCase());
+        const empFull = emp.nombre.trim().toUpperCase();
+        // Match exact full name to avoid mixing employees with same first name
+        return nombre === empFull;
       })
       .filter((c) => Number(c.diferencia) < 0)
       .map((c) => ({
@@ -88,7 +90,7 @@ export async function GET() {
         concepto: "Faltante de caja",
         detalle: `Suc ${c.sucursal} - ${c.cantVentas} ventas`,
         monto: Math.abs(Number(c.diferencia)),
-        cargadoPor: (c.chargedBy || "").toString(),
+        cargadoPor: (c.responsable || c.chargedBy || "").toString(),
       }));
 
     const totalDescuentos = descuentos.reduce((s, d) => s + d.monto, 0);

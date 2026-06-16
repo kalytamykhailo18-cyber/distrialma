@@ -20,10 +20,12 @@ rsync -a --exclude='.next' --exclude='.next-old' --exclude='node_modules' --excl
 # Symlink node_modules (don't copy — too slow)
 ln -s /home/distrialma/node_modules "$BUILD_DIR/node_modules"
 
-# Build in temp directory
+# Build in temp directory.
+# Set a generous V8 heap — the default 1.7GB ceiling can OOM on this 2GB VPS
+# when swap is already heavily used.
 echo "[deploy] Building..."
 cd "$BUILD_DIR"
-npm run build 2>&1
+NODE_OPTIONS="--max-old-space-size=4096" npm run build 2>&1
 
 # Swap .next folders
 echo "[deploy] Swapping .next folder..."

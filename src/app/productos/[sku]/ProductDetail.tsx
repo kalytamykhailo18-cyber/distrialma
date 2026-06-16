@@ -180,7 +180,11 @@ export default function ProductDetailPage() {
                 className="max-h-full max-w-full object-contain"
               />
             ) : (
-              <span className="text-gray-400">Sin imagen</span>
+              <img
+                src="/logo-alma-placeholder-v3.png"
+                alt="Sin imagen"
+                className="max-h-full max-w-full object-contain opacity-70"
+              />
             )}
           </div>
           {((product.images.length > 1) || (isAdmin && product.images.length > 0)) && (

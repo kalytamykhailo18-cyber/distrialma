@@ -2,9 +2,43 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { formatPrice } from "@/lib/utils";
 import { HiOutlineArrowLeft, HiOutlineSearch } from "react-icons/hi";
 import { PageTransition, Stagger, staggerStyle, springBtn, hoverRow, LoadingCenter, useDataReady } from "@/components/AnimateIn";
+import { hasPermission } from "@/lib/permissions";
+
+function NumericInput({ value, onChangeText, onFocus, onBlur, className, placeholder, disabled, integerOnly = false }: {
+  value: string;
+  onChangeText: (cleaned: string) => void;
+  onFocus?: () => void;
+  onBlur?: () => void;
+  className?: string;
+  placeholder?: string;
+  disabled?: boolean;
+  integerOnly?: boolean;
+}) {
+  return (
+    <input
+      type="text"
+      inputMode={integerOnly ? "numeric" : "decimal"}
+      autoComplete="off"
+      value={value}
+      onFocus={onFocus}
+      onChange={(e) => {
+        const raw = integerOnly ? e.target.value : e.target.value.replace(",", ".");
+        const pattern = integerOnly ? /^\d*$/ : /^\d*\.?\d*$/;
+        if (raw === "" || pattern.test(raw)) {
+          onChangeText(raw);
+        }
+      }}
+      onBlur={onBlur}
+      disabled={disabled}
+      placeholder={placeholder}
+      className={className}
+    />
+  );
+}
 
 function CostoSinIva({ costoConIva, ivaPct, onSync, disabled }: {
   costoConIva: string;
@@ -26,15 +60,12 @@ function CostoSinIva({ costoConIva, ivaPct, onSync, disabled }: {
   return (
     <div className="min-w-[150px] flex-1">
       <label className="block text-sm font-semibold text-gray-700 mb-1">Costo sin IVA</label>
-      <input
-        type="number"
-        min="0"
-        step="0.01"
+      <NumericInput
         value={localValue}
         onFocus={() => setFocused(true)}
-        onChange={(e) => {
-          setLocalValue(e.target.value);
-          const neto = parseFloat(e.target.value) || 0;
+        onChangeText={(v) => {
+          setLocalValue(v);
+          const neto = parseFloat(v) || 0;
           if (neto > 0) {
             const conIva = Math.round(neto * (1 + ivaPct / 100) * 100) / 100;
             onSync(String(conIva));
@@ -68,15 +99,12 @@ function MarginInput({ costo, price, onPriceChange, disabled }: {
 
   return (
     <div className="relative">
-      <input
-        type="number"
-        min="0"
-        step="0.01"
+      <NumericInput
         value={localPct}
         onFocus={() => setFocused(true)}
-        onChange={(e) => {
-          setLocalPct(e.target.value);
-          const pct = parseFloat(e.target.value);
+        onChangeText={(v) => {
+          setLocalPct(v);
+          const pct = parseFloat(v);
           if (!isNaN(pct) && costo > 0) {
             onPriceChange(String(Math.round(costo * (1 + pct / 100))));
           }
@@ -87,6 +115,31 @@ function MarginInput({ costo, price, onPriceChange, disabled }: {
       />
       <span className="absolute right-2 top-1/2 -translate-y-1/2 text-base font-bold text-brand-500 pointer-events-none">%</span>
     </div>
+  );
+}
+
+function CantInput({ cantidad, unidad, onCommit }: { cantidad: number; unidad?: string; onCommit: (n: number) => void }) {
+  const [local, setLocal] = useState("");
+  const [focused, setFocused] = useState(false);
+  const integerOnly = (unidad || "").trim().toUpperCase() !== "KG";
+
+  useEffect(() => {
+    if (!focused) setLocal(cantidad > 0 ? String(cantidad) : "");
+  }, [cantidad, focused]);
+
+  return (
+    <NumericInput
+      value={local}
+      integerOnly={integerOnly}
+      onFocus={() => setFocused(true)}
+      onChangeText={setLocal}
+      onBlur={() => {
+        setFocused(false);
+        const parsed = parseFloat(local) || 0;
+        onCommit(integerOnly ? Math.trunc(parsed) : parsed);
+      }}
+      className="w-20 text-right px-2 py-1.5 border-2 border-gray-300 rounded text-base focus:outline-none focus:border-brand-600"
+    />
   );
 }
 
@@ -115,9 +168,12 @@ interface EntryItem {
 interface StockEntry {
   id: number;
   tipo: string;
+  deposito: string | null;
   proveedorCod: string;
   proveedorName: string;
   usuario: string;
+  costeadoPor: string | null;
+  costeadoAt: string | null;
   estado: string;
   subtotal: number;
   iva: number;
@@ -130,6 +186,13 @@ interface StockEntry {
   createdAt: string;
   items: EntryItem[];
 }
+
+const DEPOSITO_NAMES: Record<string, string> = {
+  "0": "Distribuidora / Mayorista",
+  "1": "Pontevedra",
+  "2": "Minorista",
+  "3": "Cervantes",
+};
 
 interface CosteoRow {
   id: number;
@@ -163,6 +226,9 @@ function formatDate(iso: string): string {
 export default function EntryDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const { data: session } = useSession();
+  const user = session?.user as { role?: string; permissions?: string[] } | undefined;
+  const canCostear = hasPermission(user?.role, user?.permissions, "costeo");
   const [entry, setEntry] = useState<StockEntry | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -495,10 +561,22 @@ export default function EntryDetailPage() {
           <h1 className="text-2xl font-bold text-gray-900">
             {entry.tipo === "devolucion" ? "Devolución" : "Ingreso"} #{entry.id}
           </h1>
+          {/* Prominent deposito badge — the sucursal this entry was registered to */}
+          <div className="mt-2 mb-3 inline-block">
+            <div className="rounded-xl bg-brand-50 border-2 border-brand-400 px-4 py-2">
+              <span className="text-xs uppercase tracking-wide text-brand-700 font-semibold block leading-none">Depósito de ingreso</span>
+              <span className="text-xl font-bold text-brand-700 mt-1 block">
+                [{entry.deposito || "0"}] {DEPOSITO_NAMES[entry.deposito || "0"] || `Depósito ${entry.deposito || "0"}`}
+              </span>
+            </div>
+          </div>
           <div className="text-base text-gray-600 mt-2 space-y-1">
             <p><span className="font-semibold">Proveedor:</span> {entry.proveedorName}</p>
             <p><span className="font-semibold">Fecha:</span> {formatDate(entry.createdAt)}</p>
             <p><span className="font-semibold">Usuario:</span> {entry.usuario}</p>
+            {entry.costeadoPor && (
+              <p><span className="font-semibold">Costeado por:</span> {entry.costeadoPor}{entry.costeadoAt && ` (${formatDate(entry.costeadoAt)})`}</p>
+            )}
             {entry.nroFactura && <p><span className="font-semibold">Nro. Factura:</span> {entry.nroFactura}</p>}
             {entry.notas && <p><span className="font-semibold">Notas:</span> {entry.notas}</p>}
             {entry.facturaImage && (
@@ -660,22 +738,14 @@ export default function EntryDetailPage() {
                 {isPendiente && !item.costeado ? (
                   <div className="flex items-center gap-1.5">
                     <span className="text-sm font-semibold text-gray-600">Cant:</span>
-                    <input
-                      type="number"
-                      min="0.001"
-                      step="any"
-                      value={item.cantidad}
-                      onChange={(e) => {
-                        // Update locally first
-                        const newCant = parseFloat(e.target.value) || 0;
+                    <CantInput
+                      cantidad={item.cantidad}
+                      unidad={item.unidad}
+                      onCommit={async (newCant) => {
                         setEntry((prev) => prev ? {
                           ...prev,
                           items: prev.items.map((i) => i.id === item.id ? { ...i, cantidad: newCant } : i),
                         } : prev);
-                      }}
-                      onBlur={async (e) => {
-                        // Save to server on blur
-                        const newCant = parseFloat(e.target.value) || 0;
                         if (newCant <= 0) return;
                         try {
                           await fetch(`/api/admin/stock-entries/${params.id}`, {
@@ -685,7 +755,6 @@ export default function EntryDetailPage() {
                           });
                         } catch { /* ignore */ }
                       }}
-                      className="w-20 text-right px-2 py-1.5 border-2 border-gray-300 rounded text-base focus:outline-none focus:border-brand-600"
                     />
                   </div>
                 ) : (
@@ -739,12 +808,9 @@ export default function EntryDetailPage() {
                           />
                           <div className="min-w-[150px] flex-1">
                             <label className="block text-sm font-semibold text-gray-700 mb-1">Costo con IVA</label>
-                            <input
-                              type="number"
-                              min="0"
-                              step="0.01"
+                            <NumericInput
                               value={costeoRow?.costo || ""}
-                              onChange={(e) => updateCosteo(item.id, e.target.value)}
+                              onChangeText={(v) => updateCosteo(item.id, v)}
                               disabled={saving}
                               placeholder={item.costo != null && item.costo > 0 ? String(item.costo) : "0.00"}
                               className="w-full text-right px-3 py-1.5 border-2 border-brand-400 rounded-lg text-lg font-medium focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 disabled:opacity-50 disabled:bg-gray-100"
@@ -797,14 +863,11 @@ export default function EntryDetailPage() {
                                 }}
                                 disabled={saving}
                               />
-                              <input
-                                type="number"
-                                min="0"
-                                step="0.01"
+                              <NumericInput
                                 value={costeoRow?.[field] || ""}
-                                onChange={(e) => {
+                                onChangeText={(v) => {
                                   setCosteoRows((prev) =>
-                                    prev.map((r) => r.id === item.id ? { ...r, [field]: e.target.value } : r)
+                                    prev.map((r) => r.id === item.id ? { ...r, [field]: v } : r)
                                   );
                                 }}
                                 disabled={saving}
@@ -938,16 +1001,13 @@ export default function EntryDetailPage() {
                       <label className="block text-sm font-semibold text-gray-700 mb-1">
                         Cant. por caja
                       </label>
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
+                      <NumericInput
                         value={np.cantidadPorCaja}
-                        onChange={(e) =>
+                        onChangeText={(v) =>
                           updateNewProduct(
                             np.sku,
                             "cantidadPorCaja",
-                            e.target.value
+                            v
                           )
                         }
                         disabled={saving}
@@ -1063,10 +1123,10 @@ export default function EntryDetailPage() {
               {/* Subtotal (con IVA) */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1">Subtotal (con IVA)</label>
-                <input type="number" min="0" step="0.01" value={taxSubtotal}
-                  onChange={(e) => {
-                    setTaxSubtotal(e.target.value);
-                    recalcAll(e.target.value, taxIvaPct, taxIibbPct, taxPercPct);
+                <NumericInput value={taxSubtotal}
+                  onChangeText={(v) => {
+                    setTaxSubtotal(v);
+                    recalcAll(v, taxIvaPct, taxIibbPct, taxPercPct);
                   }}
                   disabled={saving}
                   placeholder="0.00"
@@ -1089,18 +1149,18 @@ export default function EntryDetailPage() {
                 <div className="bg-gray-50 rounded-lg p-3 border min-w-[150px] flex-1">
                   <label className="block text-sm font-semibold text-gray-700 mb-1.5">IVA</label>
                   <div className="relative mb-2">
-                    <input type="number" min="0" step="0.01" value={taxIvaPct}
-                      onChange={(e) => {
-                        setTaxIvaPct(e.target.value);
-                        recalcAll(taxSubtotal, e.target.value, taxIibbPct, taxPercPct);
+                    <NumericInput value={taxIvaPct}
+                      onChangeText={(v) => {
+                        setTaxIvaPct(v);
+                        recalcAll(taxSubtotal, v, taxIibbPct, taxPercPct);
                       }}
                       disabled={saving}
                       className="w-full text-right pr-7 pl-2 py-2 border-2 border-gray-300 rounded-lg text-base focus:outline-none focus:border-brand-600 disabled:opacity-50 disabled:bg-gray-100"
                     />
                     <span className="absolute right-2 top-1/2 -translate-y-1/2 text-base font-bold text-brand-500 pointer-events-none">%</span>
                   </div>
-                  <input type="number" min="0" step="0.01" value={taxIva}
-                    onChange={(e) => setTaxIva(e.target.value)}
+                  <NumericInput value={taxIva}
+                    onChangeText={setTaxIva}
                     disabled={saving} placeholder="0.00"
                     className="w-full text-right px-2 py-1.5 border-2 border-gray-300 rounded-lg text-base focus:outline-none focus:border-brand-600 disabled:opacity-50 disabled:bg-gray-100"
                   />
@@ -1110,18 +1170,18 @@ export default function EntryDetailPage() {
                 <div className="bg-gray-50 rounded-lg p-3 border min-w-[150px] flex-1">
                   <label className="block text-sm font-semibold text-gray-700 mb-1.5">IIBB</label>
                   <div className="relative mb-2">
-                    <input type="number" min="0" step="0.01" value={taxIibbPct}
-                      onChange={(e) => {
-                        setTaxIibbPct(e.target.value);
-                        recalcAll(taxSubtotal, taxIvaPct, e.target.value, taxPercPct);
+                    <NumericInput value={taxIibbPct}
+                      onChangeText={(v) => {
+                        setTaxIibbPct(v);
+                        recalcAll(taxSubtotal, taxIvaPct, v, taxPercPct);
                       }}
                       disabled={saving}
                       className="w-full text-right pr-7 pl-2 py-2 border-2 border-gray-300 rounded-lg text-base focus:outline-none focus:border-brand-600 disabled:opacity-50 disabled:bg-gray-100"
                     />
                     <span className="absolute right-2 top-1/2 -translate-y-1/2 text-base font-bold text-brand-500 pointer-events-none">%</span>
                   </div>
-                  <input type="number" min="0" step="0.01" value={taxIibb}
-                    onChange={(e) => setTaxIibb(e.target.value)}
+                  <NumericInput value={taxIibb}
+                    onChangeText={setTaxIibb}
                     disabled={saving} placeholder="0.00"
                     className="w-full text-right px-2 py-1.5 border-2 border-gray-300 rounded-lg text-base focus:outline-none focus:border-brand-600 disabled:opacity-50 disabled:bg-gray-100"
                   />
@@ -1131,18 +1191,18 @@ export default function EntryDetailPage() {
                 <div className="bg-gray-50 rounded-lg p-3 border min-w-[150px] flex-1">
                   <label className="block text-sm font-semibold text-gray-700 mb-1.5">Perc.</label>
                   <div className="relative mb-2">
-                    <input type="number" min="0" step="0.01" value={taxPercPct}
-                      onChange={(e) => {
-                        setTaxPercPct(e.target.value);
-                        recalcAll(taxSubtotal, taxIvaPct, taxIibbPct, e.target.value);
+                    <NumericInput value={taxPercPct}
+                      onChangeText={(v) => {
+                        setTaxPercPct(v);
+                        recalcAll(taxSubtotal, taxIvaPct, taxIibbPct, v);
                       }}
                       disabled={saving}
                       className="w-full text-right pr-7 pl-2 py-2 border-2 border-gray-300 rounded-lg text-base focus:outline-none focus:border-brand-600 disabled:opacity-50 disabled:bg-gray-100"
                     />
                     <span className="absolute right-2 top-1/2 -translate-y-1/2 text-base font-bold text-brand-500 pointer-events-none">%</span>
                   </div>
-                  <input type="number" min="0" step="0.01" value={taxPerc}
-                    onChange={(e) => setTaxPerc(e.target.value)}
+                  <NumericInput value={taxPerc}
+                    onChangeText={setTaxPerc}
                     disabled={saving} placeholder="0.00"
                     className="w-full text-right px-2 py-1.5 border-2 border-gray-300 rounded-lg text-base focus:outline-none focus:border-brand-600 disabled:opacity-50 disabled:bg-gray-100"
                   />
@@ -1167,8 +1227,8 @@ export default function EntryDetailPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="relative flex-1">
-                    <input type="number" min="0" step="0.01" value={taxDiscPct}
-                      onChange={(e) => setTaxDiscPct(e.target.value)}
+                    <NumericInput value={taxDiscPct}
+                      onChangeText={setTaxDiscPct}
                       disabled={saving}
                       placeholder="0"
                       className="w-full text-right pr-7 pl-2 py-2 border-2 border-gray-300 rounded-lg text-base focus:outline-none focus:border-brand-600 disabled:opacity-50 disabled:bg-gray-100"
@@ -1251,7 +1311,7 @@ export default function EntryDetailPage() {
           </button>
         </Stagger>
       )}
-      {isPendiente && entry.tipo !== "devolucion" && (
+      {isPendiente && entry.tipo !== "devolucion" && canCostear && (
         <Stagger delay={450}>
           <button
             onClick={handleCosteo}
@@ -1260,6 +1320,11 @@ export default function EntryDetailPage() {
           >
             {saving ? "Guardando costeo..." : "Confirmar costeo"}
           </button>
+        </Stagger>
+      )}
+      {isPendiente && entry.tipo !== "devolucion" && !canCostear && (
+        <Stagger delay={450}>
+          <p className="text-sm text-gray-500 italic">No tenés permiso para costear. Pedile a un admin que te lo habilite.</p>
         </Stagger>
       )}
 

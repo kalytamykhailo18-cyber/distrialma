@@ -33,6 +33,7 @@ export async function GET() {
                 LTRIM(RTRIM(c.Nume)) AS numero,
                 LTRIM(RTRIM(c.TelClave1)) AS tel1,
                 LTRIM(RTRIM(c.Telclave3)) AS celular,
+                LTRIM(RTRIM(ISNULL(c.Email,''))) AS email,
                 LTRIM(RTRIM(ISNULL(z.[Desc], ''))) AS zona
          FROM [${dbClientes}].dbo.Clientes c
          LEFT JOIN [${dbClientes}].dbo.Zonas z ON z.Cod = c.Zona
@@ -69,6 +70,7 @@ export async function GET() {
       role: user.role,
       address: [client.calle, client.numero].filter(Boolean).join(" "),
       phone: client.celular || client.tel1 || "",
+      email: client.email || "",
       deliveryDay: deliveryDays.length > 0 ? deliveryDays.join(" - ") : null,
       deliveryDays,
     });

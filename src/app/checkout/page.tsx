@@ -14,6 +14,7 @@ interface ClientInfo {
   role: string;
   address?: string;
   phone?: string;
+  email?: string;
   deliveryDay: string | null;
 }
 
@@ -28,6 +29,28 @@ export default function CheckoutPage() {
   const [showDisclaimer, setShowDisclaimer] = useState(false);
   const [pendingAction, setPendingAction] = useState<"order" | "whatsapp" | null>(null);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [emailInput, setEmailInput] = useState("");
+  const [emailSaving, setEmailSaving] = useState(false);
+  const [emailSaved, setEmailSaved] = useState<string | null>(null);
+  const [emailError, setEmailError] = useState("");
+
+  async function saveEmail() {
+    setEmailError("");
+    setEmailSaving(true);
+    try {
+      const res = await fetch("/api/client/email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: emailInput }),
+      });
+      const data = await res.json();
+      if (!res.ok) setEmailError(data.error || "Error");
+      else setEmailSaved(data.email);
+    } catch {
+      setEmailError("Error de red");
+    }
+    setEmailSaving(false);
+  }
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -136,6 +159,40 @@ export default function CheckoutPage() {
       <Stagger delay={0} y={-8}>
         <h1 className="text-2xl font-bold text-gray-900 mb-6">Finalizar pedido</h1>
       </Stagger>
+
+      {/* Email collection — only if missing */}
+      {clientInfo && !clientInfo.email && !emailSaved && (
+        <Stagger delay={40}>
+          <div className="bg-amber-50 border border-amber-300 rounded-lg p-4 mb-4">
+            <p className="text-sm text-amber-900 font-medium mb-1">¿Nos dejás tu email?</p>
+            <p className="text-xs text-amber-800 mb-3">Te avisamos por mail cuando lleguen ofertas o productos nuevos. No te llenamos de mails.</p>
+            <div className="flex gap-2">
+              <input
+                type="email"
+                value={emailInput}
+                onChange={(e) => setEmailInput(e.target.value)}
+                placeholder="tu@email.com"
+                className="flex-1 px-3 py-2 border border-amber-300 rounded-lg text-sm focus:outline-none focus:border-brand-500"
+              />
+              <button
+                onClick={saveEmail}
+                disabled={emailSaving || !emailInput}
+                className={`px-4 py-2 bg-brand-500 text-white rounded-lg text-sm font-medium hover:bg-brand-600 disabled:opacity-50 ${springBtn}`}
+              >
+                {emailSaving ? "Guardando..." : "Guardar"}
+              </button>
+            </div>
+            {emailError && <p className="text-xs text-red-600 mt-2">{emailError}</p>}
+          </div>
+        </Stagger>
+      )}
+      {emailSaved && (
+        <Stagger delay={40}>
+          <div className="bg-green-50 border border-green-300 rounded-lg p-3 mb-4">
+            <p className="text-sm text-green-800">✓ Email guardado: {emailSaved}</p>
+          </div>
+        </Stagger>
+      )}
 
       {/* Client info */}
       <Stagger delay={80}>

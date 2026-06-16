@@ -22,6 +22,7 @@ function formatPrice(n: number) {
 interface Movement {
   id: number;
   sucursal: string;
+  deposito: string | null;
   destino: string;
   subtipo: string | null;
   empleados: Array<{ cod: string; nombre: string }> | null;
@@ -31,6 +32,9 @@ interface Movement {
   imageUrl: string | null;
   aprobadoPor: string | null;
   aprobadoAt: string | null;
+  anuladoPor: string | null;
+  anuladoAt: string | null;
+  motivoAnulado: string | null;
   createdAt: string;
   items: MovementItem[];
 }
@@ -53,6 +57,10 @@ export default function MovimientoDetail() {
   const [movement, setMovement] = useState<Movement | null>(null);
   const [loading, setLoading] = useState(true);
   const [approving, setApproving] = useState(false);
+  const [anularOpen, setAnularOpen] = useState(false);
+  const [anularMotivo, setAnularMotivo] = useState("");
+  const [anulando, setAnulando] = useState(false);
+  const [anularError, setAnularError] = useState("");
 
   useEffect(() => {
     fetch(`/api/admin/movimientos?estado=all&limit=500`)
@@ -162,7 +170,7 @@ export default function MovimientoDetail() {
       {/* Info card */}
       <Stagger delay={60} y={10}>
         <div className="bg-white border rounded-xl p-4 mb-4 shadow-sm">
-          <div className="grid grid-cols-2 gap-4 text-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-sm">
             <div>
               <span className="text-gray-500">Sucursal:</span>
               <span className="ml-2 font-medium">{movement.sucursal}</span>
@@ -306,6 +314,81 @@ export default function MovimientoDetail() {
             <p className="text-sm text-amber-700">
               Este movimiento está pendiente de aprobación por un administrador.
             </p>
+          </div>
+        </Stagger>
+      )}
+
+      {/* Anular — admin only, on aprobado movements. Reverses the stock deduction. */}
+      {isAdmin && movement.estado === "aprobado" && (
+        <Stagger delay={210} y={10}>
+          {anularOpen ? (
+            <div className="bg-white border-2 border-red-300 rounded-xl p-4 shadow-sm">
+              <p className="text-sm font-medium text-red-700 mb-2">Anular este movimiento devuelve el stock al deposito {movement.deposito || "0"}.</p>
+              <label className="block text-xs text-gray-500 mb-1">Motivo (opcional)</label>
+              <input
+                type="text"
+                value={anularMotivo}
+                onChange={(e) => setAnularMotivo(e.target.value)}
+                maxLength={200}
+                placeholder="ej: cargado por error"
+                className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm mb-3"
+              />
+              <div className="flex gap-2 justify-end">
+                <button
+                  onClick={() => { setAnularOpen(false); setAnularMotivo(""); }}
+                  disabled={anulando}
+                  className="px-3 py-1.5 border text-gray-600 text-sm rounded-xl hover:bg-gray-100"
+                >Cancelar</button>
+                <button
+                  onClick={async () => {
+                    setAnulando(true);
+                    try {
+                      const r = await fetch("/api/admin/movimientos", {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ id: movement.id, action: "anular", motivoAnulado: anularMotivo }),
+                      });
+                      if (r.ok) {
+                        setMovement({ ...movement, estado: "anulado", anuladoPor: (session?.user as { name?: string })?.name || "admin", anuladoAt: new Date().toISOString(), motivoAnulado: anularMotivo || null });
+                        setAnularOpen(false);
+                      } else {
+                        const d = await r.json().catch(() => ({}));
+                        setAnularError(d.error || "No se pudo anular");
+                      }
+                    } finally {
+                      setAnulando(false);
+                    }
+                  }}
+                  disabled={anulando}
+                  className={`px-3 py-1.5 bg-red-600 text-white text-sm rounded-xl hover:bg-red-700 disabled:opacity-50 ${springBtn}`}
+                >{anulando ? "Anulando…" : "Confirmar anulacion"}</button>
+              </div>
+              {anularError && <p className="text-xs text-red-600 mt-2">{anularError}</p>}
+            </div>
+          ) : (
+            <div className="flex">
+              <button
+                onClick={() => { setAnularOpen(true); setAnularError(""); }}
+                className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium text-red-700 bg-red-50 border border-red-200 rounded-xl hover:bg-red-100 shadow-sm ${springBtn}`}
+              >
+                <HiOutlineX className="w-5 h-5" />
+                Anular movimiento (devuelve stock)
+              </button>
+            </div>
+          )}
+        </Stagger>
+      )}
+
+      {/* Show anulado info */}
+      {movement.estado === "anulado" && (
+        <Stagger delay={210} y={10}>
+          <div className="bg-red-50 border border-red-200 rounded-xl p-4 shadow-sm">
+            <p className="text-sm text-red-700 font-medium">
+              Movimiento anulado{movement.anuladoPor ? ` por ${movement.anuladoPor}` : ""}{movement.anuladoAt ? ` el ${formatDate(movement.anuladoAt)}` : ""}.
+            </p>
+            {movement.motivoAnulado && (
+              <p className="text-xs text-red-600 mt-1">Motivo: {movement.motivoAnulado}</p>
+            )}
           </div>
         </Stagger>
       )}

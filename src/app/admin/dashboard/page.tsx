@@ -7,7 +7,7 @@ import { HiTrendingUp, HiTrendingDown, HiChevronDown, HiSearch, HiPencil, HiOutl
 import Link from "next/link";
 import { PageTransition, Stagger, staggerStyle, springBtn, hoverRow, LoadingCenter, useDataReady, CollapsiblePanel } from "@/components/AnimateIn";
 
-const SUC_NAMES: Record<string, string> = { "1": "Minorista 435", "2": "Mayorista 387", "6": "May. Pontevedra", "7": "Distribuidora", "10": "Reventas" };
+const SUC_NAMES: Record<string, string> = { "1": "Minorista 435", "2": "Mayorista 387", "6": "May. Pontevedra", "7": "Distribuidora", "10": "Reventas", "11": "PedidosYa" };
 const DIAS_SEMANA = ["lunes", "martes", "miercoles", "jueves", "viernes", "sabado", "domingo"];
 const DIAS_LABEL = ["Lun", "Mar", "Mie", "Jue", "Vie", "Sab", "Dom"];
 
@@ -35,7 +35,7 @@ export default function DashboardPage() {
   const [data, setData] = useState<DashData | null>(null);
   const [loading, setLoading] = useState(false);
   const [mes, setMes] = useState(() => new Date().toISOString().slice(0, 7));
-  const [sucursales, setSucursales] = useState(["1", "2", "6", "7", "10"]);
+  const [sucursales, setSucursales] = useState(["1", "2", "6", "7", "10", "11"]);
   const [expandedCliente, setExpandedCliente] = useState<string | null>(null);
   const [clientSearch, setClientSearch] = useState("");
   const [diferencias, setDiferencias] = useState<{ empleados: Array<{ nombre: string; cierres: number; totalDiferencia: number; totalPendiente: number; totalSobrante?: number; diferencias: Array<{ id: number; fecha: string; sucursal: string; diferencia: number; ventas: number; chargedAt: string | null; chargedBy: string | null }> }> } | null>(null);
@@ -133,7 +133,7 @@ export default function DashboardPage() {
         <div className="flex flex-wrap gap-3 mb-6">
           <input type="month" value={mes} onChange={(e) => setMes(e.target.value)} className="px-3 py-2 border border-brand-400 rounded-lg text-sm" />
           <div className="flex flex-wrap gap-1">
-            {["1", "2", "6", "7", "10"].map((s) => (
+            {["1", "2", "6", "7", "10", "11"].map((s) => (
               <button key={s} onClick={() => toggleSuc(s)}
                 className={`px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs font-medium ${springBtn} ${sucursales.includes(s) ? "bg-brand-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
                 {SUC_NAMES[s]}

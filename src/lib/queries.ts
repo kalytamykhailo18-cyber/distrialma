@@ -42,6 +42,8 @@ export async function getProducts(opts: {
   brandId?: string;
   search?: string;
   includeEspecial?: boolean;
+  hideOutOfStock?: boolean;
+  stockThreshold?: number;
 }): Promise<{ products: Product[]; total: number }> {
   const pool = await getPool();
   const {
@@ -51,6 +53,8 @@ export async function getProducts(opts: {
     brandId,
     search,
     includeEspecial = false,
+    hideOutOfStock = false,
+    stockThreshold = 0,
   } = opts;
   const offset = (page - 1) * limit;
 
@@ -60,6 +64,10 @@ export async function getProducts(opts: {
     AND (s.DeBaja = 0 OR s.DeBaja IS NULL)
     AND LTRIM(RTRIM(s.Deposito)) = '0'
     AND s.Precio2 > 0`;
+
+  if (hideOutOfStock) {
+    where += ` AND s.Stk > ${Number(stockThreshold) || 0}`;
+  }
 
   const params: Record<string, unknown> = {};
 

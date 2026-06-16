@@ -30,6 +30,19 @@ export default function AdminConfigPage() {
   const [savingReparto, setSavingReparto] = useState(false);
   const [repartoSaved, setRepartoSaved] = useState(false);
 
+  // Costeo group notification
+  const [groupOptions, setGroupOptions] = useState<{ id: string; name: string }[]>([]);
+  const [costeoGroupId, setCosteoGroupId] = useState("");
+  const [costeoGroupId2, setCosteoGroupId2] = useState("");
+  const [savingGroup, setSavingGroup] = useState(false);
+  const [groupSaved, setGroupSaved] = useState(false);
+  const [groupsError, setGroupsError] = useState("");
+
+  // Recibos semanal email recipients
+  const [recibosSemanalEmails, setRecibosSemanalEmails] = useState("");
+  const [savingRecibosEmails, setSavingRecibosEmails] = useState(false);
+  const [recibosEmailsSaved, setRecibosEmailsSaved] = useState(false);
+
   useEffect(() => {
     Promise.all([
       fetch("/api/admin/settings").then((r) => r.json()),
@@ -42,6 +55,9 @@ export default function AdminConfigPage() {
         setShippingThreshold(settings.shipping_threshold || "200000");
         setShippingSku(settings.shipping_sku || "");
         setShippingPrice(settings.shipping_price || "0");
+        setCosteoGroupId(settings.costeo_group_id || "");
+        setCosteoGroupId2(settings.costeo_group_id_2 || "");
+        setRecibosSemanalEmails(settings.recibos_semanal_emails || "");
         const m: Record<number, string> = {};
         for (const mg of marginData.margins || []) {
           m[mg.lista] = String(mg.margen);
@@ -49,6 +65,14 @@ export default function AdminConfigPage() {
         setMargins(m);
       })
       .finally(() => setLoading(false));
+
+    fetch("/api/admin/bot-groups")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.error) setGroupsError(d.error);
+        setGroupOptions(d.groups || []);
+      })
+      .catch((e) => setGroupsError(e instanceof Error ? e.message : "Error"));
   }, []);
 
   async function toggleStock() {
@@ -277,6 +301,115 @@ export default function AdminConfigPage() {
               >
                 {savingMargins ? "..." : marginSaved ? "Guardado!" : "Guardar márgenes"}
               </button>
+            </div>
+          </Stagger>
+
+          {/* Costeo group notification */}
+          <Stagger delay={175}>
+            <div className="bg-white rounded-xl shadow-sm border p-6">
+              <h2 className="font-semibold text-gray-900 mb-1">
+                Avisos de costeo al grupo
+              </h2>
+              <p className="text-sm text-gray-500 mb-4">
+                Cuando se termina de costear una compra, Mily manda un mensaje al grupo elegido con los productos costeados.
+              </p>
+              {groupsError && (
+                <p className="text-sm text-amber-700 bg-amber-50 border border-amber-300 rounded px-3 py-2 mb-3">
+                  No se pudo cargar la lista de grupos del bot ({groupsError}). Asegurate de que Mily este conectado.
+                </p>
+              )}
+              <div className="space-y-2">
+                <select
+                  value={costeoGroupId}
+                  onChange={(e) => setCosteoGroupId(e.target.value)}
+                  className="w-full px-3 py-2 border border-brand-400 rounded-xl text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 bg-white"
+                >
+                  <option value="">— Grupo 1: Desactivado —</option>
+                  {groupOptions.map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.name || g.id}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={costeoGroupId2}
+                  onChange={(e) => setCosteoGroupId2(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 bg-white"
+                >
+                  <option value="">— Grupo 2: Desactivado (opcional) —</option>
+                  {groupOptions.map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.name || g.id}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  onClick={async () => {
+                    setSavingGroup(true);
+                    setGroupSaved(false);
+                    await Promise.all([
+                      fetch("/api/admin/settings", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ key: "costeo_group_id", value: costeoGroupId }),
+                      }),
+                      fetch("/api/admin/settings", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ key: "costeo_group_id_2", value: costeoGroupId2 }),
+                      }),
+                    ]);
+                    setSavingGroup(false);
+                    setGroupSaved(true);
+                    setTimeout(() => setGroupSaved(false), 2000);
+                  }}
+                  disabled={savingGroup}
+                  className={`${springBtn} w-full px-4 py-2 bg-brand-400 text-white rounded-xl text-sm font-medium hover:bg-brand-500 disabled:opacity-50`}
+                >
+                  {savingGroup ? "..." : groupSaved ? "Guardado!" : "Guardar"}
+                </button>
+              </div>
+            </div>
+          </Stagger>
+
+          {/* Recibos semanal — email recipients */}
+          <Stagger delay={325}>
+            <div className="bg-white rounded-xl border border-brand-200 shadow-sm p-5">
+              <h2 className="text-lg font-bold mb-4 text-gray-800">Informe semanal de recibos a proveedores</h2>
+              <p className="text-sm text-gray-500 mb-4">
+                Cada viernes a las 19:30 se envia por mail un resumen de los recibos de la semana (total, detalle por proveedor, cheques propios emitidos).
+                Separa varios mails con coma o punto y coma.
+              </p>
+              <div className="flex gap-3 items-end flex-wrap">
+                <div className="flex-1 min-w-[280px]">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Mails que reciben el informe</label>
+                  <input
+                    type="text"
+                    value={recibosSemanalEmails}
+                    onChange={(e) => { setRecibosSemanalEmails(e.target.value); setRecibosEmailsSaved(false); }}
+                    placeholder="alma@distrialma.com.ar, contadora@distrialma.com.ar"
+                    className="w-full px-3 py-2 border border-brand-300 rounded-xl text-sm"
+                  />
+                </div>
+                <button
+                  onClick={async () => {
+                    setSavingRecibosEmails(true);
+                    setRecibosEmailsSaved(false);
+                    await fetch("/api/admin/settings", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ key: "recibos_semanal_emails", value: recibosSemanalEmails }),
+                    });
+                    setSavingRecibosEmails(false);
+                    setRecibosEmailsSaved(true);
+                    setTimeout(() => setRecibosEmailsSaved(false), 2500);
+                  }}
+                  disabled={savingRecibosEmails}
+                  className="px-4 py-2 text-sm text-white bg-brand-400 rounded-xl hover:bg-brand-500 disabled:opacity-50"
+                >
+                  {savingRecibosEmails ? "..." : recibosEmailsSaved ? "Guardado!" : "Guardar"}
+                </button>
+              </div>
             </div>
           </Stagger>
         </div>

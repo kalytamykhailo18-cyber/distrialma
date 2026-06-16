@@ -16,7 +16,7 @@ rm -rf "$DOWNLOAD_DIR"
 gdown --folder "$DRIVE_FOLDER" -O "$DOWNLOAD_DIR" --no-cookies >> "$LOG" 2>&1
 
 # Find the MDB file
-MDB_FILE=$(find "$DOWNLOAD_DIR" -name "*.mdb" -type f | head -1)
+MDB_FILE=$(find "$DOWNLOAD_DIR" -maxdepth 1 -name "*.mdb" -type f | head -1)
 if [ -z "$MDB_FILE" ]; then
   echo "$(date): No MDB file found" >> "$LOG"
   exit 1

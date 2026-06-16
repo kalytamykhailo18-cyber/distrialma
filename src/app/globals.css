@@ -31,6 +31,23 @@ body {
   }
 }
 
+/* Default form-control contrast: dark + semibold so what staff types is
+   actually readable.  Tailwind utility classes still win because they
+   load after @layer base. */
+@layer base {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="color"]):not([type="range"]),
+  textarea,
+  select {
+    color: rgb(17, 24, 39);
+    font-weight: 600;
+  }
+  input::placeholder,
+  textarea::placeholder {
+    color: rgb(156, 163, 175);
+    font-weight: 400;
+  }
+}
+
 .scroll-auto {
   scroll-behavior: auto;
 }

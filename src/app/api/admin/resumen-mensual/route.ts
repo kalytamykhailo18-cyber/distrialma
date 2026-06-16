@@ -33,13 +33,18 @@ export async function POST(req: NextRequest) {
 
     const meses = ["", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 
-    // Totals
+    // Totals — costo capped at 999999 in PunTouch, fall back to current Stock.Costo
     const totals = await pool.request().input("desde", desde).input("hasta", hasta).query(`
       SELECT
         COUNT(DISTINCT CASE WHEN t.Tipo = 'V' THEN t.Boleta END) AS cantVentas,
         SUM(CASE WHEN t.Tipo = 'I' THEN t.Impo ELSE 0 END) AS totalVenta,
-        SUM(CASE WHEN t.Tipo = 'I' THEN t.Costo ELSE 0 END) AS totalCosto
+        SUM(CASE WHEN t.Tipo = 'I'
+          THEN CASE WHEN t.Costo >= 999999 THEN t.Cant * ISNULL(s.Costo, 0) ELSE t.Costo END
+          ELSE 0 END) AS totalCosto
       FROM [${dbTransas}].dbo.Transas t
+      OUTER APPLY (SELECT TOP 1 s.Costo FROM [${dbProd}].dbo.Stock s
+        WHERE s.CodProducto = t.Producto AND LTRIM(RTRIM(s.Deposito)) = '0'
+        AND (s.TalleColor IS NULL OR LTRIM(RTRIM(s.TalleColor)) = '') AND s.Costo > 0) s
       WHERE t.Fechora >= @desde AND t.Fechora < @hasta
         AND (t.Anulado IS NULL OR LTRIM(RTRIM(t.Anulado)) = '' OR t.Anulado = ' ')
         AND t.Cant > 0
@@ -68,14 +73,17 @@ export async function POST(req: NextRequest) {
 
     const SUC_NAMES: Record<string, string> = { "1": "Minorista 435", "2": "Mayorista 387", "6": "May. Pontevedra", "7": "Distribuidora" };
 
-    // Top 10 products
+    // Top 10 products — same costo cap fallback as dashboard
     const topProd = await pool.request().input("desde", desde).input("hasta", hasta).query(`
       SELECT TOP 10
         LTRIM(RTRIM(ISNULL(pr.Nombre, ''))) AS nombre,
         SUM(t.Impo) AS totalVenta,
-        SUM(t.Impo - t.Costo) AS ganancia
+        SUM(t.Impo - CASE WHEN t.Costo >= 999999 THEN t.Cant * ISNULL(s.Costo, 0) ELSE t.Costo END) AS ganancia
       FROM [${dbTransas}].dbo.Transas t
       LEFT JOIN [${dbProd}].dbo.Productos pr ON pr.Cod = t.Producto
+      OUTER APPLY (SELECT TOP 1 s.Costo FROM [${dbProd}].dbo.Stock s
+        WHERE s.CodProducto = t.Producto AND LTRIM(RTRIM(s.Deposito)) = '0'
+        AND (s.TalleColor IS NULL OR LTRIM(RTRIM(s.TalleColor)) = '') AND s.Costo > 0) s
       WHERE t.Tipo = 'I' AND t.Fechora >= @desde AND t.Fechora < @hasta
         AND (t.Anulado IS NULL OR LTRIM(RTRIM(t.Anulado)) = '' OR t.Anulado = ' ')
         AND t.Cant > 0

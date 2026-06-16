@@ -95,7 +95,7 @@ export default function ComboGrid() {
                   )
                 )
               ) : (
-                <span className="text-gray-400 text-sm mx-auto">Sin imagen</span>
+                <img src="/logo-alma-placeholder-v3.png" alt="Sin imagen" className="h-32 w-auto object-contain mx-auto opacity-70" />
               )}
             </div>
 
